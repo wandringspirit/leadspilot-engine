@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Maps Lead Crawler</title>
+  <link rel="stylesheet" href="/static/styles.css?v={{version}}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon">📍</span>
+      <div>
+        <h1>Google Maps Lead Crawler</h1>
+        <p class="muted">Search a place or keyword, collect listings, find emails, export CSV.</p>
+      </div>
+    </div>
+    <div class="health" id="health" title="API status"><span class="dot"></span><span id="health-text">connecting…</span></div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ left column: form + history ============ -->
+    <aside class="sidebar">
+      <section class="card">
+        <h2>New search</h2>
+        <form id="scrape-form" autocomplete="off">
+          <label for="query">City / keyword
+            <input id="query" name="query" type="text" required minlength="2" maxlength="200"
+                   placeholder='e.g. "roofing companies near houston"'>
+          </label>
+          <label for="limit">Number of results
+            <input id="limit" name="limit" type="number" min="1" max="500" value="20" required>
+            <small class="muted" id="limit-hint">1 – 500 places</small>
+          </label>
+          <label class="check"><input id="enrich" name="enrich" type="checkbox">
+            <span>Find emails &amp; phones on websites after scraping</span></label>
+          <label class="check"><input id="headed" name="headed" type="checkbox">
+            <span>Show the browser window (debug)</span></label>
+          <button type="submit" class="btn primary" id="start-btn">Start scraping</button>
+          <p class="error" id="form-error" hidden></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>History</h2>
+          <button class="btn ghost small" id="refresh-jobs" title="Refresh">↻</button>
+        </div>
+        <ul class="job-list" id="job-list"><li class="muted">No jobs yet.</li></ul>
+      </section>
+    </aside>
+
+    <!-- ============ right column: progress + results ============ -->
+    <section class="content">
+      <section class="card" id="progress-card" hidden>
+        <div class="card-head">
+          <h2 id="progress-title">Job</h2>
+          <span class="pill" id="status-pill">queued</span>
+        </div>
+        <p class="muted" id="progress-message">Waiting…</p>
+        <div class="bar"><div class="bar-fill" id="bar-fill" style="width:0%"></div></div>
+        <div class="row-between">
+          <small class="muted" id="progress-counts"></small>
+          <div>
+            <button class="btn danger small" id="cancel-btn" hidden>Cancel</button>
+          </div>
+        </div>
+        <p class="error" id="job-error" hidden></p>
+      </section>
+
+      <section class="card grow" id="results-card">
+        <div class="card-head wrap">
+          <div>
+            <h2>Results <span class="count" id="row-count">0</span></h2>
+            <small class="muted" id="results-subtitle">Start a search or pick a job from the history.</small>
+          </div>
+          <div class="toolbar">
+            <input type="search" id="filter" placeholder="Filter rows…" disabled>
+            <button class="btn" id="enrich-all-btn" disabled title="Look up emails/phones on the website of every row that is missing one">
+              ✉ Find missing emails / phones
+            </button>
+            <button class="btn" id="copy-btn" disabled>Copy CSV</button>
+            <a class="btn" id="download-btn" aria-disabled="true" download>⬇ Download CSV</a>
+            <a class="btn ghost" id="download-ext-btn" aria-disabled="true" download title="Adds Address, Category, Rating, Place ID, Maps URL, Lat/Lng, Email Source…">Extended CSV</a>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="results-table">
+            <thead>
+              <tr>
+                <th class="num">Rank</th>
+                <th>Name</th>
+                <th>City</th>
+                <th>State</th>
+                <th>Country</th>
+                <th>Email</th>
+                <th>Website</th>
+                <th>Phone</th>
+                <th>Phone Unformatted</th>
+                <th>Url</th>
+                <th class="num">Review Count</th>
+                <th>Description</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="results-body">
+              <tr class="empty"><td colspan="13">No rows yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" id="logs-card">
+        <div class="card-head wrap">
+          <div class="logs-title">
+            <button class="btn ghost small" id="logs-toggle" title="Collapse / expand" aria-expanded="true">&#9662;</button>
+            <h2>Live logs <span class="count" id="log-count">0</span></h2>
+            <small class="muted" id="logs-subtitle">Everything the scraper and the email finder do, as it happens.</small>
+          </div>
+          <div class="toolbar" id="logs-toolbar">
+            <label class="inline"><span>Level</span>
+              <select id="log-level">
+                <option value="">All</option>
+                <option value="INFO">Info+</option>
+                <option value="WARNING">Warnings+</option>
+                <option value="ERROR">Errors</option>
+              </select>
+            </label>
+            <label class="inline check"><input type="checkbox" id="log-job-only"><span>This job only</span></label>
+            <label class="inline check"><input type="checkbox" id="log-autoscroll" checked><span>Auto-scroll</span></label>
+            <button class="btn small" id="log-pause" title="Stop fetching new lines">&#10074;&#10074; Pause</button>
+            <button class="btn small" id="log-clear" title="Clear the view (the server keeps its buffer)">Clear</button>
+            <button class="btn small" id="log-download" title="Save the visible lines as a text file">&#11015; Save</button>
+          </div>
+        </div>
+        <div class="log-view" id="log-view" role="log" aria-live="polite">
+          <div class="log-empty" id="log-empty">Waiting for log lines&#8230;</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/app.js?v={{version}}"></script>
+</body>
+</html>

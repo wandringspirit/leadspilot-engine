@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Environment / secrets
+.env
+
+# Runtime data (job results, exports, debug screenshots)
+data/*
+!data/.gitkeep
+
+# Playwright traces
+playwright-traces/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

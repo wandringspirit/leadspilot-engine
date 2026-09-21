@@ -1,0 +1,97 @@
+from app.enrichment.extractors import (
+    candidate_pages,
+    clean_email,
+    decode_cfemail,
+    deobfuscate,
+    extract_from_html,
+    score_email,
+)
+
+
+def test_clean_email_accepts_valid_and_normalises():
+    assert clean_email("Info@Example-Roofing.com") == "info@example-roofing.com"
+    assert clean_email("mailto:sales@acme.com?subject=hi") == "sales@acme.com"
+    assert clean_email("<office@acme.com>") == "office@acme.com"
+
+
+def test_clean_email_rejects_junk():
+    assert clean_email("logo@2x.png") == ""
+    assert clean_email("user@example.com") == ""
+    assert clean_email("abc@sentry.io") == ""
+    assert clean_email("someone@yourdomain.com") == ""
+    assert clean_email("not-an-email") == ""
+    assert clean_email("a..b@acme.com") == ""
+
+
+def test_decode_cfemail():
+    # "info@acme.com" encoded with key 0x5a
+    encoded = "5a" + "".join(f"{ord(c) ^ 0x5A:02x}" for c in "info@acme.com")
+    assert decode_cfemail(encoded) == "info@acme.com"
+    assert decode_cfemail("zz") == ""
+
+
+def test_deobfuscate_variants():
+    assert deobfuscate("Reach us at office [at] acme [dot] com today") == ["office@acme.com"]
+    assert deobfuscate("sales (at) acme.com") == ["sales@acme.com"]
+    assert deobfuscate("nothing here") == []
+
+
+def test_score_prefers_same_domain_and_roles():
+    same, s1 = score_email("info@acme.com", "acme.com")
+    other, s2 = score_email("bob@gmail.com", "acme.com")
+    _, s3 = score_email("noreply@acme.com", "acme.com")
+    assert same and not other
+    assert s1 > s2 > s3
+
+
+def _cf(email: str, key: int = 0x5A) -> str:
+    return f"{key:02x}" + "".join(f"{ord(c) ^ key:02x}" for c in email)
+
+
+HTML = f"""
+<html><head>
+<script type="application/ld+json">{{"@type":"LocalBusiness","email":"hello@acme.com","telephone":"+1 817-555-0100"}}</script>
+<script>var junk = "tracker@sentry.io";</script>
+</head><body>
+<a href="mailto:info@acme.com?subject=Quote">Email us</a>
+<a href="tel:+18175550199">Call</a>
+<span class="__cf_email__" data-cfemail="{_cf('contact@acme.com')}">[email protected]</span>
+<p>Or write to office [at] acme [dot] com. Call (817) 555-0100.</p>
+<a href="/contact-us">Contact</a>
+<a href="/about">About the team</a>
+<a href="https://facebook.com/acme">Facebook</a>
+<a href="/gallery">Gallery</a>
+<img src="/img/hero@2x.png">
+</body></html>
+"""
+
+
+def test_extract_from_html_collects_everything():
+    result = extract_from_html(HTML, "https://www.acme.com/", "https://www.acme.com/")
+    emails = [h.email for h in result.emails]
+    assert "info@acme.com" in emails
+    assert "hello@acme.com" in emails
+    assert "office@acme.com" in emails
+    assert "contact@acme.com" in emails
+    assert "tracker@sentry.io" not in emails
+    assert "hero@2x.png" not in emails
+    assert all(h.same_domain for h in result.emails if h.email.endswith("@acme.com"))
+    assert result.emails[0].email in {"info@acme.com", "hello@acme.com", "office@acme.com"}
+    assert "+18175550100" in result.phones
+    assert "+18175550199" in result.phones
+    assert "https://www.acme.com/contact-us" in result.contact_links
+    assert "https://www.acme.com/about" in result.contact_links
+    assert not any("facebook" in link or "gallery" in link for link in result.contact_links)
+
+
+def test_extract_from_html_handles_empty():
+    result = extract_from_html("", "https://x.com", "https://x.com")
+    assert result.emails == [] and result.phones == [] and result.contact_links == []
+
+
+def test_candidate_pages_orders_and_limits():
+    pages = candidate_pages("https://www.acme.com/", ["https://www.acme.com/contact-us", "https://www.acme.com/"], 4)
+    assert pages[0] == "https://www.acme.com/contact-us"
+    assert "https://www.acme.com/contact" in pages
+    assert len(pages) == 4
+    assert "https://www.acme.com/" not in pages
