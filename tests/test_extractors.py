@@ -3,6 +3,7 @@ from app.enrichment.extractors import (
     clean_email,
     decode_cfemail,
     deobfuscate,
+    emails_in_text,
     extract_from_html,
     score_email,
 )
@@ -14,13 +15,22 @@ def test_clean_email_accepts_valid_and_normalises():
     assert clean_email("<office@acme.com>") == "office@acme.com"
 
 
-def test_clean_email_rejects_junk():
-    assert clean_email("logo@2x.png") == ""
-    assert clean_email("user@example.com") == ""
-    assert clean_email("abc@sentry.io") == ""
-    assert clean_email("someone@yourdomain.com") == ""
+def test_clean_email_rejects_only_non_addresses():
+    assert clean_email("logo@2x.png") == ""          # an asset file name, not an address
     assert clean_email("not-an-email") == ""
     assert clean_email("a..b@acme.com") == ""
+
+
+def test_clean_email_does_no_junk_filtering():
+    for email in ("user@example.com", "abc@sentry.io", "someone@yourdomain.com", "john@smithplumbing.com",
+                  "info@thecleaningcompany.com", "sales@greatest.com", "support@facebook.com"):
+        assert clean_email(email) == email
+
+
+def test_emails_in_text():
+    text = "Call or write to Info@JoesPlumbing.com, or joe [at] gmail [dot] com. Logo: logo@2x.png"
+    assert emails_in_text(text) == ["info@joesplumbing.com", "joe@gmail.com"]
+    assert emails_in_text("") == []
 
 
 def test_decode_cfemail():
@@ -73,7 +83,8 @@ def test_extract_from_html_collects_everything():
     assert "hello@acme.com" in emails
     assert "office@acme.com" in emails
     assert "contact@acme.com" in emails
-    assert "tracker@sentry.io" not in emails
+    assert "tracker@sentry.io" in emails, "no junk filtering - it is kept, ranked below the site's own"
+    assert emails.index("tracker@sentry.io") > emails.index("info@acme.com")
     assert "hero@2x.png" not in emails
     assert all(h.same_domain for h in result.emails if h.email.endswith("@acme.com"))
     assert result.emails[0].email in {"info@acme.com", "hello@acme.com", "office@acme.com"}

@@ -11,10 +11,18 @@ Code: `app/enrichment/website.py` (fetch strategy) and `app/enrichment/extractor
 | --- | --- |
 | **✉ Find** button on a row | that place (all rows sharing its rank) – `POST /api/jobs/{id}/enrich` with `row_ids` |
 | **✉ Find missing emails / phones** button | every place that has a website and is missing an email *or* a phone |
-| *Find emails & phones after scraping* checkbox / `--enrich` (CLI) | same as above, automatically when the scrape finishes |
+| *Afterwards, look for emails & phones on websites / social pages* checkbox / `--enrich` (CLI) | same as above, automatically when the scrape finishes |
 | `force: true` in the API | re-run even for places that already have an email (new addresses are added as extra rows) |
+| A search whose *Must have* filter needs an email (*Email*, *Phone or email*, *Phone and email*) | while scanning, only a place that would otherwise be rejected for lack of an email – see `PlaceFilter` in `app/jobs.py`. Places looked up this way are not fetched again by the automatic run. |
 
-Places **without a website** are marked `no_website` and skipped.
+Places **without any website** are marked `no_website` and skipped. A place whose website is a
+**profile page** – a Facebook page, Instagram profile, Yelp listing, booking page … (see
+`PROFILE_DOMAINS` and [DATA_MODEL.md §9](DATA_MODEL.md#9-search-filters)) – is searched too, but
+only that page (§2).
+
+Separately, every scraped place's **Google listing description** is scanned for addresses
+(`emails_in_text()`); they fill the Email column with `Email Source` = the listing's Maps URL,
+following the same one-row-per-email rule (§4).
 
 ## 2. Fetch strategy
 
@@ -37,6 +45,11 @@ flowchart TD
     K --> Z
 ```
 
+- **Profile pages** skip the crawl: only the listed page is fetched (and rendered with Chromium
+  when it looks JavaScript-rendered or blocks plain HTTP); `candidate_pages()` and the discovered
+  contact links are not used, because `facebook.com/contact` or `yelp.com/about` describe the
+  platform, not the business. Many platforms show little to logged-out visitors, so expect
+  `not_found` more often than on real websites.
 - `_looks_js_rendered()` – a page with several `<script>` tags and almost no body text, or an
   SPA root (`id="root"`, `id="__next"`), is treated as JavaScript-rendered.
 - Sites that return 403 / drop the connection for plain HTTP clients get the browser pass too
@@ -58,14 +71,15 @@ Sources checked in each page, in order:
 6. Phone numbers in visible text through `phonenumbers.PhoneNumberMatcher` (only *valid*
    numbers for the row's country are kept).
 
-Junk filtering (`clean_email`):
+Validation (`clean_email`) – there is deliberately **no junk filtering**: every address that is
+syntactically valid is kept, even placeholder-looking ones (`you@example.com`, `john@…`) and
+platform addresses (`…@sentry.io`, `…@wixpress.com`). An address is only rejected when it
+isn't one:
 
-- must match `local@domain.tld` (2–24 letter TLD), no `..`, local part ≤ 64 chars;
-- image / asset names that look like emails (`hero@2x.png`, `…@3x.jpg`, `.css`, `.js`, …);
-- placeholder domains (`example.com`, `yourdomain`, `email.com`, `domain.com`, …) and
-  platform noise (`sentry.io`, `wixpress.com`, `godaddy`, `wordpress.com`, `w3.org`,
-  `schema.org`, `cloudflare`, `shopify`, `mailchimp`, …);
-- placeholder locals (`user@`, `name@`, `email@`, `yourname@`, `john@`, `test@`, …).
+- it must match `local@domain.tld` (2–24 letter TLD), no `..`, local part ≤ 64 chars, domain
+  ≤ 253 chars;
+- image / asset file names that look like emails (`hero@2x.png`, `…@3x.jpg`, `.css`, `.js`, …) –
+  none of those extensions is a real top-level domain.
 
 Scoring (`score_email`) decides the order in which emails are written into rows:
 
@@ -149,3 +163,9 @@ extended CSV together with `Email Source` / `Phone Source`.
   the site manually.
 - Free-mail addresses found on a page might belong to a third party (e.g. a testimonial);
   they rank below own-domain addresses but are still returned.
+- Because nothing is filtered as junk, placeholder and tracking addresses in a page's HTML
+  (`you@example.com`, Sentry keys on Wix sites `…@sentry-next.wixpress.com`) become extra rows.
+  They sort after the site's own addresses; drop them in the spreadsheet if you don't want them.
+- Businesses without a website rarely publish an email anywhere, and Facebook / Instagram often
+  show logged-out visitors a login page instead of the business's details, so profile-page
+  lookups frequently return `not_found`.

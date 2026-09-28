@@ -9,12 +9,16 @@ each phase, where every field comes from, and what to check when Google changes 
 flowchart TD
     A["search_url<br/>https://www.google.com/maps/search/&lt;query&gt;/?hl=en&amp;gl=xx"] --> B["goto + dismiss EU consent"]
     B --> C{what rendered?}
-    C -- "div[role=feed]" --> D[Phase 1: collect links]
-    C -- "place header (h1) only" --> S[single result:<br/>extract current page, rank 1]
+    C -- "div[role=feed]" --> D[Phase 1: collect candidates]
+    C -- "place header (h1) only" --> S[single result:<br/>extract current page, rank 1,<br/>selector.accept]
     C -- "No results text" --> Z[0 rows]
     C -- nothing --> ERR[RuntimeError: feed did not appear]
     D --> D1["read feed links<br/>a[href*=/maps/place/]"]
-    D1 --> D2{enough links<br/>or end-of-list<br/>or stalled?}
+    D1 --> PF{"selector.prefilter:<br/>does the website the feed shows<br/>rule the listing out?"}
+    PF -- yes --> SK[skipped – page never opened]
+    PF -- no --> CA[candidate]
+    SK --> D2
+    CA --> D2{enough candidates<br/>or end-of-list<br/>or stalled / MAX_SCANNED?}
     D2 -- no --> D3[scroll feed to bottom<br/>wait SCROLL_PAUSE_MS]
     D3 --> D1
     D2 -- yes --> E[Phase 2: details]
@@ -24,8 +28,16 @@ flowchart TD
     W2 --> W3[wait ≤4 s for /maps/preview/place XHR]
     W3 --> W4[evaluate DETAIL_JS in page]
     W4 --> W5[build_row]
-    W5 --> R[(PlaceRow → on_row)]
+    W5 --> AC{selector.accept}
+    AC -- match --> R[(PlaceRow → on_row)]
+    AC -- no match --> SK2[skipped, counted by reason]
+    R --> MORE{limit places kept?}
+    SK2 --> MORE
+    MORE -- "no, and the list goes on" --> D
 ```
+
+Without filters there is a single round – collect `limit` links, scrape them all – exactly as
+before filters existed. See [Filtered searches](#filtered-searches--scanning-for-matches).
 
 ### Phase 1 – collect links
 
@@ -34,6 +46,11 @@ flowchart TD
   string) and numbered in feed order → **Rank**.
 - The result card next to the link is read for the visible review count (`span.UY7F9`,
   e.g. `(344)`) and rating (`span.MW4etd`). These are only fallbacks.
+- The card's *Website* button (`a[data-value="Website"]`, `aria-label="Visit … website"`) is read
+  as well. With the feed's structured record it gives the listing's website *before* its page is
+  opened (`website_hint()`): the record decides (no website there means none); the button can
+  only add a website – its absence is never trusted, layouts change; with neither, the website
+  is unknown and the page has to be opened.
 - Scrolling: `feed.scrollTop = feed.scrollHeight`, then wait `SCROLL_PAUSE_MS` (+ random
   jitter). Google appends 20 results per page. The loop stops when
   1. `limit` links are collected,
@@ -66,7 +83,35 @@ search record / link only, with the error stored in `enrichment_note` and in
 
 When the query is unambiguous (`"Triad Home Solutions Arlington"`), Google skips the feed
 and renders the place directly. The scraper detects the header without a feed and extracts
-that page as rank 1. The search XHR still fires and supplies the full record.
+that page as rank 1 (it still goes through the job's filters). The search XHR still fires and
+supplies the full record.
+
+### Filtered searches – scanning for matches
+
+`MapsScraper.scrape(query, limit, selector=...)` takes a *selector* – `PlaceFilter` in
+`app/jobs.py`, built from the job's filters ([DATA_MODEL.md §9](DATA_MODEL.md#9-search-filters)).
+`limit` then counts **kept** places, and the scan runs in rounds (`_scan()`):
+
+1. `_next_candidates(want)` reads the feed and scrolls until it has `want` = *places still
+   missing* new candidates. Each new listing gets the next rank and a website hint;
+   `selector.prefilter()` skips it without opening its page when that hint rules it out (a
+   *No website* search skips every listing whose record or Website button shows its own site).
+   Only the website is pre-filtered – phones are always checked on the place page.
+2. The candidates are scraped (Phase 2). `selector.accept()` adds emails written in the listing's
+   description, looks for an email on the website / profile page if only an email is missing,
+   and applies the filters to the finished place. Rejected places are counted by reason.
+3. If fewer than `limit` places were kept and the feed can go on, the next round asks for the
+   difference – further down the list.
+
+The scan stops (`ScrapeStats.stopped`) when `limit` places were kept (`limit`), Google shows
+*"You've reached the end of the list"* (`end_of_list` – about 120 listings per search at most),
+the feed stops growing (`stalled`) or `MAX_SCANNED` listings were read (`scan_limit`); a direct
+place page gives `single`, an empty search `no_results`. A shorter result is not an error: the
+job completes with what it found and its `notice` says why.
+
+Ranks keep each listing's position in Google's list, so a filtered result has gaps (3, 7, 12 …).
+`ScrapeStats` records `links_found` (listings read), `scraped` (place pages opened), `matched`
+(places kept) and `skipped` (reason → count, before or after opening the page).
 
 ## 2. Field sources and precedence
 
@@ -78,7 +123,7 @@ order: **place XHR record → search XHR record → DOM → result card / link U
 | Name | `[11]` | `h1.DUwDvf` | `aria-label` of the link |
 | Address | `[39]` (or `[2]` lines joined) | `button[data-item-id="address"]` aria-label | – |
 | City / State / Country | `[183][1]` components (city `[3]`, state `[5]`, country `[6]`) | parsed from the address (`parse_address`) | – |
-| Website | `[7][0]` | `a[data-item-id="authority"]` href | – |
+| Website | `[7][0]` | `a[data-item-id="authority"]` href | card's `a[data-value="Website"]` (pre-filter only) |
 | Phone | `[178][0][3]` (E.164) or `[178][0][0]` | `button[data-item-id^="phone:tel:"]` | – |
 | Rating | `[4][7]` | `div.F7nice span[aria-hidden]` | `span.MW4etd` |
 | Review count | `[4][8]` | `span[aria-label$="reviews"]` | `span.UY7F9` |
@@ -160,7 +205,8 @@ EU visitors get a consent interstitial first; `_dismiss_consent()` clicks *Accep
   *"Google Maps results feed did not appear"* – wait, lower `DETAIL_CONCURRENCY`, or use a
   proxy.
 - Google stops paging at roughly **120 results** per query. For more, run several narrower
-  queries (`roofing companies in katy tx`, `… in pearland tx`, …).
+  queries (`roofing companies in katy tx`, `… in pearland tx`, …). A job that runs into this
+  cap says so in its notice instead of claiming the city has no more businesses.
 - Results depend on the searching IP's location unless the query names a place; use
   `REGION_CODE` to pin the country.
 
@@ -174,6 +220,7 @@ Symptoms → what to look at:
 | rows have name but no phone/website/address | detail XHR path or `data-item-id` attributes changed | check the `/maps/preview/place` response in DevTools (Network tab), compare with the index map; check `DETAIL_JS` selectors |
 | description / review count empty for everyone | `[154]` / `[4][8]` moved | dump a record with `records_from_rpc()` and search for the text; update `IDX` and this table |
 | city/state empty while address is filled | `[183][1]` moved | same as above; `parse_address()` still fills US/CA/AU/UK style addresses |
+| a *No website* search opens pages of places that have one | feed records / card Website button changed | check `FEED_LINKS_JS` and `[7][0]`; results stay correct (every page is checked), it is only slower |
 
-Debug helper: run a query with `--headed` and set a breakpoint in `_extract_from_page`, or
+Debug helper: run a query with `--headed` and set a breakpoint in `_scrape_one`, or
 save an XHR body from DevTools and feed it to `records_from_rpc()` in a REPL.

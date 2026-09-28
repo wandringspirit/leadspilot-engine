@@ -1,10 +1,12 @@
 """In-process job manager.
 
-A *job* is one scrape request (query + limit). Jobs run as asyncio tasks in
-the FastAPI event loop, publish progress into the ``Job`` model and are
-persisted as JSON under ``data/jobs`` so the panel can show history after a
-restart. Enrichment (email/phone lookup on websites) runs against an existing
-job and mutates its rows in place - including the "one row per email" rule.
+A *job* is one search (business + place, or a free-text query) with a limit
+and optional filters. Jobs run as asyncio tasks in the FastAPI event loop,
+publish progress into the ``Job`` model and are persisted as JSON under
+``data/jobs`` so the panel can show history after a restart. ``PlaceFilter``
+applies the job's filters while the scraper runs. Enrichment (email/phone
+lookup on websites) runs against an existing job and mutates its rows in
+place - including the "one row per email" rule.
 
 See docs/ARCHITECTURE.md for the state machine.
 """
@@ -15,19 +17,30 @@ import json
 import logging
 import os
 import tempfile
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Awaitable, Callable
 
 from app.config import Settings, settings as default_settings
-from app.enrichment.website import ContactResult, enrich_many
+from app.enrichment.extractors import EmailHit, emails_in_text
+from app.enrichment.website import ContactResult, WebsiteEnricher, enrich_many
+from app.filters import EMAIL_CONTACTS, SearchFilters
 from app.logbuffer import current_job_id
 from app.models import Job, JobStatus, PlaceRow, Progress
-from app.scraper.maps import MapsScraper
+from app.scraper.maps import MapsScraper, PlaceRef, ScrapeStats
 from app.scraper.parsing import format_phone
 
 log = logging.getLogger(__name__)
 
 ACTIVE_STATES = {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ENRICHING}
+
+# Google Maps ends every results list at about GOOGLE_LIST_LIMIT listings, however many
+# places exist; a list that ends at NEAR_GOOGLE_LIMIT or more was probably cut short.
+GOOGLE_LIST_LIMIT = 120
+NEAR_GOOGLE_LIMIT = 100
+
+Lookup = Callable[..., Awaitable[ContactResult]]   # WebsiteEnricher.find_contacts(url, region=...)
 
 
 class JobManager:
@@ -95,14 +108,18 @@ class JobManager:
     # ------------------------------------------------------------------
     # Scraping
     # ------------------------------------------------------------------
-    def create_scrape(self, query: str, limit: int, *, enrich: bool = False, headless: bool | None = None) -> Job:
-        job = Job(query=query.strip(), limit=limit, enrich=enrich)
+    def create_scrape(self, query: str, limit: int, *, business: str = "", place: str = "",
+                      filters: SearchFilters | None = None, enrich: bool = False,
+                      headless: bool | None = None) -> Job:
+        job = Job(query=query.strip(), business=business.strip(), place=place.strip(), limit=limit,
+                  filters=filters or SearchFilters(), enrich=enrich)
         # schedule first: if no event loop is running we must not leave a ghost job behind
         task = asyncio.create_task(self._run_scrape(job, headless=headless), name=job.id)
         self.jobs[job.id] = job
         self._tasks[job.id] = task
         self.save(job)
-        log.info("Job %s queued: %r, %d result(s) wanted%s", job.id, job.query, job.limit,
+        log.info("Job %s queued: %r, %d result(s) wanted%s%s", job.id, job.query, job.limit,
+                 f" ({job.filters.label})" if job.filters.active else "",
                  ", enrichment afterwards" if enrich else "")
         return job
 
@@ -132,21 +149,27 @@ class JobManager:
                 job.rows.sort(key=lambda r: r.rank)
 
             scraper = MapsScraper(self.cfg, headless=headless, on_progress=on_progress, on_row=on_row)
+            selector = PlaceFilter(job.filters, default_region=self.cfg.DEFAULT_REGION)
             try:
-                await scraper.scrape(job.query, job.limit)
-                job.stats = {
-                    "links_found": scraper.stats.links_found,
-                    "scraped": scraper.stats.scraped,
-                    "failed": scraper.stats.failed,
-                    "reached_end": scraper.stats.reached_end,
-                    "errors": scraper.stats.errors[:20],
-                }
-                if job.enrich and job.rows:
+                async with AsyncExitStack() as stack:
+                    if selector.wants_lookups:
+                        enricher = await stack.enter_async_context(WebsiteEnricher(self.cfg))
+                        selector.lookup = enricher.find_contacts
+                    await scraper.scrape(job.query, job.limit, selector=selector)
+                job.stats = stats_to_dict(scraper.stats)
+                job.notice = result_notice(job)
+                if job.notice:
+                    log.info("Job %s: %s", job.id, job.notice)
+                # places already looked up while filtering are not fetched a second time
+                fresh = [r.row_id for r in job.rows if not r.enrichment_status]
+                if job.enrich and fresh:
                     job.status = JobStatus.ENRICHING
-                    await self._enrich(job, row_ids=None, force=False)
+                    await self._enrich(job, row_ids=fresh, force=False)
                 job.status = JobStatus.COMPLETED
                 job.progress.phase = "done"
-                job.progress.message = f"Done - {len(job.rows)} rows"
+                found = job.stats["matched"]
+                job.progress.message = (f"Done - {found} of {job.limit} found" if found < job.limit
+                                        else f"Done - {len(job.rows)} rows")
                 job.progress.percent = 100.0
                 log.info("Job %s completed: %d row(s) in %.1fs", job.id, len(job.rows),
                          asyncio.get_event_loop().time() - started)
@@ -260,6 +283,112 @@ class JobManager:
 
 
 # ----------------------------------------------------------------------
+# Filtering while scraping (the scraper's selector)
+# ----------------------------------------------------------------------
+class PlaceFilter:
+    """Applies a job's `SearchFilters` to the places the scraper finds.
+
+    * ``prefilter`` skips a listing whose website, as the results feed shows
+      it, already rules it out - its place page is never opened;
+    * ``accept`` copies emails written in the listing's description into the
+      Email column, looks for an email on the website / social page when only
+      a missing email keeps the place out (needs ``lookup``), then applies the
+      filters to the finished place.
+
+    With the default filters every place is kept (listing emails still added).
+    """
+
+    def __init__(self, filters: SearchFilters | None = None, *, lookup: Lookup | None = None,
+                 default_region: str = "US") -> None:
+        self.filters = filters or SearchFilters()
+        self.lookup = lookup
+        self.default_region = default_region
+
+    @property
+    def active(self) -> bool:
+        return self.filters.active
+
+    @property
+    def wants_lookups(self) -> bool:
+        """True when an email found on a website can decide whether a place matches."""
+        return self.filters.contact in EMAIL_CONTACTS
+
+    def prefilter(self, ref: PlaceRef) -> str:
+        return self.filters.website_reason(ref.website_hint)
+
+    async def accept(self, row: PlaceRow) -> tuple[list[PlaceRow], str]:
+        rows = [row]
+        apply_listing_emails(rows)
+        reason = self.filters.check(rows)
+        if reason and self.lookup and self.filters.email_would_help(rows):
+            log.info("Looking for an email on %s for #%d %s (%s so far)", row.website, row.rank, row.name, reason)
+            try:
+                result = await self.lookup(row.website, region=row.country or self.default_region)
+            except Exception as exc:  # noqa: BLE001 - a failed lookup only means "no email"
+                log.warning("Email lookup failed for #%d %s: %s", row.rank, row.name, exc)
+            else:
+                apply_contact_result(rows, row.rank, result, default_region=self.default_region)
+                reason = self.filters.check(rows)
+        return ([] if reason else rows), reason
+
+
+def stats_to_dict(stats: ScrapeStats) -> dict:
+    return {
+        "links_found": stats.links_found, "scraped": stats.scraped, "matched": stats.matched,
+        "skipped": dict(stats.skipped), "failed": stats.failed, "reached_end": stats.reached_end,
+        "stopped": stats.stopped, "errors": stats.errors[:20],
+    }
+
+
+def result_notice(job: Job) -> str:
+    """Explain a result smaller than the limit ('' when there is nothing to explain).
+
+    Shown above the results in the panel and printed by the CLI, e.g.
+    "Only 35 businesses found for “plumbers” in Austin, TX — that's every
+    listing Google Maps has for this search (you asked for 200)."
+    """
+    stats = job.stats
+    found, listings, stopped = stats.get("matched", 0), stats.get("links_found", 0), stats.get("stopped", "")
+    if found >= job.limit or stopped in ("", "limit"):
+        return ""
+    subject = (f"“{job.business}”" + (f" in {job.place}" if job.place else "")) if job.business else f"“{job.query}”"
+    asked = f"you asked for {job.limit}"
+    filters = job.filters.label if job.filters.active else ""
+    if stopped == "no_results" or listings == 0:
+        return f"Google Maps has no results for {subject}."
+    if stopped == "single":
+        tail = "" if found else f", and it does not match your filters ({filters})"
+        return f"Google Maps shows a single place for {subject}{tail}."
+    if stopped == "end_of_list" and listings < NEAR_GOOGLE_LIMIT:
+        if filters:
+            listed = f"the {_businesses(listings)} Google Maps lists for {subject}"
+            if not found:
+                return f"{_matching(found, listed, filters)}."
+            return f"Only {_matching(found, listed, filters)} — that's all of them ({asked})."
+        return (f"Only {_businesses(found)} found for {subject} — that's every listing Google Maps "
+                f"has for this search ({asked}).")
+    if stopped == "end_of_list":
+        matched = f" {_matching(found, 'them', filters)}." if filters else ""
+        return (f"Google Maps stopped listing {subject} after {listings} results — it shows at most about "
+                f"{GOOGLE_LIST_LIMIT} per search, so there may be more.{matched} Search smaller areas "
+                "(neighbourhoods or nearby towns) to find more.")
+    if stopped == "scan_limit":
+        return (f"Stopped after scanning {listings} listings for {subject} (MAX_SCANNED setting) with "
+                f"{found} matching ({asked}).")
+    return (f"The results list for {subject} stopped loading after {listings} listings, so there may be more "
+            f"({found} kept, {asked}). Try again later, or raise SCROLL_PAUSE_MS / SCROLL_STALL_LIMIT.")
+
+
+def _businesses(n: int) -> str:
+    return f"{n} business" if n == 1 else f"{n} businesses"
+
+
+def _matching(found: int, among: str, filters: str) -> str:
+    """'35 of <among> match your filters (…)', '1 of … matches …', 'None of … match …'."""
+    return f"{found or 'None'} of {among} {'matches' if found == 1 else 'match'} your filters ({filters})"
+
+
+# ----------------------------------------------------------------------
 # Pure helpers (unit tested in tests/test_jobs.py)
 # ----------------------------------------------------------------------
 def group_by_place(rows: list[PlaceRow]) -> dict[int, list[PlaceRow]]:
@@ -299,7 +428,6 @@ def apply_contact_result(rows: list[PlaceRow], rank: int, result: ContactResult,
     if not place_rows:
         return []
     region = place_rows[0].country or default_region
-    added: list[PlaceRow] = []
 
     if result.phones:
         national, e164 = format_phone(result.phones[0], region)
@@ -307,24 +435,8 @@ def apply_contact_result(rows: list[PlaceRow], rank: int, result: ContactResult,
             if not r.phone:
                 r.phone, r.phone_unformatted, r.phone_source = national, e164, "website"
 
-    existing = {r.email for r in place_rows if r.email}
-    new_hits = [h for h in result.emails if h.email not in existing]
-    seen: set[str] = set()
-    unique_hits = [h for h in new_hits if not (h.email in seen or seen.add(h.email))]
-
-    empty_rows = [r for r in place_rows if not r.email]
-    for hit in unique_hits:
-        if empty_rows:
-            target = empty_rows.pop(0)
-            target.email, target.email_source = hit.email, hit.source
-        else:
-            clone = place_rows[0].clone_with_email(hit.email, hit.source)
-            added.append(clone)
-
-    if added:
-        last_index = max(i for i, r in enumerate(rows) if r.rank == rank)
-        rows[last_index + 1:last_index + 1] = added
-        place_rows.extend(added)
+    added, unique_hits = _add_emails(rows, rank, result.emails)
+    place_rows.extend(added)
 
     for r in place_rows:
         if result.error and not (unique_hits or result.phones):
@@ -334,6 +446,48 @@ def apply_contact_result(rows: list[PlaceRow], rank: int, result: ContactResult,
         else:
             r.enrichment_status, r.enrichment_note = "not_found", f"checked {len(result.pages_checked)} page(s)"
     return added
+
+
+def apply_listing_emails(rows: list[PlaceRow]) -> list[PlaceRow]:
+    """Put addresses written in the Google listing itself (its description) into the Email column.
+
+    Same one-row-per-email rule as website enrichment; ``email_source`` is the
+    listing's Maps URL. Returns the rows that were added.
+    """
+    if not rows:
+        return []
+    first = rows[0]
+    hits = [EmailHit(email=e, source=first.maps_url or first.url) for e in emails_in_text(first.description)]
+    return _add_emails(rows, first.rank, hits)[0]
+
+
+def _add_emails(rows: list[PlaceRow], rank: int, hits: list[EmailHit]) -> tuple[list[PlaceRow], list[EmailHit]]:
+    """Write new addresses into a place's rows: empty Email cells first, then one cloned
+    row per further address, inserted right after the place's last row.
+
+    Returns (rows added, hits that were new to the place).
+    """
+    place_rows = [r for r in rows if r.rank == rank]
+    existing = {r.email for r in place_rows if r.email}
+    unique_hits: list[EmailHit] = []
+    for hit in hits:
+        if hit.email not in existing:
+            existing.add(hit.email)
+            unique_hits.append(hit)
+
+    added: list[PlaceRow] = []
+    empty_rows = [r for r in place_rows if not r.email]
+    for hit in unique_hits:
+        if empty_rows:
+            target = empty_rows.pop(0)
+            target.email, target.email_source = hit.email, hit.source
+        else:
+            added.append(place_rows[0].clone_with_email(hit.email, hit.source))
+
+    if added:
+        last_index = max(i for i, r in enumerate(rows) if r.rank == rank)
+        rows[last_index + 1:last_index + 1] = added
+    return added, unique_hits
 
 
 def job_to_json(job: Job) -> str:

@@ -7,6 +7,11 @@ Strategy (see docs/ENRICHMENT.md):
    homepage that look like contact/about pages + well-known paths)
 3. if nothing was found and the site looks JavaScript-rendered, render the
    homepage + first contact page with Chromium and try again
+
+A *profile page* (Facebook page, Yelp listing, booking page, ... - see
+``PROFILE_DOMAINS``) is the one page on that platform that belongs to the
+business, so only that page is fetched (and rendered if needed): the
+platform's own /contact or /about pages say nothing about the business.
 """
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ from app.enrichment.extractors import (
     extract_from_html,
     set_default_region,
 )
-from app.scraper.parsing import normalise_website
+from app.scraper.parsing import normalise_website, website_type
 
 log = logging.getLogger(__name__)
 
@@ -81,8 +86,9 @@ class WebsiteEnricher:
             result.error = "no website"
             return result
         set_default_region(region or self.region)
+        profile = website_type(site) == "profile"
 
-        log.info("Enriching %s", site)
+        log.info("Enriching %s%s", site, " (profile page - only that page is read)" if profile else "")
         try:
             home_html, final_url = await self._fetch(site)
         except Exception as exc:  # noqa: BLE001
@@ -96,7 +102,7 @@ class WebsiteEnricher:
             result.pages_checked.append(final_url)
             self._merge(merged, extract_from_html(home_html, final_url, site))
 
-        pages = candidate_pages(final_url or site, merged.contact_links, self.cfg.ENRICH_MAX_PAGES)
+        pages = [] if profile else candidate_pages(final_url or site, merged.contact_links, self.cfg.ENRICH_MAX_PAGES)
         if pages and not (merged.emails and merged.phones):
             fetched = await asyncio.gather(*(self._safe_fetch(u) for u in pages))
             for url, html in fetched:
@@ -110,7 +116,7 @@ class WebsiteEnricher:
             log.info("%s: no email in plain HTML, rendering with Chromium", site)
             try:
                 result.used_browser = True
-                rendered = await self._render_with_browser(site, merged, result)
+                rendered = await self._render_with_browser(site, merged, result, follow_links=not profile)
                 for url, html in rendered:
                     if html:
                         result.pages_checked.append(url + " (rendered)")
@@ -160,8 +166,9 @@ class WebsiteEnricher:
         except Exception:  # noqa: BLE001 - 404s etc. are expected for guessed paths
             return url, ""
 
-    async def _render_with_browser(self, site: str, merged: ExtractResult, result: ContactResult) -> list[tuple[str, str]]:
-        """Render the homepage, then the most promising contact pages, with Chromium."""
+    async def _render_with_browser(self, site: str, merged: ExtractResult, result: ContactResult, *,
+                                   follow_links: bool = True) -> list[tuple[str, str]]:
+        """Render the homepage, then (``follow_links``) the most promising contact pages, with Chromium."""
         from playwright.async_api import async_playwright
 
         out: list[tuple[str, str]] = []
@@ -191,7 +198,7 @@ class WebsiteEnricher:
                 if home:
                     found = extract_from_html(home, page.url, site)
                     self._merge(merged, found)
-                    if merged.emails:
+                    if merged.emails or not follow_links:
                         return out
                     for url in candidate_pages(page.url, found.contact_links, min(3, self.cfg.ENRICH_MAX_PAGES)):
                         html = await render(url)

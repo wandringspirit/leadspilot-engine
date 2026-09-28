@@ -33,6 +33,7 @@ DEFAULT_COLUMNS: list[tuple[str, str]] = [
 EXTENDED_COLUMNS: list[tuple[str, str]] = DEFAULT_COLUMNS + [
     ("Address", "address"),
     ("Category", "category"),
+    ("Website Type", "website_type"),
     ("Rating", "rating"),
     ("Place ID", "place_id"),
     ("Maps URL", "maps_url"),
