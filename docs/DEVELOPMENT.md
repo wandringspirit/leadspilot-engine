@@ -148,6 +148,7 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_build_row.py` | source precedence in `build_row()` |
 | `test_filters.py` | website classification (own site vs profile page), every website / contact rule, labels, `search_web` only with *no website* |
 | `test_scan.py` | the scraper's feed loop on an in-memory feed: rounds, pre-filtering, replacements, stop reasons, stats |
+| `test_blocked.py` | Google's "unusual traffic" check: recognising the page (URL, status, wording, IP address), and the scrape stopping at once – no further searches, sections or place pages – with what it found |
 | `test_area.py` | map-section geometry: world pixels, the view in a Google Maps URL, section URLs, quarters |
 | `test_area_search.py` | whole-area and multi-place searches against a simulated Google that knows where businesses are: splitting full sections, finding businesses outside the top 120, de-duplication, limits, zoom-out guard, failures |
 | `test_extractors.py` | email/phone extraction (no junk filtering), obfuscation, listing-text emails, contact-link discovery, links to other sites |
@@ -156,8 +157,8 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_websearch.py` | redirect unwrapping, DuckDuckGo / Bing result parsing, engine fallback and switch-off on captchas (fake network) |
 | `test_jobs.py` | enrichment target selection, the duplicate-row rule, `PlaceFilter` (incl. the unlisted-website check and its setup), listing emails, short-result notices |
 | `test_csv_export.py` | column layout, escaping, BOM |
-| `test_cli.py` | `cli.py` end to end on an in-memory feed: business + place, filter flags, short-result note, a business left out for its unlisted website |
-| `test_api.py` | every route through FastAPI's `TestClient`, business + place and filtered jobs run with a fake scraper, enricher and web search (a business left out for its unlisted website, web search switched off), notices, persistence (incl. pre-1.2 jobs), log tagging |
+| `test_cli.py` | `cli.py` end to end on an in-memory feed: business + place, filter flags, short-result note, a business left out for its unlisted website, a Google block (error line, CSV, exit code 3) |
+| `test_api.py` | every route through FastAPI's `TestClient`, business + place and filtered jobs run with a fake scraper, enricher and web search (a business left out for its unlisted website, web search switched off), a job Google blocked, notices, persistence (incl. pre-1.2 jobs), log tagging |
 | `test_logbuffer.py` | ring buffer semantics: cursor, limit/truncation, level filter, tracebacks, job-id tagging across asyncio tasks |
 | `test_docs.py` | documentation consistency (see §7) |
 

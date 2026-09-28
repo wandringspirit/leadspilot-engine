@@ -91,6 +91,7 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     INTERRUPTED = "interrupted"   # server restarted while the job was running
+    BLOCKED = "blocked"           # Google showed its "unusual traffic" check; rows found before are kept
 
 
 class Progress(BaseModel):

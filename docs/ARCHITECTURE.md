@@ -78,7 +78,7 @@ the same capabilities.
 | **Filters** | `app/filters.py` | `SearchFilters`: the *Website* and *Must have* rules as pure functions (used on the feed, on scraped places and to decide when an email lookup can help). |
 | **API** | `app/main.py` | REST routes, CSV download, static panel, cache headers. |
 | **JobManager** | `app/jobs.py` | Creates and tracks asyncio tasks for scrapes and enrichments; `PlaceFilter` applies a job's filters while it scrapes (listing emails, inline email lookups, the unlisted-website check); applies enrichment results (incl. duplicate-row rule); writes the short-result `notice`; persists jobs as JSON, restores them on start-up. |
-| **MapsScraper** | `app/scraper/maps.py` | Drives Chromium: search page → scroll feed → visit place pages → build rows, in rounds until `limit` places are kept by the selector. Reports progress and rows through callbacks. |
+| **MapsScraper** | `app/scraper/maps.py` | Drives Chromium: search page → scroll feed → visit place pages → build rows, in rounds until `limit` places are kept by the selector. Reports progress and rows through callbacks. Stops at once, keeping what it found, when Google shows its "unusual traffic" check (`GoogleBlocked`). |
 | **area** | `app/scraper/area.py` | Map sections for whole-area searches: reads the view Google fits to a place, builds section URLs, splits sections into quarters (pure geometry). |
 | **records** | `app/scraper/records.py` | Decodes the nested-array place records Google embeds in its XHR responses / HTML. |
 | **parsing** | `app/scraper/parsing.py` | Pure helpers: address → city/state/country, phone → national + E.164, URL cleaning, Maps URL builder. |
@@ -160,6 +160,9 @@ stateDiagram-v2
     running --> cancelled: POST /cancel
     enriching --> cancelled: POST /cancel
     running --> failed: unhandled error
+    running --> blocked: Google's "unusual traffic" check
+    enriching --> blocked: enrichment finished (after a block)
+    blocked --> enriching: POST /enrich (rows exist)
     completed --> enriching: POST /enrich
     cancelled --> enriching: POST /enrich
     failed --> enriching: POST /enrich (rows exist)
@@ -176,7 +179,10 @@ Rules enforced by `JobManager`:
 - an enrichment can only start when no task is running for that job (409 otherwise);
 - every transition is persisted to `data/jobs/<id>.json` (atomic write via temp file +
   rename), progress is persisted at most every 2 s to avoid disk churn;
-- on start-up, jobs found in an active state are marked `interrupted` (their rows are kept).
+- on start-up, jobs found in an active state are marked `interrupted` (their rows are kept);
+- a scrape that Google answers with its "unusual traffic" check stops at once and ends as
+  `blocked`: the rows found before are kept, `error` explains what happened and what to do
+  (`blocked_message()`), and enrichment still runs – it reads the businesses' own websites.
 
 ## 5. Data flow inside the scraper
 

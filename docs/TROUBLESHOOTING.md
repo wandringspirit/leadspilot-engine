@@ -13,7 +13,8 @@
 
 | Symptom | Cause | What to do |
 | --- | --- | --- |
-| Job fails with *"Google Maps results feed did not appear (blocked, captcha or layout change?)"* | Google served a captcha / "unusual traffic" page, a consent page we could not dismiss, or the layout changed | Run the job with **Show the browser window** (or `HEADLESS=false`) and look. Captcha → wait 15–30 min, lower `DETAIL_CONCURRENCY`, use `PROXY_SERVER`. Layout change → [SCRAPING.md §6](SCRAPING.md#6-when-google-changes-its-layout). |
+| Job status **blocked**, banner *"Google Maps blocked this search"* (CLI: `error: Google Maps blocked the search …`, exit code 3) | too many searches from this IP address: Google answered with its "unusual traffic" check (a captcha) instead of Google Maps. The search stopped at once; what was found before is kept | Wait at least 30 minutes before searching again – searching straight away keeps the block going. Then run smaller searches (fewer results, a smaller area – a whole-area search runs many searches), lower `DETAIL_CONCURRENCY` / raise `MIN_DELAY_MS` and `MAX_DELAY_MS`, or set `PROXY_SERVER` to search from another IP address. The rows found can still be downloaded and enriched. |
+| Job fails with *"Google Maps results feed did not appear (blocked, captcha or layout change?)"* | a page we don't recognise: a consent page we could not dismiss, a new kind of block page, or the layout changed (Google's usual captcha is reported as **blocked**, above) | Run the job with **Show the browser window** (or `HEADLESS=false`) and look. Layout change → [SCRAPING.md §6](SCRAPING.md#6-when-google-changes-its-layout). |
 | Fewer results than requested, notice *"Only N businesses found … that's every listing"* (`stats.stopped = end_of_list`) | Google's list for that search really ended | Nothing is wrong – that is all Google Maps lists. Try a related business type or a nearby area. |
 | Fewer results, notice *"Google Maps stopped listing … after 120 results"* | Google shows at most ~120 listings per search | Tick *Search the whole area* (`--whole-area`), or search several narrower places (`Katy, TX; Pasadena, TX`). |
 | Whole-area search takes a long time | every map section is a separate Google search; busy areas are split into many sections | Expected. Lower the number of results, search a smaller place, or lower `MAX_SECTIONS`. Progress shows the current section; cancelling keeps what was found. |
@@ -53,6 +54,7 @@
 | Live logs stay empty / stop updating | the view is *Paused* or collapsed, or the server restarted (the buffer lives in memory – it starts empty). Press *Resume*, expand the section, or reload the page. |
 | Live logs show "older lines dropped" | more than `LOG_BUFFER_SIZE` lines arrived between two polls; raise the setting or use *Save* regularly on very large jobs. |
 | Job shows `interrupted` | the server was restarted while it was running; the rows collected so far are kept – start a new job or enrich the partial result. |
+| Job shows `blocked` | Google showed its "unusual traffic" check – see the red banner above the results and *Scraping* above. |
 | Copy CSV does nothing | the clipboard API needs a secure context (`http://localhost` is fine; a plain LAN IP is not) – use Download instead. |
 
 ## Where to look

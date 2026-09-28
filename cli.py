@@ -25,6 +25,7 @@ from app.filters import ContactFilter, SearchFilters, WebsiteFilter
 from app.jobs import (
     PlaceFilter,
     apply_contact_result,
+    blocked_message,
     plan_searches,
     result_notice,
     select_enrichment_targets,
@@ -32,6 +33,9 @@ from app.jobs import (
 )
 from app.models import Job, PlaceRow, build_query, split_places
 from app.scraper.maps import MapsScraper
+
+
+EXIT_BLOCKED = 3      # Google showed its "unusual traffic" check; the CSV has what was found before
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -97,6 +101,7 @@ async def run(args: argparse.Namespace) -> int:
         await selector.open(stack, settings)
         rows: list[PlaceRow] = await scraper.scrape(plan_searches(job), job.limit, selector=selector)
     job.stats = stats_to_dict(scraper.stats) | selector.stats()
+    blocked = scraper.stats.stopped == "blocked"
     if scraper.stats.errors and not args.quiet:
         for err in scraper.stats.errors:
             print(f"warning: {err}", file=sys.stderr)
@@ -136,6 +141,9 @@ async def run(args: argparse.Namespace) -> int:
     for notice in (result_notice(job), selector.notice()):
         if notice:
             print(f"note: {notice}", file=sys.stderr)
+    if blocked:
+        print(f"error: {blocked_message(job)}", file=sys.stderr)
+        return EXIT_BLOCKED
     return 0
 
 

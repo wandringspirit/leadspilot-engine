@@ -5,6 +5,7 @@ import io
 
 import app.jobs as jobs
 import cli
+from app.scraper.maps import GoogleBlocked
 from tests.test_scan import FeedScraper, listing
 from tests.test_sitefinder import FakeWeb, page
 
@@ -54,6 +55,29 @@ def test_cli_leaves_out_a_business_whose_social_page_links_to_its_website(tmp_pa
     assert [r["Rank"] for r in rows] == ["2"]
     err = capsys.readouterr().err
     assert "left out 1 place(s) with a website Google Maps does not list (1 by profile page)" in err
+
+
+def test_cli_reports_a_google_block_and_still_writes_what_it_found(tmp_path, monkeypatch, capsys):
+    class BlockedAfterFirstPlace(FakeMaps):
+        async def _open_results(self, page, url, label):
+            if "Dallas" in url:
+                raise GoogleBlocked("https://www.google.com/sorry/index?continue=x", "203.0.113.7")
+            return await super()._open_results(page, url, label)
+
+    monkeypatch.setattr(jobs, "WebsiteEnricher", lambda cfg, **kw: FakeWeb())
+    monkeypatch.setattr(cli, "MapsScraper", BlockedAfterFirstPlace)
+    out = tmp_path / "leads.csv"
+    args = cli.build_parser().parse_args(
+        ["plumbers", "Austin, TX; Dallas, TX", "--website", "without", "--contact", "phone", "-o", str(out), "-q"])
+    assert asyncio.run(cli.run(args)) == cli.EXIT_BLOCKED == 3
+
+    rows = list(csv.DictReader(io.StringIO(out.read_text(encoding="utf-8-sig"))))
+    assert [r["Rank"] for r in rows] == ["2", "4"]
+    err = capsys.readouterr().err
+    assert "wrote 2 row(s) for 2 place(s)" in err
+    assert ("error: Google Maps blocked the search: it showed its “unusual traffic” check (a captcha) instead of "
+            "results, so it is treating this IP address (203.0.113.7) as a robot. The 2 businesses found before "
+            "that are kept.") in err
 
 
 def test_cli_rejects_an_empty_search(capsys):

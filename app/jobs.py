@@ -152,21 +152,30 @@ class JobManager:
                     await selector.open(stack, self.cfg)
                     await scraper.scrape(plan_searches(job), job.limit, selector=selector)
                 job.stats = stats_to_dict(scraper.stats) | selector.stats()
+                blocked = job.stats["stopped"] == "blocked"
                 job.notice = " ".join(n for n in (result_notice(job), selector.notice()) if n)
+                if blocked:
+                    job.error = blocked_message(job)
+                    log.error("Job %s: %s", job.id, job.error)
                 if job.notice:
                     log.info("Job %s: %s", job.id, job.notice)
-                # places already looked up while filtering are not fetched a second time
+                # places already looked up while filtering are not fetched a second time;
+                # enrichment reads the businesses' websites, which a Google block does not affect
                 fresh = [r.row_id for r in job.rows if not r.enrichment_status]
                 if job.enrich and fresh:
                     job.status = JobStatus.ENRICHING
                     await self._enrich(job, row_ids=fresh, force=False)
-                job.status = JobStatus.COMPLETED
+                job.status = JobStatus.BLOCKED if blocked else JobStatus.COMPLETED
                 job.progress.phase = "done"
                 found = job.stats["matched"]
-                job.progress.message = (f"Done - {found} of {job.limit} found" if found < job.limit
-                                        else f"Done - {len(job.rows)} rows")
-                job.progress.percent = 100.0
-                log.info("Job %s completed: %d row(s) in %.1fs", job.id, len(job.rows),
+                if blocked:
+                    job.progress.message = f"Blocked by Google - {found} of {job.limit} found"
+                    job.progress.percent = round(100.0 * found / job.limit, 1)
+                else:
+                    job.progress.message = (f"Done - {found} of {job.limit} found" if found < job.limit
+                                            else f"Done - {len(job.rows)} rows")
+                    job.progress.percent = 100.0
+                log.info("Job %s %s: %d row(s) in %.1fs", job.id, job.status.value, len(job.rows),
                          asyncio.get_event_loop().time() - started)
             except asyncio.CancelledError:
                 job.status = JobStatus.CANCELLED
@@ -410,8 +419,20 @@ def stats_to_dict(stats: ScrapeStats) -> dict:
         "links_found": stats.links_found, "scraped": stats.scraped, "matched": stats.matched,
         "skipped": dict(stats.skipped), "failed": stats.failed, "reached_end": stats.reached_end,
         "searches": stats.searches, "sections": stats.sections, "full_lists": stats.full_lists,
-        "dense": stats.dense, "stopped": stats.stopped, "errors": stats.errors[:20],
+        "dense": stats.dense, "stopped": stats.stopped, "blocked_ip": stats.blocked_ip, "errors": stats.errors[:20],
     }
+
+
+def blocked_message(job: Job) -> str:
+    """The error of a job Google blocked (status ``blocked``): what happened and what to do."""
+    found, ip = job.stats.get("matched", 0), job.stats.get("blocked_ip", "")
+    address = f"this IP address ({ip})" if ip else "this computer's IP address"
+    kept = (f"The {_businesses(found)} found before that {'is' if found == 1 else 'are'} kept."
+            if found else "Nothing was found before that.")
+    return (f"Google Maps blocked the search: it showed its “unusual traffic” check (a captcha) instead of "
+            f"results, so it is treating {address} as a robot. {kept} Wait at least 30 minutes before searching "
+            "again – searching straight away keeps the block going – then search a smaller area or fewer "
+            "businesses, lower DETAIL_CONCURRENCY, or set PROXY_SERVER to search from another IP address.")
 
 
 def result_notice(job: Job) -> str:
@@ -423,7 +444,7 @@ def result_notice(job: Job) -> str:
     """
     stats = job.stats
     found, listings, stopped = stats.get("matched", 0), stats.get("links_found", 0), stats.get("stopped", "")
-    if found >= job.limit or stopped in ("", "limit"):
+    if found >= job.limit or stopped in ("", "limit", "blocked"):     # a block is explained by blocked_message()
         return ""
     where = "; ".join(split_places(job.place))
     subject = (f"“{job.business}”" + (f" in {where}" if where else "")) if job.business else f"“{job.query}”"

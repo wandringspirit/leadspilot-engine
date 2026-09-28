@@ -30,6 +30,10 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
 - **Honest short results** – ask for 200 when a city has 35: you get the 35 and a note saying
   that is every listing Google Maps has there (or that Google's ~120-per-search cap was hit, so
   there may be more).
+- **A clear message when Google blocks you** – if Google answers with its "unusual traffic" check
+  (a captcha) instead of Google Maps, the search stops at once (continuing would only prolong the
+  block), keeps what it found, and the job shows as **blocked** with a red banner saying what
+  happened and what to do.
 - **Google Maps scraping** with a real Chromium browser (Playwright): scrolls the results feed
   until the requested count is reached, then opens every listing to collect name, address
   (split into city / state / country), website, phone (formatted + E.164), rating, review
@@ -145,6 +149,9 @@ it out to pass a whole search as one argument).
 | `--headed` | show the browser window while scraping |
 | `--out / -o` | CSV path (default `data/exports/<query>.csv`) |
 | `--quiet / -q` | less output |
+
+Exit codes: `0` done, `2` bad arguments, `3` Google blocked the search with its "unusual traffic"
+check – the CSV still holds what was found before, and the error line says what to do.
 
 ## Configuration
 

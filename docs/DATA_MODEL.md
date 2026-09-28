@@ -94,7 +94,7 @@ names are kept verbatim.
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
                "search_web": false, "label": "no website · phone or email" },   // see §9
   "enrich": false,
-  "status": "completed",            // queued | running | enriching | completed | failed | cancelled | interrupted
+  "status": "completed",            // queued | running | enriching | completed | failed | cancelled | interrupted | blocked
   "progress": { "phase": "done", "message": "Done - 35 of 200 found", "current": 35, "total": 200, "percent": 100.0 },
   "rows": [ { /* PlaceRow */ } ],
   "error": null,
@@ -115,6 +115,7 @@ names are kept verbatim.
     "full_lists": 0,                // lists that hit Google's ~120 cap
     "dense": 0,                     // sections still full at the smallest section size
     "stopped": "end_of_list",       // see below
+    "blocked_ip": "",               // the IP address Google's "unusual traffic" page named (stopped = blocked)
     "errors": [],
     "unlisted_websites": { "email domain": 1, "profile page": 3 },   // how they were found (§9)
     "web_searches": 0               // web searches run (filters.search_web)
@@ -141,7 +142,16 @@ place pages), `enriching`, `done`. With filters, `progress.current / total` coun
 
 `stopped` is `limit` when enough places were kept; `end_of_list`, `no_results`, `single` or
 `stalled` for a single search; `searched_all` when several searches (or all map sections) ran
-out; `section_limit` / `scan_limit` when a cap stopped the job.
+out; `section_limit` / `scan_limit` when a cap stopped the job; `blocked` when Google answered
+with its "unusual traffic" check.
+
+A **blocked** job (`status: "blocked"`, `stopped: "blocked"`) has no `notice`; its `error`
+explains the block instead, e.g. *"Google Maps blocked the search: it showed its “unusual
+traffic” check (a captcha) instead of results, so it is treating this IP address (203.0.113.7) as
+a robot. The 12 businesses found before that are kept. Wait at least 30 minutes before searching
+again – searching straight away keeps the block going – then search a smaller area or fewer
+businesses, lower DETAIL_CONCURRENCY, or set PROXY_SERVER to search from another IP address."*
+Its rows can be downloaded and enriched like any other job's.
 
 ## 7. Log entry (API)
 

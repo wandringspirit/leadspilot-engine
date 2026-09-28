@@ -347,6 +347,50 @@ def test_no_website_job_leaves_out_a_business_whose_website_a_web_search_finds(c
     assert job["notice"].startswith("Only 1 of the 4 businesses Google Maps lists for “roofers” in Houston, TX")
 
 
+def test_a_job_google_blocks_keeps_its_rows_and_says_why_it_stopped(client, monkeypatch):
+    import app.jobs as jobs_module
+    from app.enrichment.website import ContactResult
+
+    class BlockedScraper(_FakeScraper):
+        """Google shows its "unusual traffic" check after the first two listings."""
+
+        LISTINGS = _FakeScraper.LISTINGS[:2]
+
+        async def scrape(self, query, limit, *, selector=None):
+            rows = await super().scrape(query, limit, selector=selector)
+            self.stats.stopped, self.stats.blocked_ip = "blocked", "203.0.113.7"
+            return rows
+
+    enriched = []
+
+    async def fake_enrich_many(websites, *, cfg=None, region="US", on_result=None):
+        for key, url in websites.items():
+            enriched.append(url)
+            await on_result(key, ContactResult(website=url, pages_checked=[url]))
+
+    monkeypatch.setattr(jobs_module, "MapsScraper", BlockedScraper)
+    monkeypatch.setattr(jobs_module, "enrich_many", fake_enrich_many)
+    c, _ = client
+    job_id = c.post("/api/scrape", json={"business": "roofers", "place": "Houston, TX", "limit": 50}).json()["id"]
+    job = _wait_for(c, job_id)
+    assert job["status"] == "blocked"
+    assert [r["name"] for r in job["rows"]] == ["Fake Roofer", "No Site Roofing"]
+    assert job["error"].startswith("Google Maps blocked the search: it showed its “unusual traffic” check (a "
+                                   "captcha) instead of results, so it is treating this IP address (203.0.113.7) "
+                                   "as a robot. The 2 businesses found before that are kept. Wait at least 30 "
+                                   "minutes")
+    assert job["notice"] == "" and job["stats"]["blocked_ip"] == "203.0.113.7"
+    assert (job["progress"]["message"], job["progress"]["percent"]) == ("Blocked by Google - 2 of 50 found", 4.0)
+    summary = next(j for j in c.get("/api/jobs").json() if j["id"] == job_id)
+    assert (summary["status"], summary["found"]) == ("blocked", 2)
+    csv_text = c.get(f"/api/jobs/{job_id}/export.csv").content.decode("utf-8-sig")
+    assert "No Site Roofing" in csv_text, "what was found can be downloaded"
+    # the websites can still be searched for emails (they are not Google), and the job stays "blocked"
+    assert c.post(f"/api/jobs/{job_id}/enrich", json={}).status_code == 202
+    job = _wait_for(c, job_id)
+    assert enriched == ["https://fake.example"] and job["status"] == "blocked"
+
+
 def test_short_unfiltered_result_says_that_is_everything(client, monkeypatch):
     import app.jobs as jobs_module
 

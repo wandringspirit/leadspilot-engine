@@ -19,6 +19,7 @@
     statusPill: $("status-pill"),
     progressMessage: $("progress-message"), barFill: $("bar-fill"), progressCounts: $("progress-counts"),
     cancelBtn: $("cancel-btn"), jobError: $("job-error"), notice: $("notice"), noticeText: $("notice-text"),
+    blocked: $("blocked"), blockedText: $("blocked-text"),
     rowCount: $("row-count"), resultsSubtitle: $("results-subtitle"), filter: $("filter"),
     enrichAllBtn: $("enrich-all-btn"), copyBtn: $("copy-btn"), downloadBtn: $("download-btn"),
     downloadExtBtn: $("download-ext-btn"), body: $("results-body"), toast: $("toast"),
@@ -198,7 +199,9 @@
           if (wasActive) {
             const done = job.notice ? `Finished: ${job.stats.matched} of ${job.limit} found`
               : `Finished: ${job.rows.length} rows`;
-            toast(job.status === "completed" ? done : `Job ${job.status}`, job.status === "failed");
+            toast(job.status === "completed" ? done
+              : job.status === "blocked" ? "Google Maps blocked the search – see the message above the results"
+                : `Job ${job.status}`, job.status === "failed" || job.status === "blocked");
             refreshJobs();
           }
         }
@@ -218,6 +221,7 @@
     if (!job) {
       els.progressCard.hidden = true;
       els.notice.hidden = true;
+      els.blocked.hidden = true;
       els.rowCount.textContent = "0";
       els.resultsSubtitle.textContent = "Start a search or pick a job from the history.";
       els.body.innerHTML = '<tr class="empty"><td colspan="13">No rows yet.</td></tr>';
@@ -242,7 +246,13 @@
       : scanning ? `${job.progress.current} of ${job.progress.total} matches found`
         : `${job.progress.phase}: ${job.progress.current} / ${job.progress.total}`;
     els.cancelBtn.hidden = !active;
-    els.jobError.hidden = !job.error;
+    // Google's "unusual traffic" check stopped the search: a banner above the results, not the small error line
+    const blocked = job.status === "blocked";
+    els.blocked.hidden = !blocked;
+    // the banner's title already says "Google Maps blocked this search"
+    const why = (job.error || "").replace(/^Google Maps blocked the search:\s*/, "");
+    els.blockedText.textContent = blocked ? why.charAt(0).toUpperCase() + why.slice(1) : "";
+    els.jobError.hidden = !job.error || blocked;
     els.jobError.textContent = job.error || "";
     // why fewer results than asked for ("Only 35 businesses found for ...")
     els.notice.hidden = !job.notice;

@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.5.0 – 2026-09-28
+
+### Added
+- **A clear error when Google blocks the scraper.** When Google answers with its "unusual traffic"
+  check (the `google.com/sorry/` captcha page, HTTP 429, or the harder *"We're sorry … automated
+  queries"* page) instead of Google Maps, the job now ends with the new status **`blocked`** and an
+  error that says what happened, which IP address Google named, how many businesses were found
+  before, and what to do (wait at least 30 minutes; smaller searches; lower `DETAIL_CONCURRENCY`;
+  `PROXY_SERVER`). The panel shows it as a red banner above the results, a red *blocked* pill and
+  toast, and *blocked · 12 of 50 found* in the history; the CLI prints it as an `error:` line and
+  exits with code 3 after writing the CSV. Job stats gain `blocked_ip`; `stopped` can be `blocked`.
+
+### Changed
+- On a block the scrape **stops at once and keeps what it found**. Before, the job failed after the
+  page timeout with *"results feed did not appear (blocked, captcha or layout change?)"*; a
+  whole-area search tried more map sections (splitting the blocked ones) before failing; and a
+  blocked place page was retried and then kept with only the results-list data. Now nothing more
+  is requested: no retries, no further searches or sections, the other place-page tabs are stopped.
+  The block is recognised as soon as the page opens, not after the 30-second wait.
+- A results list that stops loading because Google answers its requests with HTTP 429 counts as
+  blocked (the listings already collected are still opened).
+- Enrichment still runs on a blocked job's rows (it reads the businesses' own websites).
+
 ## 1.4.0 – 2026-09-28
 
 ### Added

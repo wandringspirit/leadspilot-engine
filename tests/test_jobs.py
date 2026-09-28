@@ -10,6 +10,7 @@ from app.filters import UNLISTED_WEBSITE, SearchFilters
 from app.jobs import (
     PlaceFilter,
     apply_contact_result,
+    blocked_message,
     apply_listing_emails,
     group_by_place,
     plan_searches,
@@ -316,6 +317,20 @@ def test_notice_for_other_stops():
     assert "MAX_SCANNED" in result_notice(_job(filters=NO_SITE, matched=3, links_found=1000, stopped="scan_limit"))
     free_text = Job(query="roofers near houston", limit=50, stats={"matched": 1, "links_found": 1, "stopped": "single"})
     assert result_notice(free_text) == "Google Maps shows a single place for “roofers near houston”."
+
+
+def test_blocked_message_says_what_happened_what_was_kept_and_what_to_do():
+    job = _job(limit=50, matched=12, links_found=240, stopped="blocked", blocked_ip="203.0.113.7")
+    assert blocked_message(job) == (
+        "Google Maps blocked the search: it showed its “unusual traffic” check (a captcha) instead of results, "
+        "so it is treating this IP address (203.0.113.7) as a robot. The 12 businesses found before that are "
+        "kept. Wait at least 30 minutes before searching again – searching straight away keeps the block going "
+        "– then search a smaller area or fewer businesses, lower DETAIL_CONCURRENCY, or set PROXY_SERVER to "
+        "search from another IP address.")
+    assert "treating this computer's IP address as a robot. Nothing was found before that." in \
+        blocked_message(_job(matched=0, stopped="blocked"))
+    assert "The 1 business found before that is kept." in blocked_message(_job(matched=1, stopped="blocked"))
+    assert result_notice(job) == "", "the block is the job's error, not a short-result notice"
 
 
 # ----------------------------------------------------------------------

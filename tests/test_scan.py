@@ -24,8 +24,16 @@ def listing(website: str = "", *, phone: str = "(512) 555-0100", record: bool = 
 
 
 class FakePage:
+    url = "https://www.google.com/maps/search/plumbers+in+Austin/?hl=en"
+
     def on(self, *_args) -> None:
         pass
+
+    async def query_selector(self, _selector):
+        return None
+
+    async def inner_text(self, _selector) -> str:
+        return ""
 
     async def close(self) -> None:
         pass

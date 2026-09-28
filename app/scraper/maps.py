@@ -24,6 +24,11 @@ which splits a place into map sections (app/scraper/area.py) so it is not
 limited to Google's ~120 top listings. Places found by more than one search
 are kept once; ranks number the places in the order they were found.
 
+When Google answers with its "unusual traffic" check (a captcha) instead of
+Google Maps, the scrape stops at once - further requests would only prolong
+the block - and returns the places found so far with ``stats.stopped =
+"blocked"`` (see ``GoogleBlocked``).
+
 The scraper is a plain async class so it can be driven by the FastAPI job
 manager and by the CLI alike.
 """
@@ -36,7 +41,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Protocol
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 from playwright.async_api import (
     Browser,
@@ -79,6 +84,12 @@ PLACE_LINK_SELECTOR = 'div[role="feed"] a[href*="/maps/place/"]'
 PLACE_HEADER_SELECTOR = "h1.DUwDvf, div[role='main'] h1"
 END_OF_LIST_TEXTS = ("You've reached the end of the list", "reached the end of the list")
 NO_RESULTS_TEXTS = ("No results", "can't find", "did not match any", "Google Maps can't find")
+# Google's "unusual traffic" check: too many searches from one IP address get redirected
+# to google.com/sorry/... (HTTP 429, a captcha) - or, when the block is harder, a plain
+# "We're sorry ... automated queries" page - and Maps stays blocked from that address a while.
+BLOCKED_TEXTS = ("unusual traffic from your computer network", "detected unusual traffic",
+                 "sending automated queries")
+_BLOCKED_IP_RE = re.compile(r"IP address:\s*([0-9A-Fa-f:.]{3,45})")
 BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 BLOCKED_URL_PARTS = ("/maps/vt/", "googleusercontent.com", "gstatic.com/images", "doubleclick",
                      "google-analytics", "/maps/preview/log204")
@@ -184,9 +195,34 @@ class ScrapeStats:
     full_lists: int = 0       # result lists that hit Google's ~120 cap (there may be more)
     dense: int = 0            # sections still full at MAX_SECTION_ZOOM (may hold more)
     # why the scan stopped: limit | end_of_list | no_results | single | stalled (one search),
-    # searched_all (several searches / whole area), section_limit | scan_limit (caps)
+    # searched_all (several searches / whole area), section_limit | scan_limit (caps),
+    # blocked (Google's "unusual traffic" check)
     stopped: str = ""
+    blocked_ip: str = ""      # the IP address Google's check named, when blocked
     errors: list[str] = field(default_factory=list)
+
+
+class GoogleBlocked(RuntimeError):
+    """Google answered with its "unusual traffic" check (a captcha) instead of Google Maps."""
+
+    def __init__(self, url: str, ip: str = "") -> None:
+        super().__init__("Google showed its “unusual traffic” check instead of Google Maps"
+                         + (f" (IP address {ip})" if ip else ""))
+        self.url, self.ip = url, ip
+
+
+def is_blocked_page(url: str, text: str = "", status: int | None = None) -> bool:
+    """True for Google's "unusual traffic" page: a google…/sorry/ URL, HTTP 429 or its wording."""
+    parts = urlsplit(url or "")
+    if "google." in parts.netloc and parts.path.startswith("/sorry"):
+        return True
+    return status == 429 or any(t in (text or "").lower() for t in BLOCKED_TEXTS)
+
+
+def blocked_ip(text: str) -> str:
+    """The IP address Google's "unusual traffic" page names ('' when it shows none)."""
+    m = _BLOCKED_IP_RE.search(text or "")
+    return m.group(1) if m else ""
 
 
 class PlaceSelector(Protocol):
@@ -210,6 +246,7 @@ class RecordCapture:
         self.matcher = matcher
         self.records: list[dict[str, Any]] = []
         self.by_place_id: dict[str, dict[str, Any]] = {}
+        self.rate_limited = False      # Google answered one of the requests with HTTP 429
         self._tasks: set[asyncio.Task] = set()
 
     def attach(self, page: Page) -> None:
@@ -218,6 +255,8 @@ class RecordCapture:
     def _on_response(self, response: Response) -> None:
         if not self.matcher(response.url):
             return
+        if response.status == 429:
+            self.rate_limited = True
         task = asyncio.ensure_future(self._consume(response))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -264,6 +303,7 @@ class MapsScraper:
         self._halted = ""                         # a cap stopped the whole job: scan_limit | section_limit
         self._where = ""                          # which search is running (several searches / sections)
         self._failures = 0                        # searches in a row that could not be opened
+        self._rows: list[PlaceRow] = []           # places kept so far (what scrape() returns)
         # the results list being read
         self._feed_done = False
         self._search_stop = ""                    # end_of_list | stalled | no_results | single
@@ -289,27 +329,32 @@ class MapsScraper:
         limit = max(1, min(int(limit), self.cfg.MAX_RESULTS))
         self.stats = ScrapeStats(query=" | ".join(s.label for s in plan), requested=limit)
         self._selector, self._limit = selector, limit
-        self._seen, self._halted, self._where, self._failures = {}, "", "", 0
+        self._seen, self._halted, self._where, self._failures, self._rows = {}, "", "", 0, []
         started = time.monotonic()
         log.info("Starting %s Chromium for %s (%d %s wanted)", "headless" if self.headless else "headed",
                  "; ".join(repr(s.label) for s in plan), limit, "matching place(s)" if self._filtered else "result(s)")
         await self._start()
         try:
             page = await self._context.new_page()  # type: ignore[union-attr]
-            rows: list[PlaceRow] = []
-            for search in plan:
-                if self.stats.matched >= limit or self._halted:
-                    break
-                if search.area:
-                    rows += await self._search_area(page, search)
-                else:
-                    self._where = search.text if several else ""
-                    rows += await self._search_list(page, self.search_url(search.text), search.text)
+            try:
+                for search in plan:
+                    if self.stats.matched >= limit or self._halted:
+                        break
+                    if search.area:
+                        await self._search_area(page, search)
+                    else:
+                        self._where = search.text if several else ""
+                        await self._search_list(page, self.search_url(search.text), search.text)
+            except GoogleBlocked as exc:
+                # every further request would only prolong the block: stop, keep what was found
+                self._halted, self.stats.blocked_ip = "blocked", exc.ip
+                log.error("Google blocked the search: %s - stopping with the %d place(s) kept so far",
+                          exc, self.stats.matched)
             await page.close()
             self.stats.links_found = len(self._seen)
             self.stats.stopped = ("limit" if self.stats.matched >= limit else self._halted
                                   or ("searched_all" if several else self._search_stop or "end_of_list"))
-            rows.sort(key=lambda r: r.rank)
+            rows = sorted(self._rows, key=lambda r: r.rank)
             elapsed = time.monotonic() - started
             if self._filtered:
                 skipped = ", ".join(f"{n} {reason}" for reason, n in
@@ -397,9 +442,11 @@ class MapsScraper:
         log.info("Opening %s", url)
         try:
             capture, single = await self._open_results(page, url, label)
+        except GoogleBlocked:
+            raise                # never skipped: every other search would be blocked as well
         except Exception as exc:  # noqa: BLE001 - see below
             if not self._where:
-                raise            # the only search: fail the job (blocked, captcha, layout change ...)
+                raise            # the only search: fail the job (unknown page, layout change ...)
             self._failures += 1
             self.stats.errors.append(f"{label}: {exc}")
             log.warning("%s: search failed (%s)", label, str(exc).splitlines()[0] if str(exc) else exc)
@@ -482,11 +529,14 @@ class MapsScraper:
         url = self.search_url(place)
         log.info("Locating %s: %s", place, url)
         try:
-            await page.goto(url, wait_until="domcontentloaded")
+            response = await page.goto(url, wait_until="domcontentloaded")
             await self._dismiss_consent(page)
+            await self._raise_if_blocked(page, response)
             await page.wait_for_selector(f"{FEED_SELECTOR}, {PLACE_HEADER_SELECTOR}", timeout=self.cfg.PAGE_TIMEOUT_MS)
         except PlaywrightTimeout:
-            pass
+            await self._raise_if_blocked(page, read_text=True)
+        except GoogleBlocked:
+            raise
         except Exception as exc:  # noqa: BLE001 - fall back to a plain search
             log.warning("Could not open %s: %s", url, exc)
             return None
@@ -512,6 +562,7 @@ class MapsScraper:
         capture.attach(page)
         response = await page.goto(url, wait_until="domcontentloaded")
         await self._dismiss_consent(page)
+        await self._raise_if_blocked(page, response)
         try:
             for rec in records_from_html(await response.text() if response else ""):
                 capture.add(rec)
@@ -534,8 +585,10 @@ class MapsScraper:
             dom = await self._dom_details(page)
             rec = _pick_record(capture, ref.place_id, dom.get("name", ""))
             return None, build_row(ref, dom, rec, {}, default_region=self.cfg.DEFAULT_REGION)
-        body = (await page.inner_text("body"))[:600] if await page.query_selector("body") else ""
-        if any(t in body for t in NO_RESULTS_TEXTS):
+        body = await self._body_text(page)
+        if is_blocked_page(page.url, body):
+            raise GoogleBlocked(page.url, blocked_ip(body))
+        if any(t in body[:600] for t in NO_RESULTS_TEXTS):
             log.warning("Google Maps reports no results for %s", label)
             self.stats.reached_end = True
             self._search_stop = "no_results"
@@ -570,6 +623,11 @@ class MapsScraper:
                          len(capture.by_place_id))
                 await self._progress("details", f"Fetching details for {len(refs)} places", 0, len(refs))
             kept += await self._scrape_details(refs, capture.by_place_id)
+        if self._search_stop == "stalled" and capture.rate_limited:
+            # the list stopped growing because Google refused its requests (HTTP 429): that is the block
+            # itself - the candidates already collected were still tried, nothing more is searched
+            await self._raise_if_blocked(page, read_text=True)
+            raise GoogleBlocked(page.url)
         return kept
 
     async def _next_candidates(self, page: Page, capture: RecordCapture, want: int) -> list[PlaceRef]:
@@ -668,6 +726,29 @@ class MapsScraper:
             except Exception:
                 continue
 
+    async def _raise_if_blocked(self, page: Page, response: Response | None = None, *,
+                                read_text: bool = False) -> None:
+        """Raise GoogleBlocked when ``page`` shows Google's "unusual traffic" check.
+
+        The URL and the response status are always checked; the page's text when the
+        status is 403 (Google's harder block) or with ``read_text`` (used when the
+        expected content did not appear).
+        """
+        status = response.status if response is not None else None
+        suspect = is_blocked_page(page.url, "", status)
+        text = await self._body_text(page) if read_text or suspect or status == 403 else ""
+        if suspect or is_blocked_page(page.url, text):
+            log.error("Google answered with its “unusual traffic” check: %s", page.url)
+            raise GoogleBlocked(page.url, blocked_ip(text))
+
+    @staticmethod
+    async def _body_text(page: Page) -> str:
+        """The first 3000 characters of the page's visible text ('' when it cannot be read)."""
+        try:
+            return (await page.inner_text("body"))[:3000] if await page.query_selector("body") else ""
+        except Exception:  # noqa: BLE001 - the page may be navigating or closed
+            return ""
+
     # ------------------------------------------------------------------
     # Phase 2: visit the candidates' place pages
     # ------------------------------------------------------------------
@@ -723,9 +804,10 @@ class MapsScraper:
         workers = [asyncio.create_task(worker()) for _ in range(max(1, min(self.cfg.DETAIL_CONCURRENCY, total)))]
         try:
             await asyncio.gather(*workers)
-        except asyncio.CancelledError:
+        except BaseException:        # cancelled, or Google blocked one tab: stop the other tabs too
             for w in workers:
                 w.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)
             raise
         return results
 
@@ -735,6 +817,7 @@ class MapsScraper:
             try:
                 response = await page.goto(ref.href, wait_until="domcontentloaded")
                 await self._dismiss_consent(page)
+                await self._raise_if_blocked(page, response)
                 await page.wait_for_selector(PLACE_HEADER_SELECTOR, timeout=self.cfg.PAGE_TIMEOUT_MS)
                 await self._wait_for_details(page)
                 # the full record arrives through the preview/place XHR - give it a moment
@@ -752,9 +835,10 @@ class MapsScraper:
                 dom = await self._dom_details(page)
                 full_rec = _pick_record(capture, ref.place_id, dom.get("name") or ref.name)
                 return build_row(ref, dom, full_rec, search_rec, default_region=self.cfg.DEFAULT_REGION)
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, GoogleBlocked):
                 raise
             except Exception as exc:  # noqa: BLE001 - we retry on anything
+                await self._raise_if_blocked(page, read_text=True)   # a timeout can hide the check
                 last_error = exc
                 log.warning("Place #%d %s: attempt %d of %d failed: %s", ref.rank, ref.name, attempt + 1,
                             self.cfg.DETAIL_RETRIES + 1, str(exc).splitlines()[0] if str(exc) else exc.__class__.__name__)
@@ -810,6 +894,7 @@ class MapsScraper:
                 await result
 
     async def _emit_row(self, row: PlaceRow) -> None:
+        self._rows.append(row)
         if self.on_row:
             result = self.on_row(row)
             if asyncio.iscoroutine(result):

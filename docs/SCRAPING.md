@@ -109,8 +109,26 @@ supplies the full record.
 The scan stops (`ScrapeStats.stopped`) when `limit` places were kept (`limit`), Google shows
 *"You've reached the end of the list"* (`end_of_list` – about 120 listings per search at most),
 the feed stops growing (`stalled`) or `MAX_SCANNED` listings were read (`scan_limit`); a direct
-place page gives `single`, an empty search `no_results`. A shorter result is not an error: the
-job completes with what it found and its `notice` says why.
+place page gives `single`, an empty search `no_results`, Google's captcha `blocked` (below). A
+shorter result is not an error: the job completes with what it found and its `notice` says why.
+
+### When Google blocks the scraper
+
+Too many searches from one IP address make Google answer with its *"unusual traffic"* check
+instead of Google Maps: the page is redirected to `google.com/sorry/…` (HTTP 429, a reCAPTCHA),
+or – for a harder block – a *"We're sorry … automated queries"* page is served (HTTP 403). Google
+Maps then stays blocked from that address for a while. The scraper recognises it
+(`is_blocked_page()`: the `/sorry/` URL, HTTP 429, or the page's wording) right after opening a
+results list, the place's map (whole-area search) or a place page, and when a results list stops
+loading because Google answers its requests with HTTP 429. Then it raises `GoogleBlocked`, and:
+
+- nothing more is requested – no retries, no further searches or map sections (a failed section
+  is not split), and the other place-page tabs are stopped – since every further request would
+  only prolong the block;
+- `scrape()` returns the places kept so far with `stats.stopped = "blocked"` and
+  `stats.blocked_ip` (the address the check names, when it shows one);
+- the job ends as `blocked` and its `error` says what happened and what to do; the CLI prints it
+  and exits with code 3 after writing the CSV.
 
 Ranks keep each listing's position in Google's list, so a filtered result has gaps (3, 7, 12 …).
 `ScrapeStats` records `links_found` (listings read), `scraped` (place pages opened), `matched`
