@@ -65,6 +65,30 @@ COUNTRY_CODES: dict[str, str] = {
     "ukraine": "UA", "russia": "RU",
 }
 
+# Pages hosted on someone else's platform. A business whose Google "website" is one
+# of these (a Facebook page, an Instagram profile, a Yelp listing, a booking page, a
+# retired Google business.site page, ...) has no website of its own. A URL matches
+# when its host is one of these domains or a sub-domain of one.
+PROFILE_DOMAINS: frozenset[str] = frozenset({
+    # social networks & messaging
+    "facebook.com", "fb.com", "fb.me", "instagram.com", "twitter.com", "x.com", "tiktok.com",
+    "linkedin.com", "youtube.com", "youtu.be", "pinterest.com", "snapchat.com", "threads.net",
+    "tumblr.com", "nextdoor.com", "vk.com", "wa.me", "whatsapp.com", "m.me", "t.me", "telegram.me",
+    # link-in-bio pages
+    "linktr.ee", "linkin.bio", "beacons.ai", "bio.link", "lnk.bio", "campsite.bio", "taplink.cc", "solo.to",
+    # directories, review sites & marketplaces
+    "yelp.com", "yellowpages.com", "tripadvisor.com", "houzz.com", "angi.com", "angieslist.com",
+    "homeadvisor.com", "thumbtack.com", "bbb.org", "porch.com", "bark.com", "manta.com", "etsy.com",
+    "justdial.com", "sulekha.com", "indiamart.com", "booking.com", "airbnb.com",
+    # booking & online-ordering platforms
+    "booksy.com", "fresha.com", "vagaro.com", "styleseat.com", "schedulicity.com", "setmore.com",
+    "calendly.com", "acuityscheduling.com", "squareup.com", "glossgenius.com", "mindbodyonline.com",
+    "opentable.com", "resy.com", "toasttab.com", "doordash.com", "ubereats.com", "grubhub.com",
+    "order.online", "zomato.com", "swiggy.com",
+    # Google's own pages (business.site / negocio.site are the retired Business Profile websites)
+    "business.site", "negocio.site", "g.page", "business.google.com", "maps.google.com", "maps.app.goo.gl",
+})
+
 _STATE_ZIP_US = re.compile(r"^([A-Z]{2})\s+(\d{5})(?:-\d{4})?$")
 _PROVINCE_POSTAL_CA = re.compile(r"^([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$", re.I)
 _STATE_POSTCODE_AU = re.compile(r"^(?:(.*?)\s+)?([A-Z]{2,3})\s+(\d{4})$")  # "Sydney NSW 2000"
@@ -232,3 +256,14 @@ def website_domain(url: str) -> str:
     """'https://www.example.com/path' -> 'example.com'."""
     m = re.match(r"^(?:https?://)?(?:www\.)?([^/:?#]+)", (url or "").strip(), re.I)
     return m.group(1).lower() if m else ""
+
+
+def website_type(url: str) -> str:
+    """Classify a listing's website: 'none', 'profile' (a page on a platform from
+    `PROFILE_DOMAINS`, e.g. a Facebook page) or 'own' (the business's own site)."""
+    host = website_domain(url)
+    if not host:
+        return "none"
+    if any(host == domain or host.endswith("." + domain) for domain in PROFILE_DOMAINS):
+        return "profile"
+    return "own"

@@ -1,9 +1,9 @@
 # Google Maps Lead Crawler
 
-Search Google Maps for a place or keyword (for example `roofing companies near houston`),
-collect the top *N* listings, look up missing **emails / phone numbers on each business
-website**, and export everything as a spreadsheet-ready **CSV** — from a web panel or the
-command line.
+Search Google Maps for a type of business in a city (for example *plumbers* in *Austin, TX*),
+keep only the businesses you want — e.g. **no website of their own, but a phone or an email** —
+look up missing **emails / phone numbers on each business website**, and export everything as a
+spreadsheet-ready **CSV** — from a web panel or the command line.
 
 ```
 Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Url | Rank | Review Count | Description
@@ -11,8 +11,16 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
 
 ## Features
 
-- **Web panel** – enter a query and the number of results, watch progress live, browse the
-  rows in a table, download / copy the CSV, revisit previous jobs from the history list.
+- **Web panel** – enter a business type, a city and the number of results, watch progress live,
+  browse the rows in a table, download / copy the CSV, revisit previous jobs from the history list.
+- **Filters** – *Website*: any / **no website** / has website; *Must have*: phone, email,
+  **phone or email**, phone and email. A Facebook, Instagram, Yelp, booking or retired
+  `business.site` page does not count as a website (switchable). The number of results counts
+  *matching* businesses: the crawler keeps going down Google's list until it has that many, and
+  never opens the page of a listing the results already show has a website.
+- **Honest short results** – ask for 200 when a city has 35: you get the 35 and a note saying
+  that is every listing Google Maps has for that search (or that Google's ~120-per-search cap was
+  hit, so there may be more).
 - **Google Maps scraping** with a real Chromium browser (Playwright): scrolls the results feed
   until the requested count is reached, then opens every listing to collect name, address
   (split into city / state / country), website, phone (formatted + E.164), rating, review
@@ -25,7 +33,7 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
   Sheets) plus an *extended* export with the extra fields.
 - **Live logs** – a terminal-style section in the panel shows what the scraper and the email
   finder are doing as it happens (filter by level or by the current job, pause, clear, save).
-- **CLI** for scripted or scheduled runs (`python cli.py "dentists in austin" --limit 50 --enrich`).
+- **CLI** for scripted or scheduled runs (`python cli.py dentists "Austin, TX" --website without -n 50`).
 - **JSON API** (FastAPI, OpenAPI docs at `/docs`) so the crawler can be driven by other tools.
 - Jobs are persisted on disk, survive restarts, can be cancelled, and partial results are kept.
 
@@ -63,16 +71,27 @@ python run.py
 
 ## Using the panel
 
-1. **City / keyword** – anything you would type into Google Maps: `roofing companies near
-   houston`, `dentists in austin tx`, `coffee shops downtown seattle`.
-2. **Number of results** – how many places you want (1 – 500). Google stops paging at roughly
-   120 results for a single query; split broad searches by area for more.
-3. Optionally tick **Find emails & phones on websites after scraping** to run enrichment
-   automatically, or press **✉ Find missing emails / phones** (whole table) / the row-level
-   **✉ Find** button afterwards. Rows that gained extra emails appear indented (`↳`) under the
-   original with the same rank.
-4. **⬇ Download CSV** gives the 12-column file shown above; **Extended CSV** adds address,
-   category, rating, place id, coordinates and where each email was found.
+1. **Business type** – what you are looking for: `plumbers`, `hair salon`, `dentist`.
+2. **City / area** – where: `Austin, TX`, `Manchester`, `downtown Seattle`. The panel shows the
+   search it will run (`plumbers in Austin, TX`).
+3. **Number of results** – how many *matching* businesses you want (1 – 500). Google Maps lists
+   at most about 120 businesses per search; split broad searches by area for more.
+4. **Filters** (remembered for next time):
+   - **Website** – *Any*, **No website** (only businesses without a website of their own) or
+     *Has website*. By default a Facebook / Instagram / Yelp / booking page doesn't count as a
+     website; untick the box under the buttons to count them.
+   - **Must have** – *Phone or email* keeps businesses you can reach; *Phone*, *Email* and
+     *Phone and email* are stricter. Google Maps never shows emails, so an email comes from the
+     listing's description or, while scanning, from the business's website / social page.
+5. Optionally tick **Afterwards, look for emails & phones on websites / social pages** to run
+   enrichment automatically, or press **✉ Find missing emails / phones** (whole table) / the
+   row-level **✉ Find** button afterwards. Rows that gained extra emails appear indented (`↳`)
+   under the original with the same rank.
+6. If fewer businesses exist than you asked for, a note above the table says so — e.g. *"Only 35
+   businesses found for “plumbers” in Austin, TX — that's every listing Google Maps has for this
+   search (you asked for 200)."*
+7. **⬇ Download CSV** gives the 12-column file shown above; **Extended CSV** adds address,
+   category, website type, rating, place id, coordinates and where each email was found.
 
 The **History** list keeps every job (stored as JSON under `data/jobs/`); click one to
 reload its rows, `✕` deletes it.
@@ -87,12 +106,19 @@ the bottom resumes it. The section can be collapsed with the ▾ button.
 ## Command line
 
 ```bash
+python cli.py plumbers "Austin, TX" --website without --contact phone_or_email --limit 50
 python cli.py "roofing companies near houston" --limit 50 --enrich --out houston.csv
 ```
 
+The first argument is the business type, the second the place (leave it out to pass a whole
+search as one argument).
+
 | Option | Meaning |
 | --- | --- |
-| `--limit / -n` | number of places (default 20) |
+| `--limit / -n` | number of matching places (default 20) |
+| `--website` | `any` (default), `without` (no website of their own) or `with` |
+| `--contact` | `any` (default), `phone`, `email`, `phone_or_email` or `phone_and_email` |
+| `--profiles-are-websites` | count a Facebook / Instagram / Yelp / booking page as a website |
 | `--enrich` | look up emails / phones on every website that is missing one |
 | `--extended` | include the extra columns |
 | `--headed` | show the browser window while scraping |
@@ -119,10 +145,10 @@ Every setting is listed in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#configurati
 
 ```mermaid
 flowchart LR
-    U[Panel / CLI] -->|query, limit| J[Job manager]
+    U[Panel / CLI] -->|business, place,<br/>limit, filters| J[Job manager]
     J --> S[Maps scraper<br/>Playwright + Chromium]
-    S -->|scroll feed, open places| G[(Google Maps)]
-    S -->|rows| J
+    S -->|scroll feed, open places<br/>until enough match| G[(Google Maps)]
+    S -->|matching rows| J
     J -->|websites with<br/>missing email/phone| E[Website enricher<br/>httpx + Chromium fallback]
     E -->|emails, phones| J
     J --> C[CSV export]
@@ -139,6 +165,7 @@ app/
   jobs.py              background job manager, enrichment application, persistence
   logbuffer.py         ring buffer behind the Live logs section
   models.py            PlaceRow / Job pydantic models
+  filters.py           search filters (website / contact rules)
   config.py            settings (env / .env)
   scraper/
     maps.py            Playwright Google Maps scraper
@@ -186,5 +213,10 @@ tests that fail when a column, API route or setting is added without updating th
   [docs/SCRAPING.md](docs/SCRAPING.md) for how the fallbacks are layered and how to repair them.
 - Keep volumes reasonable (a few hundred results per session, small delays are built in) and
   use a proxy if you run large batches. Heavy use can trigger Google's bot detection.
+- Google Maps lists at most about 120 businesses per search, so a filtered search can only find
+  the matches among those; search neighbouring areas for more.
+- Google Maps does not show email addresses. For businesses without a website an email can only
+  come from their listing's description or their social / booking page, so most of them will
+  have a phone but no email.
 - Emails are collected from public business websites. Make sure your outreach complies with
   the laws that apply to you (CAN-SPAM, GDPR, PECR, …) and with Google's terms of service.

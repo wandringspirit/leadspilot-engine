@@ -17,6 +17,7 @@ flowchart TB
     subgraph Server["FastAPI process (app/main.py)"]
         API[JSON API]
         JM[JobManager<br/>app/jobs.py]
+        FLT[SearchFilters<br/>app/filters.py]
         MS[MapsScraper<br/>app/scraper/maps.py]
         REC[records.py<br/>decode Google records]
         PARSE[parsing.py<br/>address / phone / url]
@@ -38,7 +39,9 @@ flowchart TB
     CLI --> WE
     CLI --> CSV
     API --> JM
+    JM --> FLT
     JM --> MS
+    MS -.->|selector: prefilter / accept| JM
     JM --> WE
     JM --> CSV
     JM <--> FS
@@ -64,10 +67,11 @@ the same capabilities.
 | Component | File | Responsibility |
 | --- | --- | --- |
 | **Settings** | `app/config.py` | Typed configuration from environment / `.env` (pydantic-settings). |
-| **Models** | `app/models.py` | `PlaceRow` (one output row), `Job` (a scrape request with its rows, status and progress), request bodies. |
+| **Models** | `app/models.py` | `PlaceRow` (one output row), `Job` (a search – business, place, filters – with its rows, status, progress and notice), request bodies. |
+| **Filters** | `app/filters.py` | `SearchFilters`: the *Website* and *Must have* rules as pure functions (used on the feed, on scraped places and to decide when an email lookup can help). |
 | **API** | `app/main.py` | REST routes, CSV download, static panel, cache headers. |
-| **JobManager** | `app/jobs.py` | Creates and tracks asyncio tasks for scrapes and enrichments, applies enrichment results (incl. duplicate-row rule), persists jobs as JSON, restores them on start-up. |
-| **MapsScraper** | `app/scraper/maps.py` | Drives Chromium: search page → scroll feed → visit place pages → build rows. Reports progress and rows through callbacks. |
+| **JobManager** | `app/jobs.py` | Creates and tracks asyncio tasks for scrapes and enrichments; `PlaceFilter` applies a job's filters while it scrapes (listing emails, inline email lookups); applies enrichment results (incl. duplicate-row rule); writes the short-result `notice`; persists jobs as JSON, restores them on start-up. |
+| **MapsScraper** | `app/scraper/maps.py` | Drives Chromium: search page → scroll feed → visit place pages → build rows, in rounds until `limit` places are kept by the selector. Reports progress and rows through callbacks. |
 | **records** | `app/scraper/records.py` | Decodes the nested-array place records Google embeds in its XHR responses / HTML. |
 | **parsing** | `app/scraper/parsing.py` | Pure helpers: address → city/state/country, phone → national + E.164, URL cleaning, Maps URL builder. |
 | **WebsiteEnricher** | `app/enrichment/website.py` | Fetch strategy for a business website (homepage, contact pages, browser fallback), concurrency. |
@@ -90,23 +94,29 @@ sequenceDiagram
     participant E as WebsiteEnricher
     participant W as Business website
 
-    UI->>API: POST /api/scrape {query, limit, enrich}
+    UI->>API: POST /api/scrape {business, place, limit, filters, enrich}
     API->>JM: create_scrape()
     JM-->>API: Job (queued)
     API-->>UI: 202 {job id}
     activate JM
-    JM->>S: scrape(query, limit)
+    JM->>S: scrape("business in place", limit, selector=PlaceFilter)
     S->>G: open /maps/search/<query>
-    loop until limit reached or end of list
-        S->>G: scroll results feed
-        G-->>S: /search?tbm=map XHR (20 records/page)
+    loop rounds, until limit places kept or the list ends
+        loop until enough candidates
+            S->>G: scroll results feed
+            G-->>S: /search?tbm=map XHR (20 records/page)
+            S->>JM: prefilter(listing) – skip if its website rules it out
+        end
+        par up to DETAIL_CONCURRENCY tabs
+            S->>G: open candidate's place page
+            G-->>S: /maps/preview/place XHR + DOM
+            S->>JM: accept(row) – listing emails, email lookup if needed, filters
+            JM-->>S: rows to keep (or reason)
+            S-->>JM: on_row(PlaceRow) for kept rows
+        end
     end
-    par up to DETAIL_CONCURRENCY tabs
-        S->>G: open place page
-        G-->>S: /maps/preview/place XHR + DOM
-        S-->>JM: on_row(PlaceRow)
-    end
-    S-->>JM: done
+    S-->>JM: done (stats: scanned, kept, skipped, why it stopped)
+    JM->>JM: notice if fewer than limit ("Only 35 … found")
     opt enrich = true
         JM->>E: enrich_many(websites missing email/phone)
         E->>W: GET homepage / contact pages
@@ -259,6 +269,12 @@ Nothing else is stored. Deleting `data/` resets the application.
 | **JSON files for persistence** | Human-readable, zero setup, easy to back up; jobs are small (hundreds of rows). |
 | **Vanilla JS panel, no build step** | Nothing to compile; the UI is a thin client over the API and can be edited with any text editor. |
 | **One row per email** | Matches how lead lists are consumed in spreadsheets / CRMs (one contact per row) — explicitly requested. |
+| **Business + place instead of one query box** | Matches how leads are searched ("plumbers" in "Austin, TX"), names jobs and files clearly; the text sent to Google is still one query (`plumbers in Austin, TX`), and free-text queries keep working. |
+| **Filter while scanning; `limit` counts matches** | "20 businesses without a website" is what the user wants, not "20 listings, some without a website". The scraper keeps scrolling until enough places matched. |
+| **Pre-filter on the feed, confirm on the place page** | Visiting a place page is the slow part (1–3 s). The feed's records already say whether a listing has a website, so pages that cannot match are never opened; the final decision is always made on the fully scraped place. |
+| **A Facebook / Yelp / booking page is not a website** (switchable) | For lead generation such businesses have no site of their own; enrichment reads only that page, never the platform's own contact pages. |
+| **Short results are explained, not errors** | Asking for 200 in a city with 35 matches should give the 35 and say that's all Google lists — or that Google's ~120-per-search cap was hit, so the user knows whether searching nearby areas can find more. |
+| **No junk-email filtering** | Heuristic blocklists dropped real addresses (`john@smithplumbing.com`, `…@thecleaningcompany.com`); keeping everything and ordering by score loses nothing. |
 | **UTF-8 BOM in CSV** | Excel on Windows otherwise mangles accented names. |
 | **Docs-consistency tests** | Columns, routes, settings and record indexes are cross-checked against the docs so the documentation cannot silently rot. |
 | **Polling instead of websockets for progress and logs** | One code path that works through any proxy, trivially testable with `TestClient`; a 1.2 s poll of a few KB is negligible next to the browser work. |

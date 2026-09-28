@@ -23,16 +23,8 @@ OBFUSCATED_RE = re.compile(
 )
 _DOT_TOKEN_RE = re.compile(r"\s*(?:\[\s*dot\s*\]|\(\s*dot\s*\)|\{\s*dot\s*\}|\s+dot\s+)\s*", re.I)
 
-# Emails that are never a business contact.
-JUNK_DOMAIN_PARTS = (
-    "example.", "sentry.io", "sentry-next", "wixpress.com", "wix.com", "domain.com",
-    "yourdomain", "email.com", "yoursite", "mysite.com", "sitename", "company.com",
-    "godaddy", "wordpress.com", "w3.org", "schema.org", "googleapis", "cloudflare",
-    "placeholder", "test.com", "2x.png", "squarespace", "webflow", "hubspot",
-    "jquery", "bootstrap", "react", "polyfill", "shopify", "mailchimp",
-)
-JUNK_LOCAL_PARTS = ("user@", "name@", "email@", "your@", "yourname@", "someone@",
-                    "john@", "jane@", "test@", "username@", "first.last@")
+# Asset file names that match the email pattern ("logo@2x.png"). None of these
+# extensions is a real top-level domain, so no deliverable address is lost.
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".css", ".js", ".ico", ".pdf")
 ROLE_PRIORITY = ("info", "contact", "hello", "office", "sales", "admin", "support",
                  "service", "estimates", "quotes", "inquiries", "enquiries", "mail")
@@ -71,6 +63,11 @@ def decode_cfemail(encoded: str) -> str:
 
 
 def clean_email(raw: str) -> str:
+    """Normalise a candidate address; '' when it is not a syntactically valid email.
+
+    There is deliberately no junk / placeholder filtering: every valid address is
+    kept and `score_email` puts the site's own addresses first.
+    """
     email = unquote((raw or "").strip()).strip(".,;:<>()[]{}\"'")
     email = email.split("?", 1)[0]          # mailto:foo@bar.com?subject=..
     email = email.lower()
@@ -79,8 +76,6 @@ def clean_email(raw: str) -> str:
     if not EMAIL_RE.fullmatch(email):
         return ""
     if email.endswith(IMAGE_EXTENSIONS):
-        return ""
-    if any(part in email for part in JUNK_DOMAIN_PARTS) or email.startswith(JUNK_LOCAL_PARTS):
         return ""
     local, _, domain = email.partition("@")
     if len(local) > 64 or len(domain) > 253 or ".." in email:
@@ -96,6 +91,16 @@ def deobfuscate(text: str) -> list[str]:
         candidate = clean_email(f"{m.group(1)}@{domain}")
         if candidate:
             found.append(candidate)
+    return found
+
+
+def emails_in_text(text: str) -> list[str]:
+    """Addresses written in plain text (incl. `[at]` / `[dot]` spellings), in order of appearance."""
+    found: list[str] = []
+    for candidate in [m.group(0) for m in EMAIL_RE.finditer(text or "")] + deobfuscate(text):
+        email = clean_email(candidate)
+        if email and email not in found:
+            found.append(email)
     return found
 
 

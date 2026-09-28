@@ -27,7 +27,7 @@ Errors use FastAPI's shape: `{"detail": "message"}` with `400`, `404`, `409` or 
 sequenceDiagram
     participant C as Client
     participant A as API
-    C->>A: POST /api/scrape {query, limit}
+    C->>A: POST /api/scrape {business, place, limit, filters}
     A-->>C: 202 JobSummary {id, status: queued}
     loop poll every 1–2 s
         C->>A: GET /api/jobs/{id}
@@ -47,7 +47,7 @@ sequenceDiagram
 ### GET `/api/health`
 
 ```json
-{ "status": "ok", "version": "1.1.0", "jobs": 3 }
+{ "status": "ok", "version": "1.2.0", "jobs": 3 }
 ```
 
 ### GET `/api/config`
@@ -55,6 +55,7 @@ sequenceDiagram
 ```json
 {
   "max_results": 500,
+  "max_scanned": 1000,
   "headless": true,
   "detail_concurrency": 3,
   "enrich_max_pages": 6,
@@ -65,30 +66,58 @@ sequenceDiagram
 
 ### POST `/api/scrape`
 
-Starts a job and returns immediately (`202`).
+Starts a job and returns immediately (`202`). The search sent to Google Maps is
+`"<business> in <place>"`.
 
 Request body:
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `query` | string (2–200 chars) | yes | e.g. `"roofing companies near houston"` |
-| `limit` | int 1–500 | no (20) | number of places; capped by `MAX_RESULTS` |
+| `business` | string (≤120 chars) | yes¹ | what to look for, e.g. `"plumbers"` |
+| `place` | string (≤120 chars) | no | where, e.g. `"Austin, TX"` |
+| `query` | string (≤200 chars) | yes¹ | a complete free-text search (`"roofing companies near houston"`), used only when `business` is empty |
+| `limit` | int 1–500 | no (20) | number of **matching** places; capped by `MAX_RESULTS` |
+| `filters` | object | no | see below; omitted = keep every place |
 | `enrich` | bool | no (false) | run website enrichment automatically after scraping |
 | `headless` | bool | no | override `HEADLESS` for this job (`false` shows the browser) |
 
+¹ `business` or `query` must be given (the resulting search needs at least 2 characters); `422` otherwise.
+
+`filters` (all optional – rules in [DATA_MODEL.md §9](DATA_MODEL.md#9-search-filters)):
+
+| Field | Values | Default | Meaning |
+| --- | --- | --- | --- |
+| `website` | `any`, `without`, `with` | `any` | keep places without / with a website of their own |
+| `contact` | `any`, `phone`, `email`, `phone_or_email`, `phone_and_email` | `any` | contact details a place must have |
+| `profiles_as_no_website` | bool | `true` | a Facebook / Instagram / Yelp / booking / `business.site` page does not count as a website |
+
+Responses echo the filters with a read-only `label` (e.g. `"no website · phone or email"`).
+
 ```bash
-curl -X POST http://127.0.0.1:8000/api/scrape -H "Content-Type: application/json" -d "{\"query\":\"roofing companies near houston\",\"limit\":30,\"enrich\":true}"
+curl -X POST http://127.0.0.1:8000/api/scrape -H "Content-Type: application/json" -d "{\"business\":\"plumbers\",\"place\":\"Austin, TX\",\"limit\":30,\"filters\":{\"website\":\"without\",\"contact\":\"phone_or_email\"}}"
 ```
+
+With filters the job keeps scrolling Google's list until `limit` places match (or the list
+ends) and skips the place page of every listing the results feed already rules out.
 
 Response (`JobSummary`):
 
 ```json
 {
-  "id": "job_5f0c2a1b9d3e", "query": "roofing companies near houston", "limit": 30,
-  "status": "queued", "progress": { "phase": "queued", "message": "", "current": 0, "total": 0, "percent": 0.0 },
-  "row_count": 0, "created_at": "…", "updated_at": "…", "finished_at": null, "error": null
+  "id": "job_5f0c2a1b9d3e", "query": "plumbers in Austin, TX", "business": "plumbers", "place": "Austin, TX",
+  "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
+               "label": "no website · phone or email" },
+  "limit": 30, "status": "queued",
+  "progress": { "phase": "queued", "message": "", "current": 0, "total": 0, "percent": 0.0 },
+  "row_count": 0, "found": null, "notice": "",
+  "created_at": "…", "updated_at": "…", "finished_at": null, "error": null
 }
 ```
+
+`found` is the number of places kept once the scrape has finished (rows can be more – one per
+email). `notice` explains a result smaller than `limit`, e.g. *"Only 35 businesses found for
+“plumbers” in Austin, TX — that's every listing Google Maps has for this search (you asked for
+200)."*; it is empty otherwise.
 
 ### GET `/api/jobs`
 
@@ -96,7 +125,8 @@ Array of `JobSummary` (see above), newest first.
 
 ### GET `/api/jobs/{job_id}`
 
-The full `Job` (see [DATA_MODEL.md](DATA_MODEL.md#6-job-model-api)) including `rows`.
+The full `Job` (see [DATA_MODEL.md](DATA_MODEL.md#6-job-model-api)) including `rows`, `notice`
+and `stats` (listings scanned, places matched, places skipped by reason, why the scan stopped).
 Rows appear while the job is running, so clients can render progressively. `404` if unknown.
 
 ### DELETE `/api/jobs/{job_id}`
@@ -133,10 +163,11 @@ enrichment is already in progress.
 
 | Query parameter | Default | Meaning |
 | --- | --- | --- |
-| `extended` | `false` | `true` adds Address, Category, Rating, Place ID, Maps URL, Latitude, Longitude, Email Source, Phone Source, Enrichment Status |
+| `extended` | `false` | `true` adds Address, Category, Website Type, Rating, Place ID, Maps URL, Latitude, Longitude, Email Source, Phone Source, Enrichment Status |
 
 Returns `text/csv; charset=utf-8` with a UTF-8 BOM and a
-`Content-Disposition: attachment; filename="<query>.csv"` header. A copy is written to
+`Content-Disposition: attachment; filename="<query>[_<filters>].csv"` header
+(`plumbers_in_austin_tx_no_website_phone_or_email.csv`). A copy is written to
 `data/exports/<job id>.csv`.
 
 ```bash
@@ -202,9 +233,12 @@ Every element of `rows` is a `PlaceRow`; fields are described in
   "category": "Roofing contractor", "rating": 5.0, "place_id": "ChIJTZZO_rtiToYRlYiyuKpgWgc",
   "maps_url": "https://www.google.com/maps/place/HonestRoof.com/data=…",
   "latitude": 32.6807685, "longitude": -97.1082412,
-  "email_source": "", "phone_source": "maps", "enrichment_status": "", "enrichment_note": ""
+  "email_source": "", "phone_source": "maps", "enrichment_status": "", "enrichment_note": "",
+  "website_type": "own"
 }
 ```
+
+`website_type` is derived from `website` (`none`, `own` or `profile`) and read-only.
 
 ## Notes for integrators
 

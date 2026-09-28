@@ -14,8 +14,11 @@
 | Symptom | Cause | What to do |
 | --- | --- | --- |
 | Job fails with *"Google Maps results feed did not appear (blocked, captcha or layout change?)"* | Google served a captcha / "unusual traffic" page, a consent page we could not dismiss, or the layout changed | Run the job with **Show the browser window** (or `HEADLESS=false`) and look. Captcha → wait 15–30 min, lower `DETAIL_CONCURRENCY`, use `PROXY_SERVER`. Layout change → [SCRAPING.md §6](SCRAPING.md#6-when-google-changes-its-layout). |
-| Fewer results than requested, `stats.reached_end = true` | Google's list really ended (it pages to ~120 results at most) | Split the search into narrower areas or categories. |
-| Fewer results, `reached_end = false` | Feed stopped loading (slow network) | Increase `SCROLL_PAUSE_MS` / `SCROLL_STALL_LIMIT`. |
+| Fewer results than requested, notice *"Only N businesses found … that's every listing"* (`stats.stopped = end_of_list`) | Google's list for that search really ended | Nothing is wrong – that is all Google Maps lists. Try a related business type or a nearby area. |
+| Fewer results, notice *"Google Maps stopped listing … after 120 results"* | Google shows at most ~120 listings per search | Split the search into narrower areas (neighbourhoods, nearby towns) or categories. |
+| Fewer results, notice *"stopped loading after N listings"* (`stopped = stalled`) | Feed stopped loading (slow network, throttling) | Retry; increase `SCROLL_PAUSE_MS` / `SCROLL_STALL_LIMIT`. |
+| A *No website* search finds only a few businesses | most businesses in that category have a website; only the ~120 listings Google shows per search can be checked | Check the subtitle (`… listings scanned (skipped: …)`); search more areas. Untick *Facebook, Instagram … don't count as a website* only if you want to exclude businesses that just have a social page. |
+| A filtered search is slow | *Must have: Email* (or *Phone and email*, or *Phone or email* for places without a phone) searches each candidate's website / social page while scanning | Expected; use *Phone or email* or *Phone* for speed, or lower `ENRICH_MAX_PAGES`. |
 | Results are from the wrong country / city | Google localises by IP when the query has no place | Put the place in the query (`… near houston`) or set `REGION_CODE`. |
 | `City`/`State`/`Country` empty but `Address` empty too | Service-area business without a public address | Expected – nothing to parse. |
 | Descriptions empty for every row | `/maps/preview/place` XHR not captured or index `[154]` moved | Check with `--headed`; see SCRAPING.md §3. |
@@ -29,7 +32,8 @@
 | --- | --- | --- |
 | Row shows `error` with *HTTP 403* / *Server disconnected* | site blocks non-browser clients; if the Chromium fallback also failed the site is unreachable or has a hard bot wall | open the site manually; make sure `ENRICH_BROWSER_FALLBACK=true`. |
 | `not_found` although the site clearly shows an email | email is an image, is injected after a user action, or lives on a page not in the candidate list | add the page's path to `STANDARD_PATHS` / a keyword to `CONTACT_KEYWORDS` in `extractors.py`. |
-| Wrong email (e.g. a plugin vendor) | junk filter missed a pattern | add the domain to `JUNK_DOMAIN_PARTS`; report it so the default list improves. |
+| Unwanted addresses (`you@example.com`, `…@sentry.io`, a plugin vendor) as extra rows | there is no junk-email filtering, by design – every valid address found is kept | They sort after the site's own addresses; delete them in the spreadsheet. The extended CSV's `Email Source` shows the page each came from. |
+| A Facebook / Instagram page is marked `not_found` | the platform showed a login page instead of the business's details | Open the page yourself; nothing else to fetch there. |
 | Phone found on the website differs from Maps | Maps phone is kept when present; website phones only fill empty cells | use the extended CSV (`Phone Source`) to see where it came from. |
 | Enrichment button disabled | job still running, or every row with a website already has email + phone | wait, or use the API with `force: true`. |
 

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     LOCALE: str = "en-US"                 # forces English UI so selectors match
     REGION_CODE: str = ""                 # optional Google "gl" param, e.g. "us" - biases results
     MAX_RESULTS: int = 500                # hard cap for a single job
+    MAX_SCANNED: int = 1000               # listings examined per job while looking for filter matches
     DETAIL_CONCURRENCY: int = 3           # parallel tabs used for place pages
     SCROLL_PAUSE_MS: int = 1200           # wait between feed scrolls
     SCROLL_STALL_LIMIT: int = 6           # scrolls without new results -> stop

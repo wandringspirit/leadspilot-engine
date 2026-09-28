@@ -59,6 +59,7 @@ async def config() -> dict:
     """Non-secret settings the panel needs for validation and hints."""
     return {
         "max_results": settings.MAX_RESULTS,
+        "max_scanned": settings.MAX_SCANNED,
         "headless": settings.HEADLESS,
         "detail_concurrency": settings.DETAIL_CONCURRENCY,
         "enrich_max_pages": settings.ENRICH_MAX_PAGES,
@@ -71,7 +72,8 @@ async def config() -> dict:
 async def start_scrape(req: ScrapeRequest) -> JobSummary:
     if req.limit > settings.MAX_RESULTS:
         raise HTTPException(400, f"limit must be <= {settings.MAX_RESULTS}")
-    job = manager.create_scrape(req.query, req.limit, enrich=req.enrich, headless=req.headless)
+    job = manager.create_scrape(req.search_query, req.limit, business=req.business, place=req.place,
+                                filters=req.filters, enrich=req.enrich, headless=req.headless)
     return job.summary()
 
 
@@ -116,7 +118,8 @@ async def enrich_job(job_id: str, req: EnrichRequest | None = None) -> JobSummar
 @app.get("/api/jobs/{job_id}/export.csv")
 async def export_csv(job_id: str, extended: bool = Query(False)) -> Response:
     job = _job_or_404(job_id)
-    filename = _safe_filename(job.query) + ("_extended" if extended else "") + ".csv"
+    suffix = job.filters.slug()
+    filename = _safe_filename(job.query) + (f"_{suffix}" if suffix else "") + ("_extended" if extended else "") + ".csv"
     payload = rows_to_csv_bytes(job.rows, extended=extended)
     try:  # keep a copy on disk for convenience
         (settings.exports_dir / f"{job.id}{'_extended' if extended else ''}.csv").write_bytes(payload)

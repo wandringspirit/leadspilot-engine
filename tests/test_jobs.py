@@ -1,7 +1,18 @@
 from app.enrichment.extractors import EmailHit
 from app.enrichment.website import ContactResult
-from app.jobs import apply_contact_result, group_by_place, select_enrichment_targets
-from app.models import PlaceRow
+from app.filters import SearchFilters
+from app.jobs import (
+    PlaceFilter,
+    apply_contact_result,
+    apply_listing_emails,
+    group_by_place,
+    result_notice,
+    select_enrichment_targets,
+)
+from app.models import Job, PlaceRow, build_query
+from app.scraper.maps import PlaceRef
+
+NO_SITE = SearchFilters(website="without", contact="phone_or_email")
 
 
 def _row(rank: int, **kw) -> PlaceRow:
@@ -91,3 +102,125 @@ def test_apply_unknown_rank_is_noop():
     rows = [_row(1)]
     assert apply_contact_result(rows, 99, _result("https://x.com/", ["a@x.com"])) == []
     assert rows[0].email == ""
+
+
+# ----------------------------------------------------------------------
+# emails written in the listing
+# ----------------------------------------------------------------------
+def test_apply_listing_emails_follows_the_one_row_per_email_rule():
+    rows = [_row(1, website="", maps_url="https://www.google.com/maps/place/Joes",
+                 description="Email info@joes.com or joe [at] gmail [dot] com for a quote")]
+    added = apply_listing_emails(rows)
+    assert [r.email for r in rows] == ["info@joes.com", "joe@gmail.com"]
+    assert len(added) == 1 and added[0].rank == 1 and added[0].row_id != rows[0].row_id
+    assert {r.email_source for r in rows} == {"https://www.google.com/maps/place/Joes"}
+    assert apply_listing_emails([_row(2)]) == [] and apply_listing_emails([]) == []
+
+
+# ----------------------------------------------------------------------
+# PlaceFilter - the scraper's selector
+# ----------------------------------------------------------------------
+def test_place_filter_prefilter_uses_the_feed_hint():
+    f = PlaceFilter(NO_SITE)
+    assert f.prefilter(PlaceRef(rank=1, href="", website_hint="https://acme.com")) == "has a website"
+    assert f.prefilter(PlaceRef(rank=1, href="", website_hint="https://www.facebook.com/acme")) == ""
+    assert f.prefilter(PlaceRef(rank=1, href="", website_hint="")) == ""
+    assert f.prefilter(PlaceRef(rank=1, href="", website_hint=None)) == ""
+
+
+async def test_place_filter_keeps_places_without_a_website_that_have_a_phone():
+    f = PlaceFilter(NO_SITE)
+    rows, reason = await f.accept(_row(1, website=""))
+    assert reason == "" and [r.rank for r in rows] == [1]
+    assert await f.accept(_row(2)) == ([], "has a website")
+    assert await f.accept(_row(3, website="", phone="", phone_unformatted="")) == ([], "no phone or email")
+
+
+async def test_place_filter_looks_for_an_email_only_where_it_decides():
+    calls = []
+
+    async def lookup(url, *, region=None):
+        calls.append((url, region))
+        return _result(url, ["hello@joes.com"])
+
+    f = PlaceFilter(NO_SITE, lookup=lookup)
+    assert f.wants_lookups
+    rows, _ = await f.accept(_row(1, website="https://www.facebook.com/joes"))   # has a phone: no lookup
+    assert rows and calls == []
+    rows, reason = await f.accept(_row(2, website="https://www.facebook.com/joes2", phone="",
+                                       phone_unformatted="", country="GB"))
+    assert reason == "" and rows[0].email == "hello@joes.com" and rows[0].enrichment_status == "done"
+    assert calls == [("https://www.facebook.com/joes2", "GB")]
+
+
+async def test_place_filter_rejects_when_the_lookup_finds_nothing_or_fails():
+    async def nothing(url, *, region=None):
+        return _result(url, [])
+
+    async def broken(url, *, region=None):
+        raise RuntimeError("boom")
+
+    def silent():
+        return _row(3, website="https://www.facebook.com/x", phone="", phone_unformatted="")
+
+    assert await PlaceFilter(NO_SITE, lookup=nothing).accept(silent()) == ([], "no phone or email")
+    assert await PlaceFilter(NO_SITE, lookup=broken).accept(silent()) == ([], "no phone or email")
+    assert not PlaceFilter(SearchFilters(website="without", contact="phone")).wants_lookups
+
+
+async def test_default_place_filter_keeps_everything_and_adds_listing_emails():
+    f = PlaceFilter()
+    assert not f.active and not f.wants_lookups
+    rows, reason = await f.accept(_row(1, description="Write to office@p1.com"))
+    assert reason == "" and rows[0].email == "office@p1.com"
+
+
+# ----------------------------------------------------------------------
+# result_notice - "only 35 found"
+# ----------------------------------------------------------------------
+def _job(limit=200, filters=None, **stats) -> Job:
+    return Job(query=build_query("plumbers", "Austin, TX"), business="plumbers", place="Austin, TX",
+               limit=limit, filters=filters or SearchFilters(), stats=stats)
+
+
+def test_build_query():
+    assert build_query(" plumbers ", " Austin, TX ") == "plumbers in Austin, TX"
+    assert build_query("roofers near houston", "") == "roofers near houston"
+
+
+def test_no_notice_when_the_limit_was_reached_or_the_run_did_not_finish():
+    assert result_notice(_job(limit=20, matched=20, links_found=20, stopped="limit")) == ""
+    assert result_notice(_job(matched=5, links_found=5, stopped="")) == ""
+
+
+def test_notice_for_a_complete_list():
+    assert result_notice(_job(matched=35, links_found=35, stopped="end_of_list")) == (
+        "Only 35 businesses found for “plumbers” in Austin, TX — that's every listing Google Maps has "
+        "for this search (you asked for 200).")
+
+
+def test_notice_for_a_complete_list_with_filters():
+    assert result_notice(_job(filters=NO_SITE, matched=35, links_found=87, stopped="end_of_list")) == (
+        "Only 35 of the 87 businesses Google Maps lists for “plumbers” in Austin, TX match your filters "
+        "(no website · phone or email) — that's all of them (you asked for 200).")
+    one = result_notice(_job(filters=NO_SITE, matched=1, links_found=87, stopped="end_of_list"))
+    assert one.startswith("Only 1 of the 87 businesses") and " matches your filters " in one
+    assert result_notice(_job(filters=NO_SITE, matched=0, links_found=87, stopped="end_of_list")) == (
+        "None of the 87 businesses Google Maps lists for “plumbers” in Austin, TX match your filters "
+        "(no website · phone or email).")
+
+
+def test_notice_when_google_cut_the_list_short():
+    text = result_notice(_job(filters=NO_SITE, matched=35, links_found=120, stopped="end_of_list"))
+    assert text == ("Google Maps stopped listing “plumbers” in Austin, TX after 120 results — it shows at most "
+                    "about 120 per search, so there may be more. 35 of them match your filters (no website · "
+                    "phone or email). Search smaller areas (neighbourhoods or nearby towns) to find more.")
+
+
+def test_notice_for_other_stops():
+    assert result_notice(_job(matched=0, links_found=0, stopped="no_results")) == (
+        "Google Maps has no results for “plumbers” in Austin, TX.")
+    assert "stopped loading after 60 listings" in result_notice(_job(matched=60, links_found=60, stopped="stalled"))
+    assert "MAX_SCANNED" in result_notice(_job(filters=NO_SITE, matched=3, links_found=1000, stopped="scan_limit"))
+    free_text = Job(query="roofers near houston", limit=50, stats={"matched": 1, "links_found": 1, "stopped": "single"})
+    assert result_notice(free_text) == "Google Maps shows a single place for “roofers near houston”."

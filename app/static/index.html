@@ -13,7 +13,7 @@
       <span class="brand-icon">📍</span>
       <div>
         <h1>Google Maps Lead Crawler</h1>
-        <p class="muted">Search a place or keyword, collect listings, find emails, export CSV.</p>
+        <p class="muted">Find businesses by type and city, filter by website and contact details, export CSV.</p>
       </div>
     </div>
     <div class="health" id="health" title="API status"><span class="dot"></span><span id="health-text">connecting…</span></div>
@@ -25,19 +25,48 @@
       <section class="card">
         <h2>New search</h2>
         <form id="scrape-form" autocomplete="off">
-          <label for="query">City / keyword
-            <input id="query" name="query" type="text" required minlength="2" maxlength="200"
-                   placeholder='e.g. "roofing companies near houston"'>
+          <label for="business">Business type
+            <input id="business" name="business" type="text" required minlength="2" maxlength="120"
+                   placeholder="e.g. plumbers, hair salon, dentist">
           </label>
+          <label for="place">City / area
+            <input id="place" name="place" type="text" required maxlength="120" placeholder="e.g. Austin, TX">
+          </label>
+          <small class="muted query-preview" id="query-preview" hidden></small>
           <label for="limit">Number of results
             <input id="limit" name="limit" type="number" min="1" max="500" value="20" required>
-            <small class="muted" id="limit-hint">1 – 500 places</small>
+            <small class="muted" id="limit-hint">1 – 500 businesses. Google Maps lists at most about 120 per search.</small>
           </label>
+
+          <fieldset class="filters">
+            <legend>Filters</legend>
+            <div class="field">
+              <span class="field-label" id="website-label">Website</span>
+              <div class="segmented" role="radiogroup" aria-labelledby="website-label">
+                <label><input type="radio" name="website" value="any" checked><span>Any</span></label>
+                <label><input type="radio" name="website" value="without"><span>No website</span></label>
+                <label><input type="radio" name="website" value="with"><span>Has website</span></label>
+              </div>
+            </div>
+            <label for="contact">Must have
+              <select id="contact" name="contact">
+                <option value="any">No requirement</option>
+                <option value="phone_or_email">Phone or email</option>
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="phone_and_email">Phone and email</option>
+              </select>
+            </label>
+            <label class="check" id="profiles-row" hidden><input id="profiles" name="profiles" type="checkbox" checked>
+              <span>Facebook, Instagram, Yelp &amp; booking pages don't count as a website</span></label>
+            <small class="muted" id="filter-hint" hidden></small>
+          </fieldset>
+
           <label class="check"><input id="enrich" name="enrich" type="checkbox">
-            <span>Find emails &amp; phones on websites after scraping</span></label>
+            <span>Afterwards, look for emails &amp; phones on websites / social pages</span></label>
           <label class="check"><input id="headed" name="headed" type="checkbox">
             <span>Show the browser window (debug)</span></label>
-          <button type="submit" class="btn primary" id="start-btn">Start scraping</button>
+          <button type="submit" class="btn primary" id="start-btn">Search</button>
           <p class="error" id="form-error" hidden></p>
         </form>
       </section>
@@ -55,7 +84,10 @@
     <section class="content">
       <section class="card" id="progress-card" hidden>
         <div class="card-head">
-          <h2 id="progress-title">Job</h2>
+          <div class="title-line">
+            <h2 id="progress-title">Job</h2>
+            <span class="chip" id="progress-filter" hidden></span>
+          </div>
           <span class="pill" id="status-pill">queued</span>
         </div>
         <p class="muted" id="progress-message">Waiting…</p>
@@ -82,8 +114,12 @@
             </button>
             <button class="btn" id="copy-btn" disabled>Copy CSV</button>
             <a class="btn" id="download-btn" aria-disabled="true" download>⬇ Download CSV</a>
-            <a class="btn ghost" id="download-ext-btn" aria-disabled="true" download title="Adds Address, Category, Rating, Place ID, Maps URL, Lat/Lng, Email Source…">Extended CSV</a>
+            <a class="btn ghost" id="download-ext-btn" aria-disabled="true" download title="Adds Address, Category, Website Type, Rating, Place ID, Maps URL, Lat/Lng, Email Source…">Extended CSV</a>
           </div>
+        </div>
+        <div class="notice" id="notice" role="status" hidden>
+          <span class="notice-icon" aria-hidden="true">i</span>
+          <p id="notice-text"></p>
         </div>
         <div class="table-wrap">
           <table id="results-table">

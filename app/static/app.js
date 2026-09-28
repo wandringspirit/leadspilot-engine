@@ -8,17 +8,21 @@
   const $ = (id) => document.getElementById(id);
 
   const els = {
-    form: $("scrape-form"), query: $("query"), limit: $("limit"), limitHint: $("limit-hint"),
+    form: $("scrape-form"), business: $("business"), place: $("place"), queryPreview: $("query-preview"),
+    limit: $("limit"), limitHint: $("limit-hint"), contact: $("contact"), profiles: $("profiles"),
+    profilesRow: $("profiles-row"), filterHint: $("filter-hint"),
     enrich: $("enrich"), headed: $("headed"), startBtn: $("start-btn"), formError: $("form-error"),
     jobList: $("job-list"), refreshJobs: $("refresh-jobs"),
-    progressCard: $("progress-card"), progressTitle: $("progress-title"), statusPill: $("status-pill"),
+    progressCard: $("progress-card"), progressTitle: $("progress-title"), progressFilter: $("progress-filter"),
+    statusPill: $("status-pill"),
     progressMessage: $("progress-message"), barFill: $("bar-fill"), progressCounts: $("progress-counts"),
-    cancelBtn: $("cancel-btn"), jobError: $("job-error"),
+    cancelBtn: $("cancel-btn"), jobError: $("job-error"), notice: $("notice"), noticeText: $("notice-text"),
     rowCount: $("row-count"), resultsSubtitle: $("results-subtitle"), filter: $("filter"),
     enrichAllBtn: $("enrich-all-btn"), copyBtn: $("copy-btn"), downloadBtn: $("download-btn"),
     downloadExtBtn: $("download-ext-btn"), body: $("results-body"), toast: $("toast"),
     health: $("health"), healthText: $("health-text"),
   };
+  const websiteRadios = Array.from(document.querySelectorAll('input[name="website"]'));
 
   const state = { config: null, jobs: [], current: null, pollTimer: null, filter: "" };
 
@@ -51,6 +55,10 @@
   }
 
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleString() : "";
+
+  // "plumbers · Austin, TX" (free-text queries and jobs from before 1.2 have no business / place)
+  const jobTitle = (job) => job.business ? (job.place ? `${job.business} · ${job.place}` : job.business) : job.query;
+  const isFiltered = (job) => !!(job.filters && (job.filters.website !== "any" || job.filters.contact !== "any"));
 
   function cell(text, className, title) {
     const td = document.createElement("td");
@@ -85,7 +93,8 @@
     try {
       state.config = await api("/api/config");
       els.limit.max = state.config.max_results;
-      els.limitHint.textContent = `1 – ${state.config.max_results} places`;
+      els.limitHint.textContent =
+        `1 – ${state.config.max_results} businesses. Google Maps lists at most about 120 per search.`;
       els.headed.checked = !state.config.headless;
       els.health.classList.add("ok");
       els.healthText.textContent = "API online";
@@ -125,10 +134,18 @@
       if (state.current && job.id === state.current.id) li.classList.add("active");
       const main = document.createElement("div");
       main.className = "job-main";
-      const q = document.createElement("div"); q.className = "job-query"; q.textContent = job.query; q.title = job.query;
+      const q = document.createElement("div"); q.className = "job-query"; q.textContent = jobTitle(job); q.title = job.query;
       const meta = document.createElement("div"); meta.className = "job-meta";
-      meta.textContent = `${job.status} · ${job.row_count} rows · ${fmtDate(job.created_at)}`;
-      main.append(q, meta);
+      const short = job.found !== null && job.found !== undefined && job.found < job.limit;
+      const count = short ? `${job.found} of ${job.limit} found` : `${job.row_count} rows`;
+      meta.textContent = `${job.status} · ${count} · ${fmtDate(job.created_at)}`;
+      main.append(q);
+      if (isFiltered(job)) {
+        const chip = document.createElement("span");
+        chip.className = "chip small"; chip.textContent = job.filters.label;
+        main.append(chip);
+      }
+      main.append(meta);
       const del = document.createElement("button");
       del.className = "del"; del.title = "Delete job"; del.textContent = "✕";
       del.addEventListener("click", async (e) => {
@@ -175,8 +192,9 @@
         if (!ACTIVE.has(job.status)) {
           stopPolling();
           if (wasActive) {
-            toast(job.status === "completed" ? `Finished: ${job.rows.length} rows` : `Job ${job.status}`,
-                  job.status === "failed");
+            const done = job.notice ? `Finished: ${job.stats.matched} of ${job.limit} found`
+              : `Finished: ${job.rows.length} rows`;
+            toast(job.status === "completed" ? done : `Job ${job.status}`, job.status === "failed");
             refreshJobs();
           }
         }
@@ -195,6 +213,7 @@
   function renderJob(job) {
     if (!job) {
       els.progressCard.hidden = true;
+      els.notice.hidden = true;
       els.rowCount.textContent = "0";
       els.resultsSubtitle.textContent = "Start a search or pick a job from the history.";
       els.body.innerHTML = '<tr class="empty"><td colspan="13">No rows yet.</td></tr>';
@@ -202,24 +221,39 @@
       return;
     }
     const active = ACTIVE.has(job.status);
+    const filtered = isFiltered(job);
     els.progressCard.hidden = false;
-    els.progressTitle.textContent = `“${job.query}” · ${job.limit} requested`;
+    els.progressTitle.textContent = `“${jobTitle(job)}” · ${job.limit} wanted`;
+    els.progressFilter.hidden = !filtered;
+    els.progressFilter.textContent = filtered ? job.filters.label : "";
     els.statusPill.textContent = job.status;
     els.statusPill.className = "pill " + job.status;
     els.progressMessage.textContent = job.progress.message || job.status;
     const pct = active ? job.progress.percent : (job.status === "completed" ? 100 : job.progress.percent);
     els.barFill.style.width = `${pct || 0}%`;
-    els.progressCounts.textContent = job.progress.total
-      ? `${job.progress.phase}: ${job.progress.current} / ${job.progress.total}` : job.progress.phase;
+    const scanning = filtered && (job.progress.phase === "collecting" || job.progress.phase === "details");
+    els.progressCounts.textContent = !job.progress.total ? job.progress.phase
+      : scanning ? `${job.progress.current} of ${job.progress.total} matches found`
+        : `${job.progress.phase}: ${job.progress.current} / ${job.progress.total}`;
     els.cancelBtn.hidden = !active;
     els.jobError.hidden = !job.error;
     els.jobError.textContent = job.error || "";
+    // why fewer results than asked for ("Only 35 businesses found for ...")
+    els.notice.hidden = !job.notice;
+    els.noticeText.textContent = job.notice || "";
 
     els.rowCount.textContent = job.rows.length;
     const places = new Set(job.rows.map((r) => r.rank)).size;
     const withEmail = job.rows.filter((r) => r.email).length;
-    els.resultsSubtitle.textContent =
-      `${places} places · ${job.rows.length} rows · ${withEmail} with email · created ${fmtDate(job.created_at)}`;
+    const parts = [`${places} places`, `${job.rows.length} rows`, `${withEmail} with email`];
+    const stats = job.stats || {};
+    if (filtered && stats.links_found) {
+      const skipped = Object.entries(stats.skipped || {}).sort((a, b) => b[1] - a[1])
+        .map(([reason, n]) => `${n} ${reason}`).join(", ");
+      parts.push(`${stats.links_found} listings scanned${skipped ? ` (skipped: ${skipped})` : ""}`);
+    }
+    parts.push(`created ${fmtDate(job.created_at)}`);
+    els.resultsSubtitle.textContent = parts.join(" · ");
     renderRows(job);
     setToolbar(job.rows.length > 0, active);
     els.startBtn.disabled = false;
@@ -245,7 +279,9 @@
     const filter = state.filter.trim().toLowerCase();
     const rows = job.rows.filter((r) => !filter || Object.values(r).some((v) => v !== null && String(v).toLowerCase().includes(filter)));
     if (!rows.length) {
-      els.body.innerHTML = `<tr class="empty"><td colspan="13">${job.rows.length ? "No rows match the filter." : (ACTIVE.has(job.status) ? "Collecting results…" : "No rows.")}</td></tr>`;
+      const why = job.rows.length ? "No rows match the filter."
+        : ACTIVE.has(job.status) ? "Collecting results…" : isFiltered(job) ? "No matching businesses." : "No rows.";
+      els.body.innerHTML = `<tr class="empty"><td colspan="13">${why}</td></tr>`;
       return;
     }
     const active = ACTIVE.has(job.status);
@@ -272,7 +308,14 @@
       const emailTd = row.email ? linkCell("mailto:" + row.email, row.email) : cell("");
       if (row.email_source) emailTd.title = "found on " + row.email_source;
       tr.appendChild(emailTd);
-      tr.appendChild(linkCell(row.website));
+      const siteTd = linkCell(row.website);
+      siteTd.classList.add("site");
+      if (row.website_type === "profile") {
+        const tag = document.createElement("span"); tag.className = "tag profile"; tag.textContent = "profile";
+        tag.title = "A social / directory / booking page, not the business's own website";
+        siteTd.appendChild(tag);
+      }
+      tr.appendChild(siteTd);
       const phoneTd = cell(row.phone);
       if (row.phone_source === "website") {
         const tag = document.createElement("span"); tag.className = "tag website"; tag.textContent = "site"; tag.title = "phone found on the website";
@@ -317,14 +360,71 @@
   }
 
   // ------------------------------------------------------------------
+  // search form
+  // ------------------------------------------------------------------
+  const FILTERS_KEY = "searchFilters";
+  const SLOW_EMAIL = "Google Maps doesn't show emails, so each candidate's website or social page is checked " +
+    "while scanning (slower).";
+  const CONTACT_HINTS = {
+    phone: "The phone number shown on Google Maps.",
+    email: SLOW_EMAIL,
+    phone_or_email: "Most listings show a phone. For those that don't, their website or social page is " +
+      "checked for an email.",
+    phone_and_email: SLOW_EMAIL,
+  };
+
+  function currentFilters() {
+    const website = (websiteRadios.find((r) => r.checked) || { value: "any" }).value;
+    return { website, contact: els.contact.value, profiles_as_no_website: els.profiles.checked };
+  }
+
+  function updateFilterUi() {
+    const f = currentFilters();
+    els.profilesRow.hidden = f.website === "any";
+    let hint = CONTACT_HINTS[f.contact] || "";
+    if (f.website === "without" && (f.contact === "email" || f.contact === "phone_and_email")) {
+      hint += " Businesses without a website rarely publish an email, so expect few results.";
+    }
+    els.filterHint.textContent = hint;
+    els.filterHint.hidden = !hint;
+    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(f)); } catch { /* private mode etc. */ }
+  }
+
+  function restoreFilters() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || "null"); } catch { saved = null; }
+    if (!saved || typeof saved !== "object") return;
+    const radio = websiteRadios.find((r) => r.value === saved.website);
+    if (radio) radio.checked = true;
+    if (Array.from(els.contact.options).some((o) => o.value === saved.contact)) els.contact.value = saved.contact;
+    if (typeof saved.profiles_as_no_website === "boolean") els.profiles.checked = saved.profiles_as_no_website;
+  }
+
+  function updateQueryPreview() {
+    const business = els.business.value.trim();
+    const place = els.place.value.trim();
+    const query = business && place ? `${business} in ${place}` : business;
+    els.queryPreview.hidden = !query;
+    els.queryPreview.textContent = query ? `Searches Google Maps for “${query}”` : "";
+  }
+
+  els.business.addEventListener("input", updateQueryPreview);
+  els.place.addEventListener("input", updateQueryPreview);
+  websiteRadios.forEach((r) => r.addEventListener("change", updateFilterUi));
+  els.contact.addEventListener("change", updateFilterUi);
+  els.profiles.addEventListener("change", updateFilterUi);
+
+  // ------------------------------------------------------------------
   // actions
   // ------------------------------------------------------------------
   els.form.addEventListener("submit", async (e) => {
     e.preventDefault();
     els.formError.hidden = true;
     const payload = {
-      query: els.query.value.trim(),
+      business: els.business.value.trim(),
+      place: els.place.value.trim(),
       limit: Number(els.limit.value),
+      filters: currentFilters(),
       enrich: els.enrich.checked,
       headless: !els.headed.checked,
     };
@@ -332,7 +432,7 @@
     els.startBtn.textContent = "Starting…";
     try {
       const summary = await api("/api/scrape", { method: "POST", body: JSON.stringify(payload) });
-      toast(`Started job for “${summary.query}”`);
+      toast(`Started: “${summary.query}”`);
       await refreshJobs();
       selectJob(summary.id);
     } catch (err) {
@@ -340,7 +440,7 @@
       els.formError.hidden = false;
     } finally {
       els.startBtn.disabled = false;
-      els.startBtn.textContent = "Start scraping";
+      els.startBtn.textContent = "Search";
     }
   });
 
@@ -555,5 +655,8 @@
     startLogPolling();
   }
 
+  restoreFilters();
+  updateFilterUi();
+  updateQueryPreview();
   init().then(initLogs);
 })();
