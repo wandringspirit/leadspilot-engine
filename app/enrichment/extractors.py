@@ -12,7 +12,7 @@ from urllib.parse import unquote, urljoin, urlparse
 import phonenumbers
 from bs4 import BeautifulSoup
 
-from app.scraper.parsing import website_domain
+from app.scraper.parsing import unwrap_redirect, website_domain
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,24}")
 # "name [at] domain [dot] com", "name (at) domain.com", "name AT domain DOT com"
@@ -48,6 +48,13 @@ class ExtractResult:
     emails: list[EmailHit] = field(default_factory=list)
     phones: list[str] = field(default_factory=list)   # E.164
     contact_links: list[str] = field(default_factory=list)
+    external_links: list[str] = field(default_factory=list)   # links to other sites (redirects unwrapped)
+
+
+# "website":"https:\/\/example.com\/" in a page's embedded JSON (a Facebook page's
+# website, an Instagram profile's "external_url", ...)
+_JSON_WEBSITE_RE = re.compile(
+    r'"(?:website|websites|website_url|external_url)"\s*:\s*\[?\s*"((?:https?:)?\\?/\\?/[^"\s]+)"', re.I)
 
 
 # --------------------------------------------------------------------------
@@ -207,7 +214,41 @@ def extract_from_html(html: str, page_url: str, site_url: str) -> ExtractResult:
         if any(k in label for k in CONTACT_KEYWORDS) and absolute not in seen:
             seen.add(absolute)
             result.contact_links.append(absolute)
+
+    # Links to other sites - on a profile page, the business's own website is one of them.
+    # Websites named in the page's data come first, then the links in document order.
+    candidates = [m.group(1).replace("\\/", "/") for m in _JSON_WEBSITE_RE.finditer(html)]
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            candidates += list(_jsonld_urls(json.loads(script.string or "")))
+        except (json.JSONDecodeError, TypeError):
+            continue
+    candidates += [urljoin(page_url, a["href"].strip()) for a in soup.find_all("a", href=True)
+                   if not a["href"].strip().startswith(("mailto:", "tel:", "javascript:", "#"))]
+    for link in candidates:
+        link = unwrap_redirect("https:" + link if link.startswith("//") else link).split("#", 1)[0]
+        domain = website_domain(link)
+        if link.startswith(("http://", "https://")) and domain and domain != base_domain \
+                and link not in result.external_links:
+            result.external_links.append(link)
     return result
+
+
+def _jsonld_urls(node, depth: int = 0):
+    """url / sameAs / website values of JSON-LD objects."""
+    if depth > 6:
+        return
+    if isinstance(node, dict):
+        for key in ("url", "sameAs", "website"):
+            value = node.get(key)
+            for item in value if isinstance(value, list) else [value]:
+                if isinstance(item, str) and item.startswith(("http", "//")):
+                    yield item
+        for value in node.values():
+            yield from _jsonld_urls(value, depth + 1)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _jsonld_urls(item, depth + 1)
 
 
 def _walk_jsonld(node, depth: int = 0):

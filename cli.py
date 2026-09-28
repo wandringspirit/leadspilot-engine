@@ -5,6 +5,7 @@ Examples
     python cli.py plumbers "Austin, TX" --limit 30
     python cli.py plumbers "Austin, TX" --website without --contact phone_or_email -n 50
     python cli.py roofing "Houston, TX" --whole-area --website without --contact phone_or_email -n 50
+    python cli.py roofing "Houston, TX" --website without --contact phone --search-web -n 20
     python cli.py roofing "Katy, TX; Pasadena, TX; Pearland, TX" -n 100
     python cli.py "dentists in austin tx" --limit 20 --enrich --extended --headed
 """
@@ -18,7 +19,7 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 
 from app.config import settings
-from app.enrichment.website import WebsiteEnricher, enrich_many
+from app.enrichment.website import enrich_many
 from app.export.csv_export import rows_to_csv_bytes
 from app.filters import ContactFilter, SearchFilters, WebsiteFilter
 from app.jobs import (
@@ -47,6 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="keep only places with this contact information (default: any)")
     p.add_argument("--profiles-are-websites", action="store_true",
                    help="count a Facebook / Instagram / Yelp / booking page as a website")
+    p.add_argument("--search-web", action="store_true",
+                   help="with --website without: also search the web for a website a business does not "
+                        "list on Google Maps (slower)")
     p.add_argument("--out", "-o", type=Path, default=None, help="CSV path (default: data/exports/<search>.csv)")
     p.add_argument("--enrich", action="store_true", help="look up emails/phones on each website")
     p.add_argument("--extended", action="store_true", help="include extra columns (rating, address, ...)")
@@ -57,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def filters_from_args(args: argparse.Namespace) -> SearchFilters:
     return SearchFilters(website=args.website, contact=args.contact,
-                         profiles_as_no_website=not args.profiles_are_websites)
+                         profiles_as_no_website=not args.profiles_are_websites, search_web=args.search_web)
 
 
 async def run(args: argparse.Namespace) -> int:
@@ -82,17 +86,17 @@ async def run(args: argparse.Namespace) -> int:
         print('error: --whole-area needs a place, e.g. python cli.py roofing "Houston, TX" --whole-area',
               file=sys.stderr)
         return 2
+    if args.search_web and args.website != "without":
+        print("warning: --search-web only applies with --website without - ignored", file=sys.stderr)
     job = Job(query=query, business=args.business.strip() if args.place.strip() else "", place=args.place.strip(),
               whole_area=args.whole_area,
               limit=max(1, min(args.limit, settings.MAX_RESULTS)), filters=filters_from_args(args))
     selector = PlaceFilter(job.filters, default_region=settings.DEFAULT_REGION)
     scraper = MapsScraper(settings, headless=not args.headed, on_progress=on_progress)
     async with AsyncExitStack() as stack:
-        if selector.wants_lookups:
-            enricher = await stack.enter_async_context(WebsiteEnricher(settings))
-            selector.lookup = enricher.find_contacts
+        await selector.open(stack, settings)
         rows: list[PlaceRow] = await scraper.scrape(plan_searches(job), job.limit, selector=selector)
-    job.stats = stats_to_dict(scraper.stats)
+    job.stats = stats_to_dict(scraper.stats) | selector.stats()
     if scraper.stats.errors and not args.quiet:
         for err in scraper.stats.errors:
             print(f"warning: {err}", file=sys.stderr)
@@ -125,9 +129,13 @@ async def run(args: argparse.Namespace) -> int:
     print(f"wrote {len(rows)} row(s) for {found} place(s) to {out}"
           + (f" ({job.filters.label}; {scraper.stats.links_found} listing(s) scanned)" if job.filters.active else ""),
           file=sys.stderr)
-    notice = result_notice(job)
-    if notice:
-        print(f"note: {notice}", file=sys.stderr)
+    unlisted = sum(selector.sites_found.values())
+    if unlisted:
+        how = ", ".join(f"{n} by {check}" for check, n in selector.sites_found.items())
+        print(f"left out {unlisted} place(s) with a website Google Maps does not list ({how})", file=sys.stderr)
+    for notice in (result_notice(job), selector.notice()):
+        if notice:
+            print(f"note: {notice}", file=sys.stderr)
     return 0
 
 

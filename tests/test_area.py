@@ -7,7 +7,6 @@ from app.scraper.area import (
     MAX_SECTION_ZOOM,
     PANEL_W,
     VIEWPORT_H,
-    Section,
     from_world,
     section_from_url,
     to_world,

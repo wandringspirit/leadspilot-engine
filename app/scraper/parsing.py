@@ -5,8 +5,9 @@ test (see tests/test_parsing.py).
 """
 from __future__ import annotations
 
+import base64
 import re
-from urllib.parse import parse_qsl, quote_plus, unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qs, parse_qsl, quote_plus, unquote, urlencode, urlsplit, urlunsplit
 
 import phonenumbers
 from phonenumbers import NumberParseException, PhoneNumberFormat
@@ -256,6 +257,41 @@ def website_domain(url: str) -> str:
     """'https://www.example.com/path' -> 'example.com'."""
     m = re.match(r"^(?:https?://)?(?:www\.)?([^/:?#]+)", (url or "").strip(), re.I)
     return m.group(1).lower() if m else ""
+
+
+# Hosts whose links wrap the real destination in a query parameter.
+_REDIRECTORS = ("facebook.com", "instagram.com", "duckduckgo.com", "google.", "yelp.", "bing.com")
+_REDIRECT_PARAMS = ("uddg", "u", "url", "q", "target", "dest", "destination", "redirect")
+
+
+def unwrap_redirect(url: str) -> str:
+    """The real destination of a redirect link, without requesting it.
+
+    Handles l.facebook.com/l.php?u=..., duckduckgo.com/l/?uddg=...,
+    google.com/url?q=..., yelp.com/biz_redir?url=... and Bing's
+    bing.com/ck/a?...&u=a1<base64>. Other URLs are returned unchanged.
+    """
+    for _ in range(3):   # a wrapper can wrap another one
+        parts = urlsplit(url)
+        host = parts.netloc.lower()
+        if not parts.query or not any(r in host for r in _REDIRECTORS):
+            return url
+        params = parse_qs(parts.query)
+        if host.endswith("bing.com"):
+            value = params.get("u", [""])[0]
+            if not value.startswith("a1"):
+                return url
+            try:
+                url = base64.urlsafe_b64decode(value[2:] + "=" * (-len(value[2:]) % 4)).decode("utf-8")
+            except (ValueError, UnicodeDecodeError):
+                return url
+            continue
+        target = next((params[p][0] for p in _REDIRECT_PARAMS
+                       if p in params and params[p][0].startswith(("http://", "https://", "//"))), "")
+        if not target:
+            return url
+        url = "https:" + target if target.startswith("//") else target
+    return url
 
 
 def website_type(url: str) -> str:

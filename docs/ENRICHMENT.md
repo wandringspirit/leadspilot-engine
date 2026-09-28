@@ -14,6 +14,7 @@ Code: `app/enrichment/website.py` (fetch strategy) and `app/enrichment/extractor
 | *Afterwards, look for emails & phones on websites / social pages* checkbox / `--enrich` (CLI) | same as above, automatically when the scrape finishes |
 | `force: true` in the API | re-run even for places that already have an email (new addresses are added as extra rows) |
 | A search whose *Must have* filter needs an email (*Email*, *Phone or email*, *Phone and email*) | while scanning, only a place that would otherwise be rejected for lack of an email – see `PlaceFilter` in `app/jobs.py`. Places looked up this way are not fetched again by the automatic run. |
+| A *No website* search | while scanning, the profile page (Facebook, booking page …) of every place that would be kept, for a link to a website of its own (§8); the emails / phone it shows are written into the rows as well, and it is not fetched again by the automatic run. |
 
 Places **without any website** are marked `no_website` and skipped. A place whose website is a
 **profile page** – a Facebook page, Instagram profile, Yelp listing, booking page … (see
@@ -70,6 +71,13 @@ Sources checked in each page, in order:
    `name AT domain DOT com`.
 6. Phone numbers in visible text through `phonenumbers.PhoneNumberMatcher` (only *valid*
    numbers for the row's country are kept).
+
+It also lists the page's **links to other sites** (`external_links`, used by §8): websites named
+in the page's data first – `"website"` / `"external_url"` values in embedded JSON (a Facebook
+page's website, an Instagram bio link) and JSON-LD `url` / `sameAs` – then the links in document
+order. Redirect links are unwrapped without requesting them (`l.facebook.com/l.php?u=…`,
+`yelp.com/biz_redir?url=…`, Google / DuckDuckGo / Bing result links; `unwrap_redirect()` in
+`app/scraper/parsing.py`).
 
 Validation (`clean_email`) – there is deliberately **no junk filtering**: every address that is
 syntactically valid is kept, even placeholder-looking ones (`you@example.com`, `john@…`) and
@@ -169,3 +177,80 @@ extended CSV together with `Email Source` / `Phone Source`.
 - Businesses without a website rarely publish an email anywhere, and Facebook / Instagram often
   show logged-out visitors a login page instead of the business's details, so profile-page
   lookups frequently return `not_found`.
+
+## 8. Websites Google Maps does not list
+
+A Google Maps listing shows the website its owner entered in the Business Profile – often
+nothing, or a Facebook / booking / BBB page – even when the business has a site of its own (the
+listing has no website, a Google search finds `roofing4texas.com`). With the *No website* filter,
+every place that passes the other filters is checked for one before it is kept, and skipped as
+`has a website not listed on Maps` when it has one. Code: `SiteFinder` in
+`app/enrichment/sitefinder.py`, `WebSearch` in `app/enrichment/websearch.py`, called by
+`PlaceFilter` in `app/jobs.py`.
+
+```mermaid
+flowchart TD
+    P[place passes the filters<br/>website = without] --> E{an email on a domain of its own?<br/>not gmail & co., not a platform}
+    E -- yes --> E1[read that domain's home page]
+    E1 --> E2{shows the phone number,<br/>or the domain is named after the business?}
+    E2 -- yes --> X[skipped:<br/>has a website not listed on Maps]
+    E2 -- no --> F
+    E -- no --> F{its Maps website is a profile page?}
+    F -- yes --> F1[read the profile page once: links to other sites,<br/>redirects unwrapped, platforms and directories<br/>dropped, first 5 sites]
+    F1 --> F2{a linked site shows the phone number?}
+    F2 -- yes --> X
+    F2 -- no --> W
+    F -- no --> W{search_web?}
+    W -- yes --> W1[web search: name + city,<br/>then the phone number]
+    W1 --> W2{a result's site shows the phone number?<br/>first 5 sites per search}
+    W2 -- yes --> X
+    W2 -- no --> K[kept]
+    W -- no --> K
+```
+
+**When a site is the business's own.** The site's *home page* – not the page the link points to
+– or, when the home page does not show it, one of its first two contact pages must list the
+business's phone number (compared in E.164, so `(281) 932-4462` matches `+1 281-932-4462`) among
+at most 5 different numbers: a page listing many businesses is a directory. Checking the home
+page keeps a directory's page about the business from counting. For the business's own email
+domain, and for any site when the listing has no phone number, a site also counts when its
+domain contains the business's name (two of its words – `american-ridge.com` for *American Ridge
+Roofing LLC* – or its only word), it has real text and is not a parked domain; a web search
+result must then also mention the business's city.
+
+Never the business's own site: profile platforms (`PROFILE_DOMAINS`), directories and lead sites
+(`THIRD_PARTY_DOMAINS`: MapQuest, Bizapedia, Chamber of Commerce, Trustpilot …), search engines
+and big platforms, government and education sites, and any link that redirects to one of them –
+a domain that forwards to the business's Facebook page is not a website. Addresses on platform
+domains (`…@bbbemail.org`) stay in the Email column; they are only not taken for the business's
+domain.
+
+**Web search** (`search_web`, off by default; *Also search the web …* in the panel,
+`--search-web` in the CLI): plain HTTP requests to DuckDuckGo's HTML results page, Bing as the
+fallback – deliberately **not Google**, so these searches cannot get the IP that scrapes Google
+Maps blocked. Searches run one at a time, at least `WEB_SEARCH_DELAY_S` apart, and at most two
+per business (the phone number only when the name found nothing), so expect a few seconds per
+candidate. An engine that answers with a captcha / "unusual traffic" page is not asked again
+during the job; when both refuse, or three searches in a row reach neither (network blocked,
+offline), web search is switched off for the rest of the job and the job's notice says so.
+
+Pages read for these checks are remembered for the job, so a site that comes up for many
+businesses (a local directory) is fetched once.
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `WEB_SEARCH_ENGINE` | duckduckgo | engine asked first: `duckduckgo` or `bing` (the other is the fallback) |
+| `WEB_SEARCH_DELAY_S` | 3 | minimum pause between two web searches |
+| `ENRICH_TIMEOUT_S` | 15 | per page read for the checks |
+
+Limits:
+
+- Pages are read with plain HTTP. A site that only renders with JavaScript or blocks non-browser
+  clients is not recognised, and the place is kept.
+- A site that shows a different number than Google Maps (a call-tracking line, the owner's cell)
+  is only recognised by name, through the business's email domain; otherwise the place is kept.
+- Facebook and Instagram often show logged-out visitors a login page, so the profile-page check
+  finds fewer links there than on booking and directory pages.
+- Every check costs time per candidate: the email domain and profile page usually one to a few
+  page loads, the web search at least `WEB_SEARCH_DELAY_S` per search. Search engines limit
+  automated searches, so a long job may see web search switched off part way.

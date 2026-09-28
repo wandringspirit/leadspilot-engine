@@ -3,6 +3,40 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.4.0 – 2026-09-28
+
+### Added
+- **Websites Google Maps doesn't show.** A listing only shows the website its owner entered, so a
+  *No website* search could return businesses that do have a site (the listing shows nothing or a
+  booking page; a Google search finds `roofing4texas.com`). Every place that passes a *No website*
+  search is now checked before it is kept:
+  - **email domain** – an address on a domain of its own (not gmail & co.) whose site shows the
+    business's phone number or is named after the business;
+  - **profile page** – a link on its Facebook / BBB / booking page to a site that shows its phone
+    number;
+  - **web search** (optional: *Also search the web for a website they don't list on Maps* in the
+    panel, `search_web` in the API, `--search-web` in the CLI) – its name and city, then its phone
+    number, on DuckDuckGo with Bing as the fallback (never Google, so the Maps scraping IP is not
+    put at risk); a result counts when its site shows the business's phone number.
+
+  A site belongs to the business when its home page (or first contact pages) shows the phone
+  number from Maps among at most 5 numbers, so directory pages about the business don't count.
+  A business with such a site is skipped as *has a website not listed on Maps*; the log names the
+  site and the check that found it.
+- Job stats gain `unlisted_websites` (count per check) and `web_searches`; the panel shows a
+  *web search* chip on the job and the number of web searches in the results summary. Web search
+  switches itself off for the rest of a job when both engines refuse (captcha / rate limit) or
+  three searches in a row reach neither, and the job notice says so.
+- Settings `WEB_SEARCH_ENGINE` (`duckduckgo` / `bing`, default `duckduckgo`) and
+  `WEB_SEARCH_DELAY_S` (default 3 s between web searches).
+- The page extractor lists a page's links to other sites (websites named in the page's data
+  first; Facebook / Yelp / Google / DuckDuckGo / Bing redirect links unwrapped).
+
+### Changed
+- In a *No website* search the profile page of every place that would be kept is read (for its
+  links), and the emails / phone it shows are written into the rows; the automatic enrichment
+  does not fetch it again.
+
 ## 1.3.0 – 2026-09-28
 
 ### Added

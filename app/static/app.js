@@ -9,9 +9,10 @@
 
   const els = {
     form: $("scrape-form"), business: $("business"), place: $("place"), queryPreview: $("query-preview"),
-    wholeArea: $("whole-area"), progressArea: $("progress-area"),
+    wholeArea: $("whole-area"), progressArea: $("progress-area"), progressWeb: $("progress-web"),
     limit: $("limit"), limitHint: $("limit-hint"), contact: $("contact"), profiles: $("profiles"),
-    profilesRow: $("profiles-row"), filterHint: $("filter-hint"),
+    profilesRow: $("profiles-row"), searchWeb: $("search-web"), searchWebRow: $("search-web-row"),
+    filterHint: $("filter-hint"),
     enrich: $("enrich"), headed: $("headed"), startBtn: $("start-btn"), formError: $("form-error"),
     jobList: $("job-list"), refreshJobs: $("refresh-jobs"),
     progressCard: $("progress-card"), progressTitle: $("progress-title"), progressFilter: $("progress-filter"),
@@ -60,6 +61,7 @@
   // "plumbers · Austin, TX" (free-text queries and jobs from before 1.2 have no business / place)
   const jobTitle = (job) => job.business ? (job.place ? `${job.business} · ${job.place}` : job.business) : job.query;
   const isFiltered = (job) => !!(job.filters && (job.filters.website !== "any" || job.filters.contact !== "any"));
+  const searchesWeb = (job) => !!(job.filters && job.filters.website === "without" && job.filters.search_web);
 
   function cell(text, className, title) {
     const td = document.createElement("td");
@@ -139,10 +141,12 @@
       const count = short ? `${job.found} of ${job.limit} found` : `${job.row_count} rows`;
       meta.textContent = `${job.status} · ${count} · ${fmtDate(job.created_at)}`;
       main.append(q);
-      const chips = [isFiltered(job) ? job.filters.label : "", job.whole_area ? "whole area" : ""].filter(Boolean);
+      const chips = [isFiltered(job) ? job.filters.label : "", job.whole_area ? "whole area" : "",
+        searchesWeb(job) ? "web search" : ""].filter(Boolean);
       for (const text of chips) {
         const chip = document.createElement("span");
-        chip.className = "chip small" + (text === "whole area" ? " area" : ""); chip.textContent = text;
+        chip.className = "chip small" + (text === "whole area" || text === "web search" ? " area" : "");
+        chip.textContent = text;
         main.append(chip, " ");
       }
       main.append(meta);
@@ -227,6 +231,7 @@
     els.progressFilter.hidden = !filtered;
     els.progressFilter.textContent = filtered ? job.filters.label : "";
     els.progressArea.hidden = !job.whole_area;
+    els.progressWeb.hidden = !searchesWeb(job);
     els.statusPill.textContent = job.status;
     els.statusPill.className = "pill " + job.status;
     els.progressMessage.textContent = job.progress.message || job.status;
@@ -254,6 +259,7 @@
       const sections = stats.sections ? ` in ${stats.sections} map sections` : "";
       parts.push(`${stats.links_found} listings scanned${sections}${skipped ? ` (skipped: ${skipped})` : ""}`);
     }
+    if (stats.web_searches) parts.push(`${stats.web_searches} web searches`);
     parts.push(`created ${fmtDate(job.created_at)}`);
     els.resultsSubtitle.textContent = parts.join(" · ");
     renderRows(job);
@@ -377,16 +383,25 @@
 
   function currentFilters() {
     const website = (websiteRadios.find((r) => r.checked) || { value: "any" }).value;
-    return { website, contact: els.contact.value, profiles_as_no_website: els.profiles.checked };
+    // search_web only applies to "No website" (the server ignores it otherwise)
+    return { website, contact: els.contact.value, profiles_as_no_website: els.profiles.checked,
+      search_web: els.searchWeb.checked };
   }
 
   function updateFilterUi() {
     const f = currentFilters();
     els.profilesRow.hidden = f.website === "any";
+    els.searchWebRow.hidden = f.website !== "without";
     let hint = CONTACT_HINTS[f.contact] || "";
     if (f.website === "without" && (f.contact === "email" || f.contact === "phone_and_email")) {
       hint += " Businesses without a website rarely publish an email, so expect few results.";
     }
+    if (f.website === "without") {
+      hint += " A business is left out when its email address or social page leads to a website of its own" +
+        (f.search_web ? ", or a web search for its name or phone number finds one (a few seconds per business)."
+          : ".");
+    }
+    hint = hint.trim();
     els.filterHint.textContent = hint;
     els.filterHint.hidden = !hint;
     try { localStorage.setItem(FILTERS_KEY, JSON.stringify(f)); } catch { /* private mode etc. */ }
@@ -400,6 +415,7 @@
     if (radio) radio.checked = true;
     if (Array.from(els.contact.options).some((o) => o.value === saved.contact)) els.contact.value = saved.contact;
     if (typeof saved.profiles_as_no_website === "boolean") els.profiles.checked = saved.profiles_as_no_website;
+    if (typeof saved.search_web === "boolean") els.searchWeb.checked = saved.search_web;
   }
 
   // "Katy, TX; Pasadena, TX" -> ["Katy, TX", "Pasadena, TX"] (same rule as the server)
@@ -440,6 +456,7 @@
   websiteRadios.forEach((r) => r.addEventListener("change", updateFilterUi));
   els.contact.addEventListener("change", updateFilterUi);
   els.profiles.addEventListener("change", updateFilterUi);
+  els.searchWeb.addEventListener("change", updateFilterUi);
 
   // ------------------------------------------------------------------
   // actions

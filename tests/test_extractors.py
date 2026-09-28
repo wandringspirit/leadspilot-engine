@@ -106,3 +106,26 @@ def test_candidate_pages_orders_and_limits():
     assert "https://www.acme.com/contact" in pages
     assert len(pages) == 4
     assert "https://www.acme.com/" not in pages
+
+
+PROFILE_HTML = r"""
+<html><head>
+<script>{"page":{"name":"Roofing Solutions","website":"https:\/\/roofing4texas.com\/","category":"Roofer"}}</script>
+<script type="application/ld+json">{"@type":"LocalBusiness","url":"https://www.facebook.com/RoofingSolutions",
+  "sameAs":["https://www.instagram.com/roofingsolutions/"]}</script>
+</head><body>
+  <a href="/RoofingSolutions/photos">Photos</a>
+  <a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.roofing4texas.com%2Fcontact%23form&amp;h=AT0">roofing4texas.com</a>
+  <a href="https://roofing4texas.com/">duplicate</a>
+  <a href="tel:+12819324462">Call</a>
+</body></html>
+"""
+
+
+def test_extract_from_html_lists_links_to_other_sites():
+    result = extract_from_html(PROFILE_HTML, "https://www.facebook.com/RoofingSolutions",
+                               "https://www.facebook.com/RoofingSolutions")
+    # the website named in the page data first, redirects unwrapped, the page's own site left out
+    assert result.external_links == ["https://roofing4texas.com/", "https://www.instagram.com/roofingsolutions/",
+                                     "https://www.roofing4texas.com/contact"]
+    assert extract_from_html("<p>no links</p>", "https://a.com/", "https://a.com/").external_links == []

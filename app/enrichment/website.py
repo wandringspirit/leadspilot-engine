@@ -46,6 +46,7 @@ class ContactResult:
     emails: list[EmailHit] = field(default_factory=list)
     phones: list[str] = field(default_factory=list)
     pages_checked: list[str] = field(default_factory=list)
+    external_links: list[str] = field(default_factory=list)   # links to other sites found on the pages
     used_browser: bool = False
     error: str | None = None
 
@@ -128,6 +129,7 @@ class WebsiteEnricher:
 
         result.emails = sorted(merged.emails, key=lambda h: (-h.score, h.email))
         result.phones = merged.phones
+        result.external_links = merged.external_links
         if result.error and (result.emails or result.phones):
             result.error = None
         return result
@@ -146,6 +148,9 @@ class WebsiteEnricher:
         for link in found.contact_links:
             if link not in target.contact_links:
                 target.contact_links.append(link)
+        for link in found.external_links:
+            if link not in target.external_links:
+                target.external_links.append(link)
 
     async def _fetch(self, url: str) -> tuple[str, str]:
         assert self._client is not None, "use `async with WebsiteEnricher()`"
@@ -158,6 +163,10 @@ class WebsiteEnricher:
         if len(resp.content) > self.cfg.ENRICH_MAX_BYTES:
             return resp.text[: self.cfg.ENRICH_MAX_BYTES], str(resp.url)
         return resp.text, str(resp.url)
+
+    async def fetch_page(self, url: str) -> tuple[str, str]:
+        """(final URL, HTML) of one page; the HTML is '' when it cannot be fetched."""
+        return await self._safe_fetch(url)
 
     async def _safe_fetch(self, url: str) -> tuple[str, str]:
         try:

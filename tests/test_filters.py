@@ -104,3 +104,11 @@ def test_filters_parse_from_json_values():
     assert f.website is WebsiteFilter.WITHOUT and f.contact is ContactFilter.PHONE
     with pytest.raises(ValueError):
         SearchFilters.model_validate({"website": "sometimes"})
+
+
+def test_web_search_only_applies_to_a_no_website_search():
+    assert SearchFilters.model_validate({"website": "without", "search_web": True}).search_web
+    assert not SearchFilters.model_validate({"website": "with", "search_web": True}).search_web
+    assert not SearchFilters(search_web=True).search_web
+    assert not SearchFilters(website="without").search_web                  # off unless asked for
+    assert SearchFilters(website="without", search_web=True).label == "no website"   # shown as its own chip

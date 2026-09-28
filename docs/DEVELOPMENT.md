@@ -37,6 +37,8 @@ app/
   enrichment/
     website.py         WebsiteEnricher, enrich_many()
     extractors.py      extract_from_html(), clean_email(), scoring, candidate pages
+    sitefinder.py      SiteFinder - websites a Google Maps listing does not show
+    websearch.py       WebSearch - DuckDuckGo / Bing result pages (never Google)
   export/
     csv_export.py      DEFAULT_COLUMNS, EXTENDED_COLUMNS, rows_to_csv()
   static/
@@ -129,6 +131,8 @@ Settings are read from environment variables, then from `.env` in the project ro
 | `ENRICH_BROWSER_FALLBACK` | `true` | render JS-only or bot-blocking sites with Chromium |
 | `ENRICH_MAX_BYTES` | `2000000` | truncate larger pages |
 | `DEFAULT_REGION` | `US` | phone parsing region when a row has no country |
+| `WEB_SEARCH_ENGINE` | `duckduckgo` | engine asked first when a *No website* search also searches the web: `duckduckgo` or `bing` (the other is the fallback; Google is never used) |
+| `WEB_SEARCH_DELAY_S` | `3.0` | minimum pause between two web searches |
 
 ## 5. Tests
 
@@ -142,16 +146,18 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_parsing.py` | address splitting, phone formatting, review/rating parsing, URL cleaning |
 | `test_records.py` | Google record decoding (synthetic records), index-map documentation check |
 | `test_build_row.py` | source precedence in `build_row()` |
-| `test_filters.py` | website classification (own site vs profile page), every website / contact rule, labels |
+| `test_filters.py` | website classification (own site vs profile page), every website / contact rule, labels, `search_web` only with *no website* |
 | `test_scan.py` | the scraper's feed loop on an in-memory feed: rounds, pre-filtering, replacements, stop reasons, stats |
 | `test_area.py` | map-section geometry: world pixels, the view in a Google Maps URL, section URLs, quarters |
 | `test_area_search.py` | whole-area and multi-place searches against a simulated Google that knows where businesses are: splitting full sections, finding businesses outside the top 120, de-duplication, limits, zoom-out guard, failures |
-| `test_extractors.py` | email/phone extraction (no junk filtering), obfuscation, listing-text emails, contact-link discovery |
+| `test_extractors.py` | email/phone extraction (no junk filtering), obfuscation, listing-text emails, contact-link discovery, links to other sites |
 | `test_website.py` | enrichment fetch strategy: profile pages read alone, own sites crawled |
-| `test_jobs.py` | enrichment target selection, the duplicate-row rule, `PlaceFilter`, listing emails, short-result notices |
+| `test_sitefinder.py` | finding a website a listing does not show: email domains, profile-page links, web search results, directory / parked / look-alike sites rejected, one fetch per page per job |
+| `test_websearch.py` | redirect unwrapping, DuckDuckGo / Bing result parsing, engine fallback and switch-off on captchas (fake network) |
+| `test_jobs.py` | enrichment target selection, the duplicate-row rule, `PlaceFilter` (incl. the unlisted-website check and its setup), listing emails, short-result notices |
 | `test_csv_export.py` | column layout, escaping, BOM |
-| `test_cli.py` | `cli.py` end to end on an in-memory feed: business + place, filter flags, short-result note |
-| `test_api.py` | every route through FastAPI's `TestClient`, business + place and filtered jobs run with a fake scraper and enricher, notices, persistence (incl. pre-1.2 jobs), log tagging |
+| `test_cli.py` | `cli.py` end to end on an in-memory feed: business + place, filter flags, short-result note, a business left out for its unlisted website |
+| `test_api.py` | every route through FastAPI's `TestClient`, business + place and filtered jobs run with a fake scraper, enricher and web search (a business left out for its unlisted website, web search switched off), notices, persistence (incl. pre-1.2 jobs), log tagging |
 | `test_logbuffer.py` | ring buffer semantics: cursor, limit/truncation, level filter, tracebacks, job-id tagging across asyncio tasks |
 | `test_docs.py` | documentation consistency (see §7) |
 

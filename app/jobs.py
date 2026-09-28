@@ -24,8 +24,10 @@ from typing import Awaitable, Callable
 
 from app.config import Settings, settings as default_settings
 from app.enrichment.extractors import EmailHit, emails_in_text
+from app.enrichment.sitefinder import SiteFinder
+from app.enrichment.websearch import WebSearch
 from app.enrichment.website import ContactResult, WebsiteEnricher, enrich_many
-from app.filters import EMAIL_CONTACTS, SearchFilters
+from app.filters import EMAIL_CONTACTS, UNLISTED_WEBSITE, SearchFilters, WebsiteFilter
 from app.logbuffer import current_job_id
 from app.models import Job, JobStatus, PlaceRow, Progress, build_query, split_places
 from app.scraper.maps import GOOGLE_LIST_LIMIT, NEAR_GOOGLE_LIMIT, MapsScraper, PlaceRef, ScrapeStats, Search
@@ -147,12 +149,10 @@ class JobManager:
             selector = PlaceFilter(job.filters, default_region=self.cfg.DEFAULT_REGION)
             try:
                 async with AsyncExitStack() as stack:
-                    if selector.wants_lookups:
-                        enricher = await stack.enter_async_context(WebsiteEnricher(self.cfg))
-                        selector.lookup = enricher.find_contacts
+                    await selector.open(stack, self.cfg)
                     await scraper.scrape(plan_searches(job), job.limit, selector=selector)
-                job.stats = stats_to_dict(scraper.stats)
-                job.notice = result_notice(job)
+                job.stats = stats_to_dict(scraper.stats) | selector.stats()
+                job.notice = " ".join(n for n in (result_notice(job), selector.notice()) if n)
                 if job.notice:
                     log.info("Job %s: %s", job.id, job.notice)
                 # places already looked up while filtering are not fetched a second time
@@ -288,16 +288,21 @@ class PlaceFilter:
     * ``accept`` copies emails written in the listing's description into the
       Email column, looks for an email on the website / social page when only
       a missing email keeps the place out (needs ``lookup``), then applies the
-      filters to the finished place.
+      filters to the finished place;
+    * with website=without, a place that matches is checked for a website its
+      listing does not show (needs ``site_finder``) and skipped when it has one.
 
-    With the default filters every place is kept (listing emails still added).
+    ``open()`` sets up ``lookup`` and ``site_finder`` for a job. With the default
+    filters every place is kept (listing emails still added).
     """
 
     def __init__(self, filters: SearchFilters | None = None, *, lookup: Lookup | None = None,
-                 default_region: str = "US") -> None:
+                 site_finder: SiteFinder | None = None, default_region: str = "US") -> None:
         self.filters = filters or SearchFilters()
         self.lookup = lookup
+        self.site_finder = site_finder
         self.default_region = default_region
+        self.sites_found: dict[str, int] = {}     # how the unlisted websites were found -> count
 
     @property
     def active(self) -> bool:
@@ -308,6 +313,27 @@ class PlaceFilter:
         """True when an email found on a website can decide whether a place matches."""
         return self.filters.contact in EMAIL_CONTACTS
 
+    @property
+    def checks_sites(self) -> bool:
+        """True when places that match are checked for a website Google Maps does not list."""
+        return self.filters.website is WebsiteFilter.WITHOUT
+
+    async def open(self, stack: AsyncExitStack, cfg: Settings) -> None:
+        """Set up what the filters need for a job; ``stack`` closes it.
+
+        An HTTP client for email lookups and website checks, plus a web search
+        client when ``search_web`` is on. Nothing is opened without filters.
+        """
+        if not (self.wants_lookups or self.checks_sites):
+            return
+        web = await stack.enter_async_context(WebsiteEnricher(cfg, region=self.default_region))
+        search = None
+        if self.checks_sites and self.filters.search_web:
+            search = WebSearch(cfg)
+            stack.push_async_callback(search.aclose)
+        self.site_finder = SiteFinder(web, search=search, default_region=self.default_region)
+        self.lookup = self.site_finder.contacts    # a page looked up for an email is not fetched again
+
     def prefilter(self, ref: PlaceRef) -> str:
         return self.filters.website_reason(ref.website_hint)
 
@@ -315,6 +341,7 @@ class PlaceFilter:
         rows = [row]
         apply_listing_emails(rows)
         reason = self.filters.check(rows)
+        looked_up = False
         if reason and self.lookup and self.filters.email_would_help(rows):
             log.info("Looking for an email on %s for #%d %s (%s so far)", row.website, row.rank, row.name, reason)
             try:
@@ -324,7 +351,46 @@ class PlaceFilter:
             else:
                 apply_contact_result(rows, row.rank, result, default_region=self.default_region)
                 reason = self.filters.check(rows)
+                looked_up = True
+        if not reason and self.checks_sites and self.site_finder is not None:
+            reason = await self._check_site(rows, looked_up=looked_up)
         return ([] if reason else rows), reason
+
+    async def _check_site(self, rows: list[PlaceRow], *, looked_up: bool) -> str:
+        """UNLISTED_WEBSITE when the place has a website its listing does not show, else ''."""
+        row = rows[0]
+        try:
+            found = await self.site_finder.find(rows)  # type: ignore[union-attr]
+        except Exception as exc:  # noqa: BLE001 - a failed check must not lose a matching place
+            log.warning("Website check failed for #%d %s: %s", row.rank, row.name, exc)
+            return ""
+        if found is not None:
+            self.sites_found[found.how] = self.sites_found.get(found.how, 0) + 1
+            log.info("#%d %s has a website Google Maps does not list: %s (found by %s)",
+                     row.rank, row.name, found.url, found.how)
+            return UNLISTED_WEBSITE
+        # the social page was read for its links: keep the emails / phone it shows too
+        result = None if looked_up or not row.website else self.site_finder.looked_up(row.website)  # type: ignore[union-attr]
+        if result is not None:
+            apply_contact_result(rows, row.rank, result, default_region=self.default_region)
+        return ""
+
+    def stats(self) -> dict:
+        """Job stats of the website checks: unlisted websites found (by check) and web searches run."""
+        search = self.site_finder.search if self.site_finder is not None else None
+        return {"unlisted_websites": dict(self.sites_found), "web_searches": getattr(search, "searches", 0)}
+
+    def notice(self) -> str:
+        """Says when web search was switched off during the job ('' otherwise)."""
+        search = self.site_finder.search if self.site_finder is not None else None
+        if search is None or not getattr(search, "disabled", ""):
+            return ""
+        n = search.searches
+        if not n:
+            return (f"Web search did not work ({search.disabled}), so businesses were only checked by their "
+                    "email domain and social page.")
+        return (f"Web search stopped after {n} search{'' if n == 1 else 'es'} ({search.disabled}); the "
+                "businesses after that were only checked by their email domain and social page.")
 
 
 def plan_searches(job: Job) -> list[Search]:

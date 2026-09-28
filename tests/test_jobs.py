@@ -1,6 +1,12 @@
+from contextlib import AsyncExitStack
+
+import app.jobs as jobs
+from app.config import Settings
 from app.enrichment.extractors import EmailHit
+from app.enrichment.sitefinder import SiteFinder
+from app.enrichment.websearch import WebSearch
 from app.enrichment.website import ContactResult
-from app.filters import SearchFilters
+from app.filters import UNLISTED_WEBSITE, SearchFilters
 from app.jobs import (
     PlaceFilter,
     apply_contact_result,
@@ -12,6 +18,7 @@ from app.jobs import (
 )
 from app.models import Job, PlaceRow, build_query, split_places
 from app.scraper.maps import PlaceRef, Search
+from tests.test_sitefinder import FakeSearch, FakeWeb, page
 
 NO_SITE = SearchFilters(website="without", contact="phone_or_email")
 
@@ -174,6 +181,90 @@ async def test_default_place_filter_keeps_everything_and_adds_listing_emails():
     assert not f.active and not f.wants_lookups
     rows, reason = await f.accept(_row(1, description="Write to office@p1.com"))
     assert reason == "" and rows[0].email == "office@p1.com"
+
+
+# ---- websites the listing does not show ------------------------------------
+async def test_place_filter_skips_a_place_whose_email_domain_is_its_website():
+    web = FakeWeb({"https://joesplumbing.com/": page("(817) 555-0100")})
+    f = PlaceFilter(NO_SITE, site_finder=SiteFinder(web))
+    assert await f.accept(_row(1, website="", description="Email info@joesplumbing.com")) == ([], UNLISTED_WEBSITE)
+    rows, reason = await f.accept(_row(2, website="", description="Email joe@gmail.com"))
+    assert reason == "" and rows[0].email == "joe@gmail.com"
+    assert f.stats() == {"unlisted_websites": {"email domain": 1}, "web_searches": 0}
+
+
+async def test_place_filter_checks_only_places_that_match_without_a_website():
+    web = FakeWeb()                                   # joes.com does not load
+    f = PlaceFilter(NO_SITE, site_finder=SiteFinder(web))
+    rows, reason = await f.accept(_row(1, website="", phone="", phone_unformatted="", description="joe@joes.com"))
+    assert reason == "" and rows[0].email == "joe@joes.com"
+    assert await f.accept(_row(2)) == ([], "has a website")
+    assert await f.accept(_row(3, website="", phone="", phone_unformatted="")) == ([], "no phone or email")
+    assert web.fetched == ["https://joes.com/"], "places the filters reject are not checked"
+    other = PlaceFilter(SearchFilters(website="any", contact="phone"), site_finder=SiteFinder(web))
+    assert not other.checks_sites and (await other.accept(_row(4, website="", description="a@joes4.com")))[1] == ""
+    assert web.fetched == ["https://joes.com/"]
+
+
+async def test_place_filter_keeps_what_the_social_page_shows():
+    profile = "https://www.facebook.com/joes"
+    web = FakeWeb()
+
+    async def contacts(url, *, region=None):
+        web.looked_up.append(url)
+        return _result(url, ["hello@joes.com"])
+
+    web.find_contacts = contacts
+    finder = SiteFinder(web)
+    f = PlaceFilter(NO_SITE, lookup=finder.contacts, site_finder=finder)
+    rows, reason = await f.accept(_row(1, website=profile))           # has a phone: no email lookup ...
+    assert reason == "" and rows[0].email == "hello@joes.com" and rows[0].enrichment_status == "done"
+    rows, reason = await f.accept(_row(2, website=profile + "2", phone="", phone_unformatted=""))
+    assert reason == "" and [r.email for r in rows] == ["hello@joes.com"]    # ... one lookup each, applied once
+    assert web.looked_up == [profile, profile + "2"]
+
+
+async def test_place_filter_keeps_a_place_when_the_website_check_breaks():
+    class Broken(SiteFinder):
+        async def find(self, rows):
+            raise RuntimeError("boom")
+
+    f = PlaceFilter(NO_SITE, site_finder=Broken(FakeWeb()))
+    rows, reason = await f.accept(_row(1, website=""))
+    assert reason == "" and len(rows) == 1
+
+
+async def test_place_filter_open_sets_up_what_the_filters_need(monkeypatch):
+    monkeypatch.setattr(jobs, "WebsiteEnricher", lambda cfg, **kw: FakeWeb())
+    cfg = Settings()
+    plain = PlaceFilter(SearchFilters(website="with", contact="phone"))
+    async with AsyncExitStack() as stack:
+        await plain.open(stack, cfg)
+    assert plain.site_finder is None and plain.lookup is None
+
+    checks = PlaceFilter(SearchFilters(website="without", contact="phone"))
+    searches = PlaceFilter(SearchFilters(website="without", contact="phone", search_web=True))
+    ignored = PlaceFilter(SearchFilters(website="with", contact="email", search_web=True))
+    async with AsyncExitStack() as stack:
+        for f in (checks, searches, ignored):
+            await f.open(stack, cfg)
+    assert checks.site_finder is not None and checks.site_finder.search is None
+    assert isinstance(searches.site_finder.search, WebSearch)
+    assert ignored.lookup is not None and ignored.site_finder.search is None and not ignored.checks_sites
+
+
+async def test_place_filter_says_when_web_search_was_switched_off():
+    search = FakeSearch()
+    search.searches, search.disabled = 12, "the search engines refused more automated searches"
+    f = PlaceFilter(SearchFilters(website="without", search_web=True), site_finder=SiteFinder(FakeWeb(), search=search))
+    assert f.notice() == ("Web search stopped after 12 searches (the search engines refused more automated "
+                          "searches); the businesses after that were only checked by their email domain and "
+                          "social page.")
+    assert f.stats()["web_searches"] == 12
+    search.searches, search.disabled = 0, "the search engines could not be reached"
+    assert f.notice() == ("Web search did not work (the search engines could not be reached), so businesses "
+                          "were only checked by their email domain and social page.")
+    assert PlaceFilter(NO_SITE).notice() == "" and PlaceFilter(NO_SITE).stats()["web_searches"] == 0
 
 
 # ----------------------------------------------------------------------

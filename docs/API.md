@@ -91,6 +91,7 @@ Request body:
 | `website` | `any`, `without`, `with` | `any` | keep places without / with a website of their own |
 | `contact` | `any`, `phone`, `email`, `phone_or_email`, `phone_and_email` | `any` | contact details a place must have |
 | `profiles_as_no_website` | bool | `true` | a Facebook / Instagram / Yelp / booking / `business.site` page does not count as a website |
+| `search_web` | bool | `false` | with `website: without` only: also run a web search per candidate for a website it does not list on Google Maps (slower – a few seconds per business). Its email domain and social page are always checked. |
 
 Responses echo the filters with a read-only `label` (e.g. `"no website · phone or email"`).
 
@@ -114,7 +115,7 @@ Response (`JobSummary`):
   "id": "job_5f0c2a1b9d3e", "query": "plumbers in Austin, TX", "business": "plumbers", "place": "Austin, TX",
   "whole_area": false,
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
-               "label": "no website · phone or email" },
+               "search_web": false, "label": "no website · phone or email" },
   "limit": 30, "status": "queued",
   "progress": { "phase": "queued", "message": "", "current": 0, "total": 0, "percent": 0.0 },
   "row_count": 0, "found": null, "notice": "",
@@ -135,7 +136,7 @@ Array of `JobSummary` (see above), newest first.
 
 The full `Job` (see [DATA_MODEL.md](DATA_MODEL.md#6-job-model-api)) including `rows`, `notice`
 and `stats` (listings scanned, searches and map sections run, places matched, places skipped by
-reason, why the scan stopped).
+reason, why the scan stopped, websites found that Google Maps does not list, web searches run).
 Rows appear while the job is running, so clients can render progressively. `404` if unknown.
 
 ### DELETE `/api/jobs/{job_id}`

@@ -14,14 +14,18 @@ way (unit tested in tests/test_filters.py):
 
 "Website" means the business's *own* site: a Facebook page, Yelp listing,
 booking page, ... (see `PROFILE_DOMAINS` in app/scraper/parsing.py) counts as
-no website unless ``profiles_as_no_website`` is switched off.
+no website unless ``profiles_as_no_website`` is switched off. With
+``website=without`` a place that matches is also checked for a website Google
+Maps does not list (its email domain, the links on its social page and, with
+``search_web``, a web search - see app/enrichment/sitefinder.py); a place with
+one is skipped as `UNLISTED_WEBSITE`.
 """
 from __future__ import annotations
 
 from enum import Enum
 from typing import TYPE_CHECKING, Sequence
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 from app.scraper.parsing import website_type
 
@@ -46,6 +50,9 @@ class ContactFilter(str, Enum):
 # Requirements that an email can satisfy - only these ever trigger an email lookup.
 EMAIL_CONTACTS = {ContactFilter.EMAIL, ContactFilter.PHONE_OR_EMAIL, ContactFilter.PHONE_AND_EMAIL}
 
+# Skip reason of a place with a website that its Google Maps listing does not show.
+UNLISTED_WEBSITE = "has a website not listed on Maps"
+
 _WEBSITE_LABELS = {WebsiteFilter.WITH: "has a website", WebsiteFilter.WITHOUT: "no website"}
 _CONTACT_LABELS = {
     ContactFilter.PHONE: "has a phone", ContactFilter.EMAIL: "has an email",
@@ -59,6 +66,15 @@ class SearchFilters(BaseModel):
         ContactFilter.ANY, description="any | phone | email | phone_or_email | phone_and_email")
     profiles_as_no_website: bool = Field(
         True, description="A Facebook / Instagram / Yelp / booking page does not count as a website")
+    search_web: bool = Field(
+        False, description="With website=without: also search the web for a website the business does not "
+                           "list on Google Maps (slower)")
+
+    @model_validator(mode="after")
+    def _search_web_needs_no_website(self) -> "SearchFilters":
+        if self.website is not WebsiteFilter.WITHOUT:
+            self.search_web = False      # only a "no website" search looks for unlisted websites
+        return self
 
     @property
     def active(self) -> bool:

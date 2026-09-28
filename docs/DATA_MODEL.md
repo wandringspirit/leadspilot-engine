@@ -92,7 +92,7 @@ names are kept verbatim.
   "whole_area": false,                  // true: each place searched map section by map section
   "limit": 200,
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
-               "label": "no website · phone or email" },   // see §9
+               "search_web": false, "label": "no website · phone or email" },   // see §9
   "enrich": false,
   "status": "completed",            // queued | running | enriching | completed | failed | cancelled | interrupted
   "progress": { "phase": "done", "message": "Done - 35 of 200 found", "current": 35, "total": 200, "percent": 100.0 },
@@ -104,9 +104,10 @@ names are kept verbatim.
   "finished_at": "2026-09-20T15:06:01.456Z",
   "stats": {
     "links_found": 87,              // distinct listings read from Google's results lists
-    "scraped": 38,                  // place pages opened
+    "scraped": 42,                  // place pages opened
     "matched": 35,                  // places kept (= places, not rows)
-    "skipped": { "has a website": 49, "no phone or email": 3 },   // places left out, by reason
+    "skipped": { "has a website": 45, "has a website not listed on Maps": 4, "no phone or email": 3 },
+                                    // places left out, by reason
     "failed": 0,
     "reached_end": true,
     "searches": 1,                  // Google Maps result lists opened
@@ -114,7 +115,9 @@ names are kept verbatim.
     "full_lists": 0,                // lists that hit Google's ~120 cap
     "dense": 0,                     // sections still full at the smallest section size
     "stopped": "end_of_list",       // see below
-    "errors": []
+    "errors": [],
+    "unlisted_websites": { "email domain": 1, "profile page": 3 },   // how they were found (§9)
+    "web_searches": 0               // web searches run (filters.search_web)
   }
 }
 ```
@@ -231,7 +234,7 @@ passes both checks:
 | `website` | Keeps places… |
 | --- | --- |
 | `any` | with or without a website |
-| `without` | whose `Website` is empty – or a profile page, while `profiles_as_no_website` is `true` |
+| `without` | whose `Website` is empty – or a profile page, while `profiles_as_no_website` is `true` – and that have no website Google Maps leaves out (below) |
 | `with` | with a website of their own – or a profile page, while `profiles_as_no_website` is `false` |
 
 | `contact` | Keeps places that have… |
@@ -255,3 +258,19 @@ passes both checks:
 - `limit` counts kept places. The feed is scrolled until that many matched, Google's list ends
   (about 120 listings per search – use the whole-area search to go past it) or `MAX_SCANNED`
   listings were examined; `notice` explains a shorter result (§6).
+
+**Websites Google Maps does not list.** A listing shows only the website its owner entered, so
+with `website = without` a place that passes every other check is also checked for a website of
+its own – skipped as `has a website not listed on Maps` when one is found
+([ENRICHMENT.md §8](ENRICHMENT.md#8-websites-google-maps-does-not-list)):
+
+| Check | Runs | Finds |
+| --- | --- | --- |
+| email domain | always | an address on a domain of its own (not gmail & co.) whose site shows the business's phone number or is named after it |
+| profile page | always | a link on its Facebook / BBB / booking page to a site that shows its phone number |
+| web search | with `search_web: true` | a result for its name + city, then its phone number, whose site shows the phone number |
+
+`search_web` is ignored (stored as `false`) unless `website` is `without`. Job stats count the
+websites found per check (`unlisted_websites`) and the web searches run (`web_searches`).
+Addresses on platform domains (`…@bbbemail.org`) are kept like any other email; they just are
+not taken for the business's own domain.

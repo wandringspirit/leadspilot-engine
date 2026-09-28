@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     ENRICH_MAX_BYTES: int = 2_000_000     # ignore pages larger than this
     DEFAULT_REGION: str = "US"            # phone parsing region when unknown
 
+    # --- Web search for websites Google Maps does not list ----------------
+    WEB_SEARCH_ENGINE: str = "duckduckgo" # duckduckgo | bing - the other one is the fallback (never Google)
+    WEB_SEARCH_DELAY_S: float = 3.0       # at least this long between two web searches
+
     @property
     def jobs_dir(self) -> Path:
         return self.DATA_DIR / "jobs"

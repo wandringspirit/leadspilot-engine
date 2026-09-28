@@ -99,7 +99,10 @@ supplies the full record.
    Only the website is pre-filtered – phones are always checked on the place page.
 2. The candidates are scraped (Phase 2). `selector.accept()` adds emails written in the listing's
    description, looks for an email on the website / profile page if only an email is missing,
-   and applies the filters to the finished place. Rejected places are counted by reason.
+   and applies the filters to the finished place; in a *No website* search a place that matches
+   is then checked for a website its listing does not show
+   ([ENRICHMENT.md §8](ENRICHMENT.md#8-websites-google-maps-does-not-list)). Rejected places are
+   counted by reason.
 3. If fewer than `limit` places were kept and the feed can go on, the next round asks for the
    difference – further down the list.
 

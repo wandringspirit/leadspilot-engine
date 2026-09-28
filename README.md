@@ -18,6 +18,10 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
   `business.site` page does not count as a website (switchable). The number of results counts
   *matching* businesses: the crawler keeps going down Google's list until it has that many, and
   never opens the page of a listing the results already show has a website.
+- **Websites Google Maps doesn't show** – a listing only shows the website its owner entered, so
+  a *No website* search also checks each business's email domain and the links on its Facebook /
+  booking page, and – if you tick it – runs a web search for its name and phone number. A
+  business whose own website turns up (verified by its phone number on that site) is left out.
 - **Whole-area search** – a single Google Maps search lists only a city's ~120 most prominent
   businesses (nearly all with websites). Ticked by default, *Search the whole area* splits the map
   into sections, searches each one and splits busy sections further, so smaller businesses –
@@ -88,7 +92,11 @@ python run.py
 5. **Filters** (remembered for next time):
    - **Website** – *Any*, **No website** (only businesses without a website of their own) or
      *Has website*. By default a Facebook / Instagram / Yelp / booking page doesn't count as a
-     website; untick the box under the buttons to count them.
+     website; untick the box under the buttons to count them. With *No website*, a business is
+     also left out when its email address or social page leads to a website of its own that
+     Google Maps doesn't show; tick **Also search the web for a website they don't list on Maps**
+     to look each one up with a web search too (slower: a few seconds per business; uses
+     DuckDuckGo / Bing, never Google).
    - **Must have** – *Phone or email* keeps businesses you can reach; *Phone*, *Email* and
      *Phone and email* are stricter. Google Maps never shows emails, so an email comes from the
      listing's description or, while scanning, from the business's website / social page.
@@ -116,6 +124,7 @@ the bottom resumes it. The section can be collapsed with the ▾ button.
 
 ```bash
 python cli.py roofing "Houston, TX" --whole-area --website without --contact phone_or_email --limit 50
+python cli.py roofing "Houston, TX" --website without --contact phone --search-web --limit 20
 python cli.py plumbers "Katy, TX; Pasadena, TX" --limit 100
 python cli.py "roofing companies near houston" --limit 50 --enrich --out houston.csv
 ```
@@ -130,6 +139,7 @@ it out to pass a whole search as one argument).
 | `--website` | `any` (default), `without` (no website of their own) or `with` |
 | `--contact` | `any` (default), `phone`, `email`, `phone_or_email` or `phone_and_email` |
 | `--profiles-are-websites` | count a Facebook / Instagram / Yelp / booking page as a website |
+| `--search-web` | with `--website without`: also search the web for a website a business doesn't list on Google Maps (slower) |
 | `--enrich` | look up emails / phones on every website that is missing one |
 | `--extended` | include the extra columns |
 | `--headed` | show the browser window while scraping |
@@ -149,6 +159,7 @@ Copy `.env.example` to `.env` and adjust. The most useful switches:
 | `PROXY_SERVER` | *(empty)* | `http://user:pass@host:port` for all Maps traffic |
 | `ENRICH_MAX_PAGES` | `6` | pages fetched per website when looking for contacts |
 | `ENRICH_BROWSER_FALLBACK` | `true` | render JS-only / bot-blocking sites with Chromium |
+| `WEB_SEARCH_DELAY_S` | `3.0` | pause between web searches (*Also search the web …*) |
 
 Every setting is listed in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#configuration-reference).
 
@@ -186,6 +197,8 @@ app/
   enrichment/
     website.py         website fetching strategy (httpx -> Chromium fallback)
     extractors.py      email / phone extraction & filtering
+    sitefinder.py      finds websites a Google Maps listing does not show
+    websearch.py       DuckDuckGo / Bing web search (never Google)
   export/csv_export.py CSV column layout and writer
   static/              the web panel (index.html, app.js, styles.css)
 cli.py                 command line entry point
@@ -202,7 +215,7 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/README.md](docs/README.md) | documentation index |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |
-| [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | how emails / phones are discovered on websites and the duplicate-row rule |
+| [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | how emails / phones are discovered on websites, the duplicate-row rule, and how websites a listing doesn't show are found |
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | every output column, CSV format, parsing rules |
 | [docs/API.md](docs/API.md) | REST API reference with examples |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | dev setup, configuration reference, testing, extending, keeping docs in sync |

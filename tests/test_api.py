@@ -31,6 +31,13 @@ class _FakeEnricher:
         emails = [EmailHit(email="hello@fbroofing.com", source=website)] if "fbroofing" in website else []
         return ContactResult(website=website, emails=emails, pages_checked=[website])
 
+    async def fetch_page(self, url):
+        # only No Site Roofing has a site of its own - one its Google listing does not show
+        if url == "https://nositeroofing.com/":
+            return url, ("<html><body><h1>No Site Roofing</h1><p>Roof repair and replacement in Houston. "
+                         + "Free estimates, insured crews, storm damage specialists. " * 5 + "</p></body></html>")
+        return url, ""
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
@@ -267,7 +274,7 @@ def test_business_and_place_make_the_search(client, monkeypatch):
     assert res.status_code == 202, res.text
     summary = res.json()
     assert (summary["query"], summary["business"], summary["place"]) == ("roofers in Houston, TX", "roofers", "Houston, TX")
-    assert summary["filters"] == {"website": "any", "contact": "any", "profiles_as_no_website": True,
+    assert summary["filters"] == {"website": "any", "contact": "any", "profiles_as_no_website": True, "search_web": False,
                                   "label": "all businesses"}
     job = _wait_for(c, summary["id"])
     assert _FakeScraper.queries[-1] == [Search("roofers in Houston, TX")]
@@ -300,6 +307,44 @@ def test_filtered_job_keeps_matches_and_explains_a_short_result(client, monkeypa
     res = c.get(f"/api/jobs/{job_id}/export.csv?extended=true")
     assert 'filename="roofers_in_houston_tx_no_website_phone_or_email_extended.csv"' in res.headers["content-disposition"]
     assert ",Website Type," in res.content.decode("utf-8-sig").splitlines()[0]
+
+
+def test_no_website_job_leaves_out_a_business_whose_website_a_web_search_finds(client, monkeypatch):
+    import app.jobs as jobs_module
+
+    class FakeWebSearch:
+        """Finds No Site Roofing's website, then refuses like a rate-limited engine."""
+
+        def __init__(self, cfg):
+            self.searches, self.disabled, self.queries = 0, "", []
+
+        async def aclose(self):
+            return None
+
+        async def search(self, query):
+            self.queries.append(query)
+            if self.searches:
+                self.disabled = "the search engines refused more automated searches"
+                return []
+            self.searches += 1
+            return ["https://www.yelp.com/biz/no-site-roofing-houston", "https://nositeroofing.com/about"]
+
+    monkeypatch.setattr(jobs_module, "MapsScraper", _FakeScraper)
+    monkeypatch.setattr(jobs_module, "WebSearch", FakeWebSearch)
+    c, _ = client
+    res = c.post("/api/scrape", json={"business": "roofers", "place": "Houston, TX", "limit": 200, "filters": {
+        "website": "without", "contact": "phone_or_email", "search_web": True}})
+    assert res.json()["filters"]["search_web"] is True
+    job = _wait_for(c, res.json()["id"])
+    assert job["status"] == "completed", job
+    assert [r["name"] for r in job["rows"]] == ["Facebook Roofing"]
+    assert job["stats"]["skipped"] == {"has a website": 1, "has a website not listed on Maps": 1,
+                                       "no phone or email": 1}
+    assert job["stats"]["unlisted_websites"] == {"web search": 1} and job["stats"]["web_searches"] == 1
+    assert job["notice"].endswith("Web search stopped after 1 search (the search engines refused more automated "
+                                  "searches); the businesses after that were only checked by their email domain "
+                                  "and social page.")
+    assert job["notice"].startswith("Only 1 of the 4 businesses Google Maps lists for “roofers” in Houston, TX")
 
 
 def test_short_unfiltered_result_says_that_is_everything(client, monkeypatch):
