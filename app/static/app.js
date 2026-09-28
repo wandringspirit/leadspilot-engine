@@ -9,6 +9,7 @@
 
   const els = {
     form: $("scrape-form"), business: $("business"), place: $("place"), queryPreview: $("query-preview"),
+    wholeArea: $("whole-area"), progressArea: $("progress-area"),
     limit: $("limit"), limitHint: $("limit-hint"), contact: $("contact"), profiles: $("profiles"),
     profilesRow: $("profiles-row"), filterHint: $("filter-hint"),
     enrich: $("enrich"), headed: $("headed"), startBtn: $("start-btn"), formError: $("form-error"),
@@ -93,8 +94,6 @@
     try {
       state.config = await api("/api/config");
       els.limit.max = state.config.max_results;
-      els.limitHint.textContent =
-        `1 – ${state.config.max_results} businesses. Google Maps lists at most about 120 per search.`;
       els.headed.checked = !state.config.headless;
       els.health.classList.add("ok");
       els.healthText.textContent = "API online";
@@ -140,10 +139,11 @@
       const count = short ? `${job.found} of ${job.limit} found` : `${job.row_count} rows`;
       meta.textContent = `${job.status} · ${count} · ${fmtDate(job.created_at)}`;
       main.append(q);
-      if (isFiltered(job)) {
+      const chips = [isFiltered(job) ? job.filters.label : "", job.whole_area ? "whole area" : ""].filter(Boolean);
+      for (const text of chips) {
         const chip = document.createElement("span");
-        chip.className = "chip small"; chip.textContent = job.filters.label;
-        main.append(chip);
+        chip.className = "chip small" + (text === "whole area" ? " area" : ""); chip.textContent = text;
+        main.append(chip, " ");
       }
       main.append(meta);
       const del = document.createElement("button");
@@ -226,6 +226,7 @@
     els.progressTitle.textContent = `“${jobTitle(job)}” · ${job.limit} wanted`;
     els.progressFilter.hidden = !filtered;
     els.progressFilter.textContent = filtered ? job.filters.label : "";
+    els.progressArea.hidden = !job.whole_area;
     els.statusPill.textContent = job.status;
     els.statusPill.className = "pill " + job.status;
     els.progressMessage.textContent = job.progress.message || job.status;
@@ -247,10 +248,11 @@
     const withEmail = job.rows.filter((r) => r.email).length;
     const parts = [`${places} places`, `${job.rows.length} rows`, `${withEmail} with email`];
     const stats = job.stats || {};
-    if (filtered && stats.links_found) {
+    if ((filtered || job.whole_area) && stats.links_found) {
       const skipped = Object.entries(stats.skipped || {}).sort((a, b) => b[1] - a[1])
         .map(([reason, n]) => `${n} ${reason}`).join(", ");
-      parts.push(`${stats.links_found} listings scanned${skipped ? ` (skipped: ${skipped})` : ""}`);
+      const sections = stats.sections ? ` in ${stats.sections} map sections` : "";
+      parts.push(`${stats.links_found} listings scanned${sections}${skipped ? ` (skipped: ${skipped})` : ""}`);
     }
     parts.push(`created ${fmtDate(job.created_at)}`);
     els.resultsSubtitle.textContent = parts.join(" · ");
@@ -400,16 +402,41 @@
     if (typeof saved.profiles_as_no_website === "boolean") els.profiles.checked = saved.profiles_as_no_website;
   }
 
+  // "Katy, TX; Pasadena, TX" -> ["Katy, TX", "Pasadena, TX"] (same rule as the server)
+  const splitPlaces = (text) => Array.from(new Set(
+    text.split(/[;\n]/).map((p) => p.trim().replace(/\s+/g, " ")).filter(Boolean)));
+
   function updateQueryPreview() {
     const business = els.business.value.trim();
-    const place = els.place.value.trim();
-    const query = business && place ? `${business} in ${place}` : business;
-    els.queryPreview.hidden = !query;
-    els.queryPreview.textContent = query ? `Searches Google Maps for “${query}”` : "";
+    const places = splitPlaces(els.place.value);
+    let text = "";
+    if (business && places.length && els.wholeArea.checked) {
+      text = `Searches “${business}” across all of ${places.join(" · ")}, map section by section`;
+    } else if (business && places.length) {
+      text = "Searches Google Maps for " + places.map((p) => `“${business} in ${p}”`).join(", ");
+    } else if (business) {
+      text = `Searches Google Maps for “${business}”`;
+    }
+    els.queryPreview.hidden = !text;
+    els.queryPreview.textContent = text;
+    els.limitHint.textContent = `1 – ${state.config ? state.config.max_results : 500} businesses. ` +
+      (els.wholeArea.checked ? "The search goes on until it has found that many or covered the whole area."
+        : "Google Maps lists at most about 120 per search.");
+  }
+
+  function restoreWholeArea() {
+    try {
+      const saved = localStorage.getItem("wholeArea");
+      if (saved !== null) els.wholeArea.checked = saved === "1";
+    } catch { /* private mode etc. */ }
   }
 
   els.business.addEventListener("input", updateQueryPreview);
   els.place.addEventListener("input", updateQueryPreview);
+  els.wholeArea.addEventListener("change", () => {
+    try { localStorage.setItem("wholeArea", els.wholeArea.checked ? "1" : "0"); } catch { /* ignore */ }
+    updateQueryPreview();
+  });
   websiteRadios.forEach((r) => r.addEventListener("change", updateFilterUi));
   els.contact.addEventListener("change", updateFilterUi);
   els.profiles.addEventListener("change", updateFilterUi);
@@ -423,6 +450,7 @@
     const payload = {
       business: els.business.value.trim(),
       place: els.place.value.trim(),
+      whole_area: els.wholeArea.checked,
       limit: Number(els.limit.value),
       filters: currentFilters(),
       enrich: els.enrich.checked,
@@ -656,7 +684,8 @@
   }
 
   restoreFilters();
+  restoreWholeArea();
   updateFilterUi();
   updateQueryPreview();
-  init().then(initLogs);
+  init().then(() => { updateQueryPreview(); initLogs(); });
 })();

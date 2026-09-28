@@ -19,6 +19,11 @@ without one - are skipped without opening their page, every scraped place goes
 through ``selector.accept()``, and the feed is scrolled further until enough
 places matched or Google's list ends.
 
+A job can hold several searches (one per place) and a *whole-area* search,
+which splits a place into map sections (app/scraper/area.py) so it is not
+limited to Google's ~120 top listings. Places found by more than one search
+are kept once; ranks number the places in the order they were found.
+
 The scraper is a plain async class so it can be driven by the FastAPI job
 manager and by the CLI alike.
 """
@@ -45,6 +50,7 @@ from playwright.async_api import (
 
 from app.config import Settings, settings as default_settings
 from app.models import PlaceRow
+from app.scraper.area import MAX_SECTION_ZOOM, VIEWPORT_H, VIEWPORT_W, Section, section_from_url
 from app.scraper.parsing import (
     build_maps_search_url,
     country_to_code,
@@ -76,6 +82,10 @@ NO_RESULTS_TEXTS = ("No results", "can't find", "did not match any", "Google Map
 BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 BLOCKED_URL_PARTS = ("/maps/vt/", "googleusercontent.com", "gstatic.com/images", "doubleclick",
                      "google-analytics", "/maps/preview/log204")
+# Google Maps ends every results list at about GOOGLE_LIST_LIMIT listings, however many
+# places exist; a list with NEAR_GOOGLE_LIMIT or more was probably cut short.
+GOOGLE_LIST_LIMIT = 120
+NEAR_GOOGLE_LIMIT = 100
 
 # Collect place links (+ what the result card shows) from the feed.
 # `website` is the href of the card's "Website" button, or null when the card shows
@@ -146,17 +156,35 @@ class PlaceRef:
         return place_id_from_href(self.href)
 
 
+@dataclass(frozen=True)
+class Search:
+    """One thing to look up: ``text`` as typed into Google Maps, or - with
+    ``area`` - ``text`` searched section by section across that place's map."""
+
+    text: str
+    area: str = ""
+
+    @property
+    def label(self) -> str:
+        return f"{self.text} (whole area of {self.area})" if self.area else self.text
+
+
 @dataclass
 class ScrapeStats:
     query: str = ""
     requested: int = 0
-    links_found: int = 0      # listings read from the results feed
+    links_found: int = 0      # distinct listings read from the results feeds
     scraped: int = 0          # place pages scraped
     matched: int = 0          # places kept (all scraped places when there is no filter)
     skipped: dict[str, int] = field(default_factory=dict)   # reason -> places left out by the filters
     failed: int = 0
     reached_end: bool = False
-    # why the scan stopped: limit | end_of_list | no_results | single | stalled | scan_limit
+    searches: int = 0         # Google Maps result lists opened
+    sections: int = 0         # of which map sections (whole-area search)
+    full_lists: int = 0       # result lists that hit Google's ~120 cap (there may be more)
+    dense: int = 0            # sections still full at MAX_SECTION_ZOOM (may hold more)
+    # why the scan stopped: limit | end_of_list | no_results | single | stalled (one search),
+    # searched_all (several searches / whole area), section_limit | scan_limit (caps)
     stopped: str = ""
     errors: list[str] = field(default_factory=list)
 
@@ -232,8 +260,15 @@ class MapsScraper:
         self.stats = ScrapeStats()
         self._selector: PlaceSelector | None = None
         self._limit = 0
-        self._seen: dict[str, PlaceRef] = {}
+        self._seen: dict[str, PlaceRef] = {}      # every place listed so far, by listing_key()
+        self._halted = ""                         # a cap stopped the whole job: scan_limit | section_limit
+        self._where = ""                          # which search is running (several searches / sections)
+        self._failures = 0                        # searches in a row that could not be opened
+        # the results list being read
         self._feed_done = False
+        self._search_stop = ""                    # end_of_list | stalled | no_results | single
+        self._feed_keys: set[str] = set()         # distinct listings in it (incl. ones seen before)
+        self._feed_points: list[tuple[float, float]] = []
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -241,45 +276,47 @@ class MapsScraper:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    async def scrape(self, query: str, limit: int, *, selector: PlaceSelector | None = None) -> list[PlaceRow]:
-        """Return up to ``limit`` places for ``query`` - with a selector, ``limit`` places it accepted."""
+    async def scrape(self, searches: str | Search | list[Search], limit: int, *,
+                     selector: PlaceSelector | None = None) -> list[PlaceRow]:
+        """Return up to ``limit`` places - with a selector, ``limit`` places it accepted.
+
+        ``searches`` is a query string, a `Search` or a list of them; they run in
+        order until enough places were kept.
+        """
+        plan = [Search(searches)] if isinstance(searches, str) else [searches] if isinstance(searches, Search) \
+            else list(searches)
+        several = len(plan) > 1 or any(s.area for s in plan)
         limit = max(1, min(int(limit), self.cfg.MAX_RESULTS))
-        self.stats = ScrapeStats(query=query, requested=limit)
+        self.stats = ScrapeStats(query=" | ".join(s.label for s in plan), requested=limit)
         self._selector, self._limit = selector, limit
-        self._seen, self._feed_done = {}, False
+        self._seen, self._halted, self._where, self._failures = {}, "", "", 0
         started = time.monotonic()
-        log.info("Starting %s Chromium for %r (%d %s wanted)", "headless" if self.headless else "headed",
-                 query, limit, "matching place(s)" if self._filtered else "result(s)")
+        log.info("Starting %s Chromium for %s (%d %s wanted)", "headless" if self.headless else "headed",
+                 "; ".join(repr(s.label) for s in plan), limit, "matching place(s)" if self._filtered else "result(s)")
         await self._start()
         try:
             page = await self._context.new_page()  # type: ignore[union-attr]
-            await self._progress("collecting", "Opening Google Maps", 0, limit)
-            log.info("Opening %s", self.search_url(query))
-            capture, single = await self._open_results(page, query)
             rows: list[PlaceRow] = []
-            if single is not None:
-                log.info("Google returned a single place directly: %s", single.name)
-                self.stats.links_found = self.stats.scraped = 1
-                self.stats.stopped = "single"
-                rows, reason = await self._select(single)
-                if rows:
-                    self.stats.matched = 1
-                    for row in rows:
-                        await self._emit_row(row)
+            for search in plan:
+                if self.stats.matched >= limit or self._halted:
+                    break
+                if search.area:
+                    rows += await self._search_area(page, search)
                 else:
-                    self._count_skip(reason)
-                    log.info("%s does not match the filters: %s", single.name, reason)
-            elif capture is not None:
-                rows = await self._scan(page, capture, limit)
+                    self._where = search.text if several else ""
+                    rows += await self._search_list(page, self.search_url(search.text), search.text)
             await page.close()
+            self.stats.links_found = len(self._seen)
+            self.stats.stopped = ("limit" if self.stats.matched >= limit else self._halted
+                                  or ("searched_all" if several else self._search_stop or "end_of_list"))
             rows.sort(key=lambda r: r.rank)
             elapsed = time.monotonic() - started
             if self._filtered:
                 skipped = ", ".join(f"{n} {reason}" for reason, n in
                                     sorted(self.stats.skipped.items(), key=lambda kv: -kv[1])) or "none"
-                log.info("Scan finished in %.1fs: %d of %d matching place(s) from %d listing(s), "
+                log.info("Scan finished in %.1fs: %d of %d matching place(s) from %d listing(s) in %d search(es), "
                          "%d place page(s) opened, %d failed; skipped: %s", elapsed, self.stats.matched, limit,
-                         self.stats.links_found, self.stats.scraped, self.stats.failed, skipped)
+                         self.stats.links_found, self.stats.searches, self.stats.scraped, self.stats.failed, skipped)
                 await self._progress("done", f"Found {self.stats.matched} matching places in "
                                      f"{self.stats.links_found} listings", self.stats.matched, limit)
             else:
@@ -314,7 +351,7 @@ class MapsScraper:
         self._context = await self._browser.new_context(
             locale=self.cfg.LOCALE,
             user_agent=self.cfg.USER_AGENT,
-            viewport={"width": 1366, "height": 900},
+            viewport={"width": VIEWPORT_W, "height": VIEWPORT_H},   # area.py's section maths assume this size
             extra_http_headers={"Accept-Language": f"{self.cfg.LOCALE},en;q=0.9"},
         )
         self._context.set_default_timeout(self.cfg.PAGE_TIMEOUT_MS)
@@ -346,13 +383,126 @@ class MapsScraper:
     # Phase 1: collect place links from the results feed
     # ------------------------------------------------------------------
     def search_url(self, query: str) -> str:
-        url = f"{MAPS_BASE}/search/{quote_plus(query.strip())}/?hl=en"
-        if self.cfg.REGION_CODE:
-            url += f"&gl={self.cfg.REGION_CODE.lower()}"
-        return url
+        return f"{MAPS_BASE}/search/{quote_plus(query.strip())}/{self._params()}"
 
-    async def _open_results(self, page: Page, query: str) -> tuple[RecordCapture | None, PlaceRow | None]:
-        """Open the search page.
+    def _params(self) -> str:
+        return "?hl=en" + (f"&gl={self.cfg.REGION_CODE.lower()}" if self.cfg.REGION_CODE else "")
+
+    async def _search_list(self, page: Page, url: str, label: str) -> list[PlaceRow]:
+        """Open one Google Maps results list and scrape it until the limit or its end."""
+        self._feed_done, self._search_stop, self._feed_keys, self._feed_points = False, "", set(), []
+        self.stats.searches += 1
+        await self._progress("collecting", f"Opening {self._where}" if self._where else "Opening Google Maps",
+                             self.stats.matched if self._filtered else len(self._seen), self._limit)
+        log.info("Opening %s", url)
+        try:
+            capture, single = await self._open_results(page, url, label)
+        except Exception as exc:  # noqa: BLE001 - see below
+            if not self._where:
+                raise            # the only search: fail the job (blocked, captcha, layout change ...)
+            self._failures += 1
+            self.stats.errors.append(f"{label}: {exc}")
+            log.warning("%s: search failed (%s)", label, str(exc).splitlines()[0] if str(exc) else exc)
+            if self._failures >= 3:
+                raise RuntimeError(f"3 searches in a row failed, last: {exc}") from exc
+            return []
+        self._failures = 0
+        if single is not None:
+            rows = await self._take_single(single)
+        elif capture is not None:
+            rows = await self._scan(page, capture, self._limit)
+        else:
+            rows = []
+        self.stats.links_found = len(self._seen)
+        if len(self._feed_keys) >= NEAR_GOOGLE_LIMIT:
+            self.stats.full_lists += 1
+        return rows
+
+    async def _take_single(self, row: PlaceRow) -> list[PlaceRow]:
+        """Google opened one place instead of a list: treat it as a one-listing list."""
+        self._search_stop = "single"
+        log.info("Google returned a single place directly: %s", row.name)
+        key = row.place_id or row.maps_url
+        if key in self._seen:
+            return []
+        row.rank = len(self._seen) + 1
+        self._seen[key] = PlaceRef(rank=row.rank, href=row.maps_url, name=row.name)
+        self.stats.scraped += 1
+        kept, reason = await self._select(row)
+        if kept:
+            self.stats.matched += 1
+            for kept_row in kept:
+                await self._emit_row(kept_row)
+        else:
+            self._count_skip(reason)
+            log.info("%s does not match the filters: %s", row.name, reason)
+        return kept
+
+    async def _search_area(self, page: Page, search: Search) -> list[PlaceRow]:
+        """Search ``search.text`` across the map of ``search.area``, section by section.
+
+        Starts with the view Google fits to the place; a section whose list is
+        full (and about that part of the map - Google did not zoom out) is split
+        into four quarters, searched after the sections already queued, nearest
+        to the centre first.
+        """
+        root = await self._locate(page, search.area)
+        if root is None:
+            log.warning("Could not read Google's map of %r - searching it as one list instead", search.area)
+            self._where = search.area
+            return await self._search_list(page, self.search_url(f"{search.text} in {search.area}"), search.label)
+        log.info("%s: map about %.0f km wide - searching %r section by section", search.area, root.width_km,
+                 search.text)
+        queue, kept = [root], []
+        while queue and self.stats.matched < self._limit and not self._halted:
+            if self.stats.sections >= self.cfg.MAX_SECTIONS:
+                log.warning("Stopped after %d map section(s) (MAX_SECTIONS)", self.stats.sections)
+                self._halted = "section_limit"
+                break
+            section = queue.pop(0)
+            self.stats.sections += 1
+            self._where = f"{search.area} · section {self.stats.sections} ({section.width_km:.1f} km)"
+            kept += await self._search_list(page, section.url(search.text, MAPS_BASE) + self._params(), self._where)
+            failed = self._failures > 0          # searched again as quarters, so nothing is skipped
+            listed = len(self._feed_keys)
+            near = sum(1 for lat, lng in self._feed_points if section.near(lat, lng))
+            full = listed >= NEAR_GOOGLE_LIMIT and near * 2 >= listed
+            split = (full or failed) and section.zoom < MAX_SECTION_ZOOM
+            log.info("%s: %d listing(s)%s", self._where, listed,
+                     " - splitting it into 4" if split else
+                     " - still full at the smallest section size" if full else "")
+            if split:
+                queue.extend(sorted(section.quarters(), key=root.distance))
+            elif full:
+                self.stats.dense += 1
+        return kept
+
+    async def _locate(self, page: Page, place: str) -> Section | None:
+        """Open ``place`` on Google Maps and return the part of the map Google shows for it."""
+        url = self.search_url(place)
+        log.info("Locating %s: %s", place, url)
+        try:
+            await page.goto(url, wait_until="domcontentloaded")
+            await self._dismiss_consent(page)
+            await page.wait_for_selector(f"{FEED_SELECTOR}, {PLACE_HEADER_SELECTOR}", timeout=self.cfg.PAGE_TIMEOUT_MS)
+        except PlaywrightTimeout:
+            pass
+        except Exception as exc:  # noqa: BLE001 - fall back to a plain search
+            log.warning("Could not open %s: %s", url, exc)
+            return None
+        # Google writes the view it fits to the place into the URL (/@lat,lng,zoomz) once the map settles
+        last, steady = "", 0
+        for _ in range(40):
+            current = page.url
+            steady = steady + 1 if current == last else 0
+            last = current
+            if steady >= 3 and section_from_url(current):
+                break
+            await page.wait_for_timeout(250)
+        return section_from_url(last)
+
+    async def _open_results(self, page: Page, url: str, label: str) -> tuple[RecordCapture | None, PlaceRow | None]:
+        """Open a search page.
 
         Returns ``(capture, None)`` when the results feed appeared (``capture``
         collects the feed's place records), ``(None, row)`` when Google jumped
@@ -360,7 +510,7 @@ class MapsScraper:
         """
         capture = RecordCapture(is_search_response)
         capture.attach(page)
-        response = await page.goto(self.search_url(query), wait_until="domcontentloaded")
+        response = await page.goto(url, wait_until="domcontentloaded")
         await self._dismiss_consent(page)
         try:
             for rec in records_from_html(await response.text() if response else ""):
@@ -386,9 +536,9 @@ class MapsScraper:
             return None, build_row(ref, dom, rec, {}, default_region=self.cfg.DEFAULT_REGION)
         body = (await page.inner_text("body"))[:600] if await page.query_selector("body") else ""
         if any(t in body for t in NO_RESULTS_TEXTS):
-            log.warning("Google Maps reports no results for %r", query)
+            log.warning("Google Maps reports no results for %s", label)
             self.stats.reached_end = True
-            self.stats.stopped = "no_results"
+            self._search_stop = "no_results"
             return None, None
         log.error("Results feed did not appear; page url=%s title=%r", page.url, await page.title())
         raise RuntimeError("Google Maps results feed did not appear (blocked, captcha or layout change?)")
@@ -405,7 +555,7 @@ class MapsScraper:
         log.info("Results feed loaded, collecting links")
         kept: list[PlaceRow] = []
         rounds = 0
-        while self.stats.matched < limit and not self._feed_done:
+        while self.stats.matched < limit and not self._feed_done and not self._halted:
             refs = await self._next_candidates(page, capture, limit - self.stats.matched)
             self.stats.links_found = len(self._seen)
             if not refs:
@@ -420,8 +570,6 @@ class MapsScraper:
                          len(capture.by_place_id))
                 await self._progress("details", f"Fetching details for {len(refs)} places", 0, len(refs))
             kept += await self._scrape_details(refs, capture.by_place_id)
-        if self.stats.matched >= limit:
-            self.stats.stopped = "limit"
         return kept
 
     async def _next_candidates(self, page: Page, capture: RecordCapture, want: int) -> list[PlaceRef]:
@@ -430,14 +578,20 @@ class MapsScraper:
         scan_cap = max(limit, self.cfg.MAX_SCANNED)
         candidates: list[PlaceRef] = []
         stalls = 0
+        where = f"{self._where} · " if self._where else ""
         while len(candidates) < want:
             links = await self._feed_links(page)
             await capture.settle()  # records of the listings that just loaded
-            before = len(seen)
+            before, listed_before = len(seen), len(self._feed_keys)
             for link in links:
-                key = link["href"].split("?", 1)[0]
+                key = listing_key(link["href"])
+                if key not in self._feed_keys:
+                    self._feed_keys.add(key)
+                    point = latlng_from_href(link["href"])
+                    if point:
+                        self._feed_points.append(point)
                 if key in seen:
-                    continue
+                    continue     # found by an earlier search / section
                 if len(seen) >= scan_cap:
                     break
                 ref = PlaceRef(rank=len(seen) + 1, href=link["href"], name=link.get("name", ""),
@@ -454,32 +608,33 @@ class MapsScraper:
                 if len(candidates) >= want:
                     break  # links not read yet stay unseen and are picked up by the next round
             if self._filtered:
-                await self._progress("collecting", f"Scanned {len(seen)} listings · {self.stats.matched} of "
-                                     f"{limit} matches so far", self.stats.matched, limit)
+                await self._progress("collecting", f"{where}Scanned {len(seen)} listings · {self.stats.matched} "
+                                     f"of {limit} matches so far", self.stats.matched, limit)
                 if len(seen) != before:
                     log.info("Feed: %d listing(s) scanned, %d new candidate(s)", len(seen), len(candidates))
             else:
-                await self._progress("collecting", f"Found {len(seen)} of {limit} places", len(seen), limit)
+                await self._progress("collecting", f"{where}Found {len(seen)} of {limit} places", len(seen), limit)
                 if len(seen) != before:
                     log.info("Feed: %d of %d place(s) found", len(seen), limit)
             if len(candidates) >= want:
                 break
             if len(seen) >= scan_cap:
                 log.warning("Stopped scanning after %d listing(s) (MAX_SCANNED)", len(seen))
-                self._feed_done, self.stats.stopped = True, "scan_limit"
+                self._feed_done, self._halted = True, "scan_limit"
                 break
             if await self._feed_at_end(page):
-                log.info("Reached the end of Google's list at %d listing(s)", len(seen))
+                log.info("Reached the end of Google's list at %d listing(s)", len(self._feed_keys))
                 self.stats.reached_end = self._feed_done = True
-                self.stats.stopped = "end_of_list"
+                self._search_stop = "end_of_list"
                 break
             if stalls >= self.cfg.SCROLL_STALL_LIMIT:
                 log.warning("Feed stopped growing after %d scroll(s) without new results (%d collected)",
-                            stalls, len(seen))
-                self._feed_done, self.stats.stopped = True, "stalled"
+                            stalls, len(self._feed_keys))
+                self._feed_done, self._search_stop = True, "stalled"
                 break
             await self._scroll_feed(page)
-            stalls = stalls + 1 if len(seen) == before else 0
+            # a list full of places other searches already found is still growing
+            stalls = stalls + 1 if len(self._feed_keys) == listed_before else 0
         return candidates
 
     # Browser primitives of the feed loop (overridden in tests/test_scan.py).
@@ -671,6 +826,16 @@ _LATLNG_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)")
 def place_id_from_href(href: str) -> str:
     m = _PLACE_ID_RE.search(href or "")
     return m.group(1) if m else ""
+
+
+def listing_key(href: str) -> str:
+    """One key per place whichever search listed it: its place id, else its URL without the query string."""
+    return place_id_from_href(href) or (href or "").split("?", 1)[0]
+
+
+def latlng_from_href(href: str) -> tuple[float, float] | None:
+    m = _LATLNG_RE.search(href or "")
+    return (float(m.group(1)), float(m.group(2))) if m else None
 
 
 def website_hint(card_website: str | None, search_rec: dict[str, Any] | None) -> str | None:

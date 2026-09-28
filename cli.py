@@ -4,6 +4,8 @@ Examples
 --------
     python cli.py plumbers "Austin, TX" --limit 30
     python cli.py plumbers "Austin, TX" --website without --contact phone_or_email -n 50
+    python cli.py roofing "Houston, TX" --whole-area --website without --contact phone_or_email -n 50
+    python cli.py roofing "Katy, TX; Pasadena, TX; Pearland, TX" -n 100
     python cli.py "dentists in austin tx" --limit 20 --enrich --extended --headed
 """
 from __future__ import annotations
@@ -19,15 +21,25 @@ from app.config import settings
 from app.enrichment.website import WebsiteEnricher, enrich_many
 from app.export.csv_export import rows_to_csv_bytes
 from app.filters import ContactFilter, SearchFilters, WebsiteFilter
-from app.jobs import PlaceFilter, apply_contact_result, result_notice, select_enrichment_targets, stats_to_dict
-from app.models import Job, PlaceRow, build_query
+from app.jobs import (
+    PlaceFilter,
+    apply_contact_result,
+    plan_searches,
+    result_notice,
+    select_enrichment_targets,
+    stats_to_dict,
+)
+from app.models import Job, PlaceRow, build_query, split_places
 from app.scraper.maps import MapsScraper
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Find businesses on Google Maps and export them to CSV")
     p.add_argument("business", help='what to look for, e.g. "plumbers" (or a whole search: "roofers near houston")')
-    p.add_argument("place", nargs="?", default="", help='where to look, e.g. "Austin, TX"')
+    p.add_argument("place", nargs="?", default="",
+                   help='where to look, e.g. "Austin, TX" - several separated by ";"')
+    p.add_argument("--whole-area", action="store_true",
+                   help="search each place section by section, not just Google's top ~120 (slower, finds more)")
     p.add_argument("--limit", "-n", type=int, default=20, help="number of matching places (default 20)")
     p.add_argument("--website", choices=[f.value for f in WebsiteFilter], default="any",
                    help="keep only places with / without their own website (default: any)")
@@ -66,7 +78,12 @@ async def run(args: argparse.Namespace) -> int:
     if len(query) < 2:
         print('error: say what to look for, e.g. python cli.py plumbers "Austin, TX"', file=sys.stderr)
         return 2
+    if args.whole_area and not split_places(args.place):
+        print('error: --whole-area needs a place, e.g. python cli.py roofing "Houston, TX" --whole-area',
+              file=sys.stderr)
+        return 2
     job = Job(query=query, business=args.business.strip() if args.place.strip() else "", place=args.place.strip(),
+              whole_area=args.whole_area,
               limit=max(1, min(args.limit, settings.MAX_RESULTS)), filters=filters_from_args(args))
     selector = PlaceFilter(job.filters, default_region=settings.DEFAULT_REGION)
     scraper = MapsScraper(settings, headless=not args.headed, on_progress=on_progress)
@@ -74,7 +91,7 @@ async def run(args: argparse.Namespace) -> int:
         if selector.wants_lookups:
             enricher = await stack.enter_async_context(WebsiteEnricher(settings))
             selector.lookup = enricher.find_contacts
-        rows: list[PlaceRow] = await scraper.scrape(job.query, job.limit, selector=selector)
+        rows: list[PlaceRow] = await scraper.scrape(plan_searches(job), job.limit, selector=selector)
     job.stats = stats_to_dict(scraper.stats)
     if scraper.stats.errors and not args.quiet:
         for err in scraper.stats.errors:

@@ -6,6 +6,7 @@ import app.main as main_module
 from app.config import settings
 from app.jobs import JobManager
 from app.models import Job, JobStatus, PlaceRow
+from app.scraper.maps import Search
 
 
 class _FakeEnricher:
@@ -77,6 +78,7 @@ def test_scrape_validation(client):
     assert c.post("/api/scrape", json={"place": "Houston, TX"}).status_code == 422          # what to look for?
     assert c.post("/api/scrape", json={"business": "  ", "place": "Houston"}).status_code == 422
     assert c.post("/api/scrape", json={"business": "roofers", "filters": {"website": "sometimes"}}).status_code == 422
+    assert c.post("/api/scrape", json={"business": "roofers", "whole_area": True}).status_code == 422  # where?
 
 
 def test_list_get_delete_job(client):
@@ -268,7 +270,7 @@ def test_business_and_place_make_the_search(client, monkeypatch):
     assert summary["filters"] == {"website": "any", "contact": "any", "profiles_as_no_website": True,
                                   "label": "all businesses"}
     job = _wait_for(c, summary["id"])
-    assert _FakeScraper.queries[-1] == "roofers in Houston, TX"
+    assert _FakeScraper.queries[-1] == [Search("roofers in Houston, TX")]
     assert job["status"] == "completed" and job["notice"] == "" and job["progress"]["message"] == "Done - 1 rows"
 
 
@@ -324,3 +326,17 @@ def test_jobs_saved_before_filters_existed_still_load(client):
     assert job.business == "" and not job.filters.active and job.notice == ""
     assert job.rows[0].website_type == "own"
     assert job.summary().found is None
+
+
+def test_whole_area_and_several_places_plan_one_search_per_place(client, monkeypatch):
+    import app.jobs as jobs_module
+
+    monkeypatch.setattr(jobs_module, "MapsScraper", _FakeScraper)
+    c, _ = client
+    body = {"business": "roofers", "place": "Katy, TX; Pasadena, TX", "limit": 5}
+    summary = c.post("/api/scrape", json={**body, "whole_area": True}).json()
+    assert summary["whole_area"] is True and summary["place"] == "Katy, TX; Pasadena, TX"
+    _wait_for(c, summary["id"])
+    assert _FakeScraper.queries[-1] == [Search("roofers", area="Katy, TX"), Search("roofers", area="Pasadena, TX")]
+    _wait_for(c, c.post("/api/scrape", json=body).json()["id"])
+    assert _FakeScraper.queries[-1] == [Search("roofers in Katy, TX"), Search("roofers in Pasadena, TX")]

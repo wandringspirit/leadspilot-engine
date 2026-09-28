@@ -73,7 +73,8 @@ async def start_scrape(req: ScrapeRequest) -> JobSummary:
     if req.limit > settings.MAX_RESULTS:
         raise HTTPException(400, f"limit must be <= {settings.MAX_RESULTS}")
     job = manager.create_scrape(req.search_query, req.limit, business=req.business, place=req.place,
-                                filters=req.filters, enrich=req.enrich, headless=req.headless)
+                                whole_area=req.whole_area, filters=req.filters, enrich=req.enrich,
+                                headless=req.headless)
     return job.summary()
 
 

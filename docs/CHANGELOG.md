@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.3.0 – 2026-09-28
+
+### Added
+- **Search the whole area** (on by default in the panel; `whole_area` in the API, `--whole-area` in
+  the CLI). A single Google Maps search only lists a city's ~120 most prominent businesses – nearly
+  all with websites – so the crawler now splits the map Google shows for the place into sections,
+  searches each one, and splits every section whose list is still full into four smaller ones
+  (down to ~2 km), until the lists run out. Smaller, less prominent businesses – typically the
+  ones without a website – show up this way. Places found by several sections are kept once.
+- **Several places in one search**: separate them with `;` (`Katy, TX; Pasadena, TX`); each place
+  is searched in turn (or section by section with *whole area*), duplicates are dropped.
+- `MAX_SECTIONS` setting (default 100 map sections per job); job stats gain `searches`, `sections`,
+  `full_lists` and `dense`; new stop reasons `searched_all` and `section_limit`, each with its own
+  short-result notice (*"Searched all of Houston, TX for “roofing” (37 map sections): 812 businesses
+  listed, 35 of them match your filters …"*).
+- The panel shows the running section in the progress line, a *whole area* chip on the job and in
+  the history, and the number of map sections in the results summary.
+
+### Changed
+- `MAX_SCANNED` default raised from 1000 to 5000 (a whole-area search reads many more listings;
+  most are skipped without opening their page).
+- With several searches or a whole-area search, `Rank` is the order in which places were found.
+- A search that fails inside a multi-search job is logged and skipped (a failed map section is
+  searched again as four smaller ones); three failures in a row still fail the job.
+- The notice for a search that hit Google's ~120 cap now suggests searching the whole area.
+
 ## 1.2.0 – 2026-09-28
 
 ### Added

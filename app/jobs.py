@@ -27,18 +27,13 @@ from app.enrichment.extractors import EmailHit, emails_in_text
 from app.enrichment.website import ContactResult, WebsiteEnricher, enrich_many
 from app.filters import EMAIL_CONTACTS, SearchFilters
 from app.logbuffer import current_job_id
-from app.models import Job, JobStatus, PlaceRow, Progress
-from app.scraper.maps import MapsScraper, PlaceRef, ScrapeStats
+from app.models import Job, JobStatus, PlaceRow, Progress, build_query, split_places
+from app.scraper.maps import GOOGLE_LIST_LIMIT, NEAR_GOOGLE_LIMIT, MapsScraper, PlaceRef, ScrapeStats, Search
 from app.scraper.parsing import format_phone
 
 log = logging.getLogger(__name__)
 
 ACTIVE_STATES = {JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.ENRICHING}
-
-# Google Maps ends every results list at about GOOGLE_LIST_LIMIT listings, however many
-# places exist; a list that ends at NEAR_GOOGLE_LIMIT or more was probably cut short.
-GOOGLE_LIST_LIMIT = 120
-NEAR_GOOGLE_LIMIT = 100
 
 Lookup = Callable[..., Awaitable[ContactResult]]   # WebsiteEnricher.find_contacts(url, region=...)
 
@@ -109,10 +104,10 @@ class JobManager:
     # Scraping
     # ------------------------------------------------------------------
     def create_scrape(self, query: str, limit: int, *, business: str = "", place: str = "",
-                      filters: SearchFilters | None = None, enrich: bool = False,
+                      whole_area: bool = False, filters: SearchFilters | None = None, enrich: bool = False,
                       headless: bool | None = None) -> Job:
-        job = Job(query=query.strip(), business=business.strip(), place=place.strip(), limit=limit,
-                  filters=filters or SearchFilters(), enrich=enrich)
+        job = Job(query=query.strip(), business=business.strip(), place=place.strip(), whole_area=whole_area,
+                  limit=limit, filters=filters or SearchFilters(), enrich=enrich)
         # schedule first: if no event loop is running we must not leave a ghost job behind
         task = asyncio.create_task(self._run_scrape(job, headless=headless), name=job.id)
         self.jobs[job.id] = job
@@ -155,7 +150,7 @@ class JobManager:
                     if selector.wants_lookups:
                         enricher = await stack.enter_async_context(WebsiteEnricher(self.cfg))
                         selector.lookup = enricher.find_contacts
-                    await scraper.scrape(job.query, job.limit, selector=selector)
+                    await scraper.scrape(plan_searches(job), job.limit, selector=selector)
                 job.stats = stats_to_dict(scraper.stats)
                 job.notice = result_notice(job)
                 if job.notice:
@@ -332,11 +327,24 @@ class PlaceFilter:
         return ([] if reason else rows), reason
 
 
+def plan_searches(job: Job) -> list[Search]:
+    """The Google Maps searches a job runs: one per place, or each place's map sections (``whole_area``)."""
+    places = split_places(job.place)
+    if not job.business:
+        return [Search(job.query)]
+    if not places:
+        return [Search(job.business)]
+    if job.whole_area:
+        return [Search(job.business, area=place) for place in places]
+    return [Search(build_query(job.business, place)) for place in places]
+
+
 def stats_to_dict(stats: ScrapeStats) -> dict:
     return {
         "links_found": stats.links_found, "scraped": stats.scraped, "matched": stats.matched,
         "skipped": dict(stats.skipped), "failed": stats.failed, "reached_end": stats.reached_end,
-        "stopped": stats.stopped, "errors": stats.errors[:20],
+        "searches": stats.searches, "sections": stats.sections, "full_lists": stats.full_lists,
+        "dense": stats.dense, "stopped": stats.stopped, "errors": stats.errors[:20],
     }
 
 
@@ -351,9 +359,31 @@ def result_notice(job: Job) -> str:
     found, listings, stopped = stats.get("matched", 0), stats.get("links_found", 0), stats.get("stopped", "")
     if found >= job.limit or stopped in ("", "limit"):
         return ""
-    subject = (f"“{job.business}”" + (f" in {job.place}" if job.place else "")) if job.business else f"“{job.query}”"
+    where = "; ".join(split_places(job.place))
+    subject = (f"“{job.business}”" + (f" in {where}" if where else "")) if job.business else f"“{job.query}”"
     asked = f"you asked for {job.limit}"
     filters = job.filters.label if job.filters.active else ""
+    if stopped in ("searched_all", "section_limit"):       # several searches / whole area
+        sections, term = stats.get("sections", 0), f"“{job.business}”"
+        if not listings:
+            return f"Google Maps has no results for {term} in {where}."
+        if stopped == "section_limit":
+            return (f"Stopped after {sections} map sections of {where} (MAX_SECTIONS setting) with {found} found "
+                    f"for {term} ({asked}). Raise MAX_SECTIONS or search a smaller area to cover the rest.")
+        scope = (f"all of {where} for {term} ({sections} map section{'' if sections == 1 else 's'})"
+                 if job.whole_area else f"{where} for {term} ({stats.get('searches', 0)} searches)")
+        if filters:
+            text = f"Searched {scope}: {_businesses(listings)} listed, {_matching(found, 'them', filters)}"
+            text += f" — that's all of them ({asked})." if found else "."
+        else:
+            text = (f"Only {_businesses(found)} found in {scope} — that's every listing Google Maps has there "
+                    f"({asked}).")
+        if stats.get("dense"):
+            text += " A few very busy spots may hold more."
+        elif not job.whole_area and stats.get("full_lists"):
+            text += (f" Some searches hit Google's limit of about {GOOGLE_LIST_LIMIT} results — search the whole "
+                     "area (section by section) to find more.")
+        return text
     if stopped == "no_results" or listings == 0:
         return f"Google Maps has no results for {subject}."
     if stopped == "single":
@@ -370,8 +400,8 @@ def result_notice(job: Job) -> str:
     if stopped == "end_of_list":
         matched = f" {_matching(found, 'them', filters)}." if filters else ""
         return (f"Google Maps stopped listing {subject} after {listings} results — it shows at most about "
-                f"{GOOGLE_LIST_LIMIT} per search, so there may be more.{matched} Search smaller areas "
-                "(neighbourhoods or nearby towns) to find more.")
+                f"{GOOGLE_LIST_LIMIT} per search, so there may be more.{matched} Search the whole area "
+                "(section by section) to find more.")
     if stopped == "scan_limit":
         return (f"Stopped after scanning {listings} listings for {subject} (MAX_SCANNED setting) with "
                 f"{found} matching ({asked}).")

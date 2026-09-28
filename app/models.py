@@ -31,6 +31,16 @@ def build_query(business: str, place: str = "") -> str:
     return f"{business} in {place}" if business and place else business
 
 
+def split_places(place: str) -> list[str]:
+    """'Katy, TX; Pasadena, TX' -> ['Katy, TX', 'Pasadena, TX'] (';' or new lines separate places)."""
+    out: list[str] = []
+    for part in (place or "").replace("\n", ";").split(";"):
+        part = " ".join(part.split())
+        if part and part not in out:
+            out.append(part)
+    return out
+
+
 class PlaceRow(BaseModel):
     """One row of output. A place can produce several rows (one per email)."""
 
@@ -94,8 +104,10 @@ class Progress(BaseModel):
 class ScrapeRequest(BaseModel):
     business: str = Field("", max_length=120, examples=["plumbers"],
                           description="What to look for: a business type or keyword")
-    place: str = Field("", max_length=120, examples=["Austin, TX"],
-                       description="Where to look: a city, area or address")
+    place: str = Field("", max_length=500, examples=["Austin, TX"],
+                       description="Where to look: a city, area or address - several separated by ';'")
+    whole_area: bool = Field(False, description="Search each place section by section instead of one "
+                                                "search, to get past Google's ~120 results per search")
     query: str = Field("", max_length=200, examples=["roofing companies near houston"],
                        description="A complete free-text search, used when `business` is empty")
     limit: int = Field(20, ge=1, le=500, description="Number of matching places wanted")
@@ -110,6 +122,8 @@ class ScrapeRequest(BaseModel):
             self.place = ""  # a free-text query already says where
         if len(self.search_query) < 2:
             raise ValueError("enter a business (e.g. 'plumbers') and a place (e.g. 'Austin, TX'), or a query")
+        if self.whole_area and not split_places(self.place):
+            raise ValueError("searching the whole area needs a business and a place")
         return self
 
     @property
@@ -127,7 +141,8 @@ class Job(BaseModel):
     id: str = Field(default_factory=lambda: new_id("job_"))
     query: str                          # the search sent to Google Maps
     business: str = ""                  # empty for free-text queries (and jobs from before 1.2)
-    place: str = ""
+    place: str = ""                     # one place, or several separated by ';'
+    whole_area: bool = False            # each place searched section by section
     limit: int
     filters: SearchFilters = Field(default_factory=SearchFilters)
     enrich: bool = False
@@ -148,7 +163,7 @@ class Job(BaseModel):
     def summary(self) -> "JobSummary":
         return JobSummary(
             id=self.id, query=self.query, business=self.business, place=self.place,
-            filters=self.filters, limit=self.limit, status=self.status,
+            whole_area=self.whole_area, filters=self.filters, limit=self.limit, status=self.status,
             progress=self.progress, row_count=len(self.rows),
             found=self.stats.get("matched"), notice=self.notice,
             created_at=self.created_at, updated_at=self.updated_at,
@@ -178,6 +193,7 @@ class JobSummary(BaseModel):
     query: str
     business: str = ""
     place: str = ""
+    whole_area: bool = False
     filters: SearchFilters = Field(default_factory=SearchFilters)
     limit: int
     status: JobStatus

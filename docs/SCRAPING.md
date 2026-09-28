@@ -113,6 +113,62 @@ Ranks keep each listing's position in Google's list, so a filtered result has ga
 `ScrapeStats` records `links_found` (listings read), `scraped` (place pages opened), `matched`
 (places kept) and `skipped` (reason → count, before or after opening the page).
 
+### Several searches in one job
+
+`scrape()` also takes a list of `Search(text, area="")`. The job manager builds it
+(`plan_searches()`): one text search per place (`roofing in Katy, TX`, `roofing in Pasadena, TX`),
+or – with *whole area* – one area search per place. They run in order until `limit` places were
+kept. Listings are de-duplicated across searches by place id (`listing_key()`), so a place that
+several searches list is checked once; ranks then number the places in the order they were found.
+If a search cannot be opened it is logged and skipped; three failures in a row fail the job (a
+lone search still fails immediately, as before). The job stops with `searched_all` when every
+search ran out.
+
+### Whole-area search – map sections
+
+A Google Maps search lists about 120 businesses at most, the most prominent first. For a whole
+city that means the established businesses – a real search for “roofing” in Houston listed 117,
+114 of them with websites – and the smaller ones never appear. Zoomed into a small part of the map, the
+same search lists the businesses *there*, and when fewer than ~120 match, the list runs out: it
+holds all of them. `_search_area()` uses that (geometry in `app/scraper/area.py`):
+
+```mermaid
+flowchart TD
+    L["_locate(place): open the place,<br/>read the view Google fits to it<br/>(/@lat,lng,zoomz in the URL)"] --> Q[(queue: root section)]
+    Q --> S["search the business at the section:<br/>/maps/search/&lt;business&gt;/@lat,lng,zoomz"]
+    S --> R[read the list like any search<br/>pre-filter, open candidates, accept]
+    R --> F{"≥100 listings, at least half<br/>on this section?"}
+    F -- "yes, section wider than ~2 km" --> SPL[split into 4 quarters,<br/>queued nearest to the centre first]
+    SPL --> Q
+    F -- "yes, already ~2 km" --> D[count as dense]
+    F -- no --> DONE[section complete]
+    D --> NXT{limit reached, queue empty<br/>or MAX_SECTIONS?}
+    DONE --> NXT
+    NXT -- no --> S
+    NXT -- yes --> END[stop: limit / searched_all / section_limit]
+```
+
+- **Sections** are rectangles in Web-Mercator world pixels. Each is searched at the zoom that
+  fits it into the *visible* map – the 1366 × 900 window minus the ~408 px results panel that
+  covers the left of the full-width map – with a 10 % margin, so neighbouring sections overlap a
+  little. The URL centre is the window centre, so it is placed half a panel west of the section.
+- **Splitting** only happens when the list is full *and* at least half of its listings lie on the
+  section (±10 %): if Google zooms out to show businesses from elsewhere (an empty section), the
+  list is not about this section and splitting would only repeat that.
+- A section whose search failed is split too, so its area is still covered.
+- `MAX_SECTION_ZOOM` (16, sections ~2 km wide) ends the splitting; a still-full section there is
+  counted in `stats.dense` and the notice says a few very busy spots may hold more.
+- `MAX_SECTIONS` (default 100) caps the sections per job (`section_limit`).
+- If the place's map cannot be read (no `/@…z` in the URL), the place is searched as one text
+  search instead.
+
+Cost: each section is one results list (~5–15 s to scroll); only candidates' place pages are
+opened. A large city for a common trade needs a few dozen sections; the search stops as soon as
+`limit` places were kept. The logs show every section with its listing count and whether it was
+split. These assumptions about Google (the results panel over the map, local results for a
+zoomed-in view) are covered by `tests/test_area_search.py` against a simulated Google; if Google
+changes them, a section search may return fewer local results – see §6.
+
 ## 2. Field sources and precedence
 
 `build_row(ref, dom, full_record, search_record)` picks the first non-empty value in this
@@ -204,9 +260,12 @@ EU visitors get a consent interstitial first; `_dismiss_consent()` clicks *Accep
   load without detail buttons, empty records. The job fails with
   *"Google Maps results feed did not appear"* – wait, lower `DETAIL_CONCURRENCY`, or use a
   proxy.
-- Google stops paging at roughly **120 results** per query. For more, run several narrower
-  queries (`roofing companies in katy tx`, `… in pearland tx`, …). A job that runs into this
-  cap says so in its notice instead of claiming the city has no more businesses.
+- Google stops paging at roughly **120 results** per query. The whole-area search gets past it
+  by searching map sections; several places (`Katy, TX; Pearland, TX`) or narrower queries work
+  too. A job that runs into this cap says so in its notice instead of claiming the city has no
+  more businesses.
+- A whole-area search opens many more result lists than a single search – keep an eye on the
+  logs for captchas, and use a proxy for large areas.
 - Results depend on the searching IP's location unless the query names a place; use
   `REGION_CODE` to pin the country.
 
@@ -221,6 +280,7 @@ Symptoms → what to look at:
 | description / review count empty for everyone | `[154]` / `[4][8]` moved | dump a record with `records_from_rpc()` and search for the text; update `IDX` and this table |
 | city/state empty while address is filled | `[183][1]` moved | same as above; `parse_address()` still fills US/CA/AU/UK style addresses |
 | a *No website* search opens pages of places that have one | feed records / card Website button changed | check `FEED_LINKS_JS` and `[7][0]`; results stay correct (every page is checked), it is only slower |
+| whole-area search: no section is ever split, or sections list places far away | Google no longer keeps a zoomed-in search local, or the results panel / window geometry changed | run `--headed`, open a section URL from the log, compare the visible map with the section; adjust `PANEL_W` / `VIEWPORT_*` / `FIT_MARGIN` in `app/scraper/area.py` |
 
 Debug helper: run a query with `--headed` and set a breakpoint in `_scrape_one`, or
 save an XHR body from DevTools and feed it to `records_from_rpc()` in a REPL.

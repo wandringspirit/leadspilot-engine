@@ -56,7 +56,7 @@ class FeedScraper(MapsScraper):
     async def _stop(self) -> None:
         self._context = None
 
-    async def _open_results(self, page, query):
+    async def _open_results(self, page, url, label):
         capture = RecordCapture(lambda url: False)
         for i, item in enumerate(self.listings, start=1):
             if item["record"]:
@@ -203,7 +203,7 @@ async def test_stalled_feed_stops_after_scroll_stall_limit():
 
 async def test_single_place_result_goes_through_the_selector():
     class SinglePlace(FeedScraper):
-        async def _open_results(self, page, query):
+        async def _open_results(self, page, url, label):
             return None, PlaceRow(rank=1, name="Only One", website="https://only.com", phone="1")
 
     scraper = SinglePlace([])

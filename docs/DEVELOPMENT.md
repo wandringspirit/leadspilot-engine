@@ -30,7 +30,8 @@ app/
                        PlaceFilter (applies filters while scraping), result_notice()
   logbuffer.py         in-memory ring buffer behind the panel's Live logs (+ job id tagging)
   scraper/
-    maps.py            MapsScraper (Playwright) + build_row()
+    maps.py            MapsScraper (Playwright) + build_row(); Search, several searches per job
+    area.py            map sections for whole-area searches (pure geometry)
     records.py         Google record decoder (index map IDX)
     parsing.py         address / phone / url helpers, reference tables
   enrichment/
@@ -76,10 +77,13 @@ from app.jobs import PlaceFilter
 
 leads = SearchFilters(website="without", contact="phone_or_email")
 rows = await MapsScraper().scrape("plumbers in Austin, TX", 20, selector=PlaceFilter(leads))
+# the whole map of Austin, section by section:
+rows = await MapsScraper().scrape(Search("plumbers", area="Austin, TX"), 20, selector=PlaceFilter(leads))
 ```
 
 `limit` then counts kept places, and `scraper.stats` tells how many listings were read, how many
-were skipped and why, and why the scan stopped (`stats.stopped`).
+were skipped and why, how many searches / map sections ran, and why the scan stopped
+(`stats.stopped`). `Search` comes from `app.scraper.maps`.
 
 ## 4. Configuration reference
 
@@ -103,7 +107,8 @@ Settings are read from environment variables, then from `.env` in the project ro
 | `LOCALE` | `en-US` | browser locale; the UI is additionally forced to English with `hl=en` |
 | `REGION_CODE` | *(empty)* | Google `gl` parameter (`us`, `gb`, …) to bias results to a country |
 | `MAX_RESULTS` | `500` | hard cap for `limit` |
-| `MAX_SCANNED` | `1000` | most listings read per job while looking for filter matches (Google itself stops at about 120 per search) |
+| `MAX_SCANNED` | `5000` | most distinct listings read per job while looking for matches (a single Google search stops at about 120; a whole-area search reads many more) |
+| `MAX_SECTIONS` | `100` | most map sections searched per job by a whole-area search |
 | `DETAIL_CONCURRENCY` | `3` | tabs used in parallel for place pages |
 | `SCROLL_PAUSE_MS` | `1200` | pause after each feed scroll (plus up to 400 ms jitter) |
 | `SCROLL_STALL_LIMIT` | `6` | consecutive scrolls without new results before giving up |
@@ -139,6 +144,8 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_build_row.py` | source precedence in `build_row()` |
 | `test_filters.py` | website classification (own site vs profile page), every website / contact rule, labels |
 | `test_scan.py` | the scraper's feed loop on an in-memory feed: rounds, pre-filtering, replacements, stop reasons, stats |
+| `test_area.py` | map-section geometry: world pixels, the view in a Google Maps URL, section URLs, quarters |
+| `test_area_search.py` | whole-area and multi-place searches against a simulated Google that knows where businesses are: splitting full sections, finding businesses outside the top 120, de-duplication, limits, zoom-out guard, failures |
 | `test_extractors.py` | email/phone extraction (no junk filtering), obfuscation, listing-text emails, contact-link discovery |
 | `test_website.py` | enrichment fetch strategy: profile pages read alone, own sites crawled |
 | `test_jobs.py` | enrichment target selection, the duplicate-row rule, `PlaceFilter`, listing emails, short-result notices |

@@ -47,7 +47,7 @@ sequenceDiagram
 ### GET `/api/health`
 
 ```json
-{ "status": "ok", "version": "1.2.0", "jobs": 3 }
+{ "status": "ok", "version": "1.3.0", "jobs": 3 }
 ```
 
 ### GET `/api/config`
@@ -74,7 +74,8 @@ Request body:
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `business` | string (≤120 chars) | yes¹ | what to look for, e.g. `"plumbers"` |
-| `place` | string (≤120 chars) | no | where, e.g. `"Austin, TX"` |
+| `place` | string (≤500 chars) | no | where, e.g. `"Austin, TX"`; several places separated by `;` are searched in turn (`"Katy, TX; Pasadena, TX"`) |
+| `whole_area` | bool | no (false) | search each place section by section instead of one search, to get past Google's ~120 results per search (needs `business` and `place`) |
 | `query` | string (≤200 chars) | yes¹ | a complete free-text search (`"roofing companies near houston"`), used only when `business` is empty |
 | `limit` | int 1–500 | no (20) | number of **matching** places; capped by `MAX_RESULTS` |
 | `filters` | object | no | see below; omitted = keep every place |
@@ -98,13 +99,20 @@ curl -X POST http://127.0.0.1:8000/api/scrape -H "Content-Type: application/json
 ```
 
 With filters the job keeps scrolling Google's list until `limit` places match (or the list
-ends) and skips the place page of every listing the results feed already rules out.
+ends) and skips the place page of every listing the results feed already rules out. With
+`whole_area` it does that section by section over the whole map of each place
+([SCRAPING.md](SCRAPING.md#whole-area-search--map-sections)):
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/scrape -H "Content-Type: application/json" -d "{\"business\":\"roofing\",\"place\":\"Houston, TX\",\"whole_area\":true,\"limit\":50,\"filters\":{\"website\":\"without\",\"contact\":\"phone_or_email\"}}"
+```
 
 Response (`JobSummary`):
 
 ```json
 {
   "id": "job_5f0c2a1b9d3e", "query": "plumbers in Austin, TX", "business": "plumbers", "place": "Austin, TX",
+  "whole_area": false,
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
                "label": "no website · phone or email" },
   "limit": 30, "status": "queued",
@@ -126,7 +134,8 @@ Array of `JobSummary` (see above), newest first.
 ### GET `/api/jobs/{job_id}`
 
 The full `Job` (see [DATA_MODEL.md](DATA_MODEL.md#6-job-model-api)) including `rows`, `notice`
-and `stats` (listings scanned, places matched, places skipped by reason, why the scan stopped).
+and `stats` (listings scanned, searches and map sections run, places matched, places skipped by
+reason, why the scan stopped).
 Rows appear while the job is running, so clients can render progressively. `404` if unknown.
 
 ### DELETE `/api/jobs/{job_id}`

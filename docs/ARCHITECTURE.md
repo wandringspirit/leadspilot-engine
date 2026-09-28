@@ -72,6 +72,7 @@ the same capabilities.
 | **API** | `app/main.py` | REST routes, CSV download, static panel, cache headers. |
 | **JobManager** | `app/jobs.py` | Creates and tracks asyncio tasks for scrapes and enrichments; `PlaceFilter` applies a job's filters while it scrapes (listing emails, inline email lookups); applies enrichment results (incl. duplicate-row rule); writes the short-result `notice`; persists jobs as JSON, restores them on start-up. |
 | **MapsScraper** | `app/scraper/maps.py` | Drives Chromium: search page → scroll feed → visit place pages → build rows, in rounds until `limit` places are kept by the selector. Reports progress and rows through callbacks. |
+| **area** | `app/scraper/area.py` | Map sections for whole-area searches: reads the view Google fits to a place, builds section URLs, splits sections into quarters (pure geometry). |
 | **records** | `app/scraper/records.py` | Decodes the nested-array place records Google embeds in its XHR responses / HTML. |
 | **parsing** | `app/scraper/parsing.py` | Pure helpers: address → city/state/country, phone → national + E.164, URL cleaning, Maps URL builder. |
 | **WebsiteEnricher** | `app/enrichment/website.py` | Fetch strategy for a business website (homepage, contact pages, browser fallback), concurrency. |
@@ -99,7 +100,8 @@ sequenceDiagram
     JM-->>API: Job (queued)
     API-->>UI: 202 {job id}
     activate JM
-    JM->>S: scrape("business in place", limit, selector=PlaceFilter)
+    JM->>S: scrape(plan_searches(job), limit, selector=PlaceFilter)
+    Note over S,G: one search per place – or, for a whole-area search,<br/>one per map section, splitting sections whose list is full
     S->>G: open /maps/search/<query>
     loop rounds, until limit places kept or the list ends
         loop until enough candidates
@@ -273,6 +275,7 @@ Nothing else is stored. Deleting `data/` resets the application.
 | **Filter while scanning; `limit` counts matches** | "20 businesses without a website" is what the user wants, not "20 listings, some without a website". The scraper keeps scrolling until enough places matched. |
 | **Pre-filter on the feed, confirm on the place page** | Visiting a place page is the slow part (1–3 s). The feed's records already say whether a listing has a website, so pages that cannot match are never opened; the final decision is always made on the fully scraped place. |
 | **A Facebook / Yelp / booking page is not a website** (switchable) | For lead generation such businesses have no site of their own; enrichment reads only that page, never the platform's own contact pages. |
+| **Whole-area search as a quadtree of map sections** | Google lists ~120 businesses per search, most prominent first, so the smaller businesses of a city never appear. Searching zoomed-in sections gets the full list of each section; splitting only sections whose list is full keeps the number of searches proportional to how busy the area is (one search for a small town, dozens for a metro). Sections are geometric (from the view Google fits to the place), so no list of neighbourhoods or external geocoder is needed. |
 | **Short results are explained, not errors** | Asking for 200 in a city with 35 matches should give the 35 and say that's all Google lists — or that Google's ~120-per-search cap was hit, so the user knows whether searching nearby areas can find more. |
 | **No junk-email filtering** | Heuristic blocklists dropped real addresses (`john@smithplumbing.com`, `…@thecleaningcompany.com`); keeping everything and ordering by score loses nothing. |
 | **UTF-8 BOM in CSV** | Excel on Windows otherwise mangles accented names. |

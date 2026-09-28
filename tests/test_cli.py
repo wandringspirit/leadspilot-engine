@@ -20,9 +20,9 @@ def test_cli_business_place_filters_and_short_result_note(tmp_path, monkeypatch,
             super().__init__(LISTINGS)
             self.on_progress = on_progress
 
-        async def _open_results(self, page, query):
-            self.query = query
-            return await super()._open_results(page, query)
+        async def _open_results(self, page, url, label):
+            self.query = label
+            return await super()._open_results(page, url, label)
 
     monkeypatch.setattr(cli, "MapsScraper", FakeMaps)
     out = tmp_path / "leads.csv"
@@ -50,3 +50,27 @@ def test_cli_filter_flags():
     assert (f.website.value, f.contact.value, f.profiles_as_no_website) == ("with", "phone_and_email", False)
     default = cli.filters_from_args(cli.build_parser().parse_args(["roofers near houston"]))
     assert not default.active and default.profiles_as_no_website
+
+
+def test_cli_whole_area_needs_a_place(capsys):
+    args = cli.build_parser().parse_args(["roofing", "--whole-area"])
+    assert asyncio.run(cli.run(args)) == 2
+    assert "--whole-area needs a place" in capsys.readouterr().err
+
+
+def test_cli_whole_area_searches_each_place_in_sections(tmp_path, monkeypatch):
+    planned = []
+
+    class Recorder(FeedScraper):
+        def __init__(self, cfg, *, headless=None, on_progress=None):
+            super().__init__(LISTINGS)
+
+        async def scrape(self, searches, limit, *, selector=None):
+            planned.extend(searches)
+            return []
+
+    monkeypatch.setattr(cli, "MapsScraper", Recorder)
+    args = cli.build_parser().parse_args(["roofing", "Katy, TX; Pasadena, TX", "--whole-area",
+                                          "-o", str(tmp_path / "x.csv"), "-q"])
+    assert asyncio.run(cli.run(args)) == 0
+    assert [(s.text, s.area) for s in planned] == [("roofing", "Katy, TX"), ("roofing", "Pasadena, TX")]

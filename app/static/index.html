@@ -30,8 +30,13 @@
                    placeholder="e.g. plumbers, hair salon, dentist">
           </label>
           <label for="place">City / area
-            <input id="place" name="place" type="text" required maxlength="120" placeholder="e.g. Austin, TX">
+            <input id="place" name="place" type="text" required maxlength="500" placeholder="e.g. Austin, TX">
+            <small class="muted">Several places? Separate them with <kbd>;</kbd></small>
           </label>
+          <label class="check"><input id="whole-area" name="whole_area" type="checkbox" checked>
+            <span>Search the whole area, not just Google's top ~120
+              <small class="muted block">Splits the map into sections and searches each one — finds the smaller
+                businesses too, but takes longer.</small></span></label>
           <small class="muted query-preview" id="query-preview" hidden></small>
           <label for="limit">Number of results
             <input id="limit" name="limit" type="number" min="1" max="500" value="20" required>
@@ -87,6 +92,7 @@
           <div class="title-line">
             <h2 id="progress-title">Job</h2>
             <span class="chip" id="progress-filter" hidden></span>
+            <span class="chip area" id="progress-area" hidden>whole area</span>
           </div>
           <span class="pill" id="status-pill">queued</span>
         </div>

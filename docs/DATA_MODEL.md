@@ -19,7 +19,7 @@ These match the spreadsheet layout the tool was designed for, in this order:
 | 7 | `Phone` | `phone` | text | national format, e.g. `(817) 606-8303` (from Maps, or from the website when Maps has none) |
 | 8 | `Phone Unformatted` | `phone_unformatted` | text | E.164, e.g. `+18176068303` (empty when the number could not be validated) |
 | 9 | `Url` | `url` | url | `https://www.google.com/maps/search/?api=1&query=<name>&query_place_id=<place id>` – opens the listing in Google Maps |
-| 10 | `Rank` | `rank` | int | 1-based position in the Google Maps results for the query. Duplicated (multi-email) rows share the rank. With filters the ranks have gaps – each match keeps its position in Google's list. |
+| 10 | `Rank` | `rank` | int | 1-based position in the Google Maps results for the query. Duplicated (multi-email) rows share the rank. With filters the ranks have gaps – each match keeps its position in Google's list. With several places or a whole-area search, the rank is the order in which the place was found (a place listed by several searches keeps its first rank). |
 | 11 | `Review Count` | `review_count` | int | number of Google reviews (empty if unknown) |
 | 12 | `Description` | `description` | text | the business's own "From the business" description on Google Maps; whitespace collapsed to one line. Empty when the business has none. |
 
@@ -88,7 +88,8 @@ names are kept verbatim.
   "id": "job_5f0c2a1b9d3e",
   "query": "plumbers in Austin, TX",    // the search sent to Google Maps
   "business": "plumbers",               // "" for free-text queries and jobs from before 1.2
-  "place": "Austin, TX",
+  "place": "Austin, TX",                // several places are separated by ";"
+  "whole_area": false,                  // true: each place searched map section by map section
   "limit": 200,
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
                "label": "no website · phone or email" },   // see §9
@@ -102,13 +103,17 @@ names are kept verbatim.
   "updated_at": "2026-09-20T15:06:01.456Z",
   "finished_at": "2026-09-20T15:06:01.456Z",
   "stats": {
-    "links_found": 87,              // listings read from Google's results list
+    "links_found": 87,              // distinct listings read from Google's results lists
     "scraped": 38,                  // place pages opened
     "matched": 35,                  // places kept (= places, not rows)
     "skipped": { "has a website": 49, "no phone or email": 3 },   // places left out, by reason
     "failed": 0,
     "reached_end": true,
-    "stopped": "end_of_list",       // limit | end_of_list | no_results | single | stalled | scan_limit
+    "searches": 1,                  // Google Maps result lists opened
+    "sections": 0,                  // of which map sections (whole-area search)
+    "full_lists": 0,                // lists that hit Google's ~120 cap
+    "dense": 0,                     // sections still full at the smallest section size
+    "stopped": "end_of_list",       // see below
     "errors": []
   }
 }
@@ -128,6 +133,12 @@ place pages), `enriching`, `done`. With filters, `progress.current / total` coun
 | `no_results` / `single` | *Google Maps has no results for …* / *Google Maps shows a single place for …* |
 | `stalled` | the list stopped loading – there may be more; try again or raise `SCROLL_PAUSE_MS` |
 | `scan_limit` | `MAX_SCANNED` listings were examined |
+| `searched_all` (several places or whole area) | *Searched all of Houston, TX for “roofing” (37 map sections): 812 businesses listed, 35 of them match your filters (…) — that's all of them (you asked for 50).* Adds *"A few very busy spots may hold more"* when a section was still full at the smallest size, and suggests the whole-area search when separate place searches hit Google's cap. |
+| `section_limit` | `MAX_SECTIONS` map sections were searched before the area was covered |
+
+`stopped` is `limit` when enough places were kept; `end_of_list`, `no_results`, `single` or
+`stalled` for a single search; `searched_all` when several searches (or all map sections) ran
+out; `section_limit` / `scan_limit` when a cap stopped the job.
 
 ## 7. Log entry (API)
 
@@ -153,6 +164,7 @@ classDiagram
         +str query
         +str business
         +str place
+        +bool whole_area
         +int limit
         +SearchFilters filters
         +bool enrich
@@ -241,5 +253,5 @@ passes both checks:
   the listing's description or – when an email requirement would otherwise reject the place –
   one found on its website / profile page while scanning.
 - `limit` counts kept places. The feed is scrolled until that many matched, Google's list ends
-  (about 120 listings per search) or `MAX_SCANNED` listings were examined; `notice` explains a
-  shorter result (§6).
+  (about 120 listings per search – use the whole-area search to go past it) or `MAX_SCANNED`
+  listings were examined; `notice` explains a shorter result (§6).

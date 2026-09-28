@@ -6,11 +6,12 @@ from app.jobs import (
     apply_contact_result,
     apply_listing_emails,
     group_by_place,
+    plan_searches,
     result_notice,
     select_enrichment_targets,
 )
-from app.models import Job, PlaceRow, build_query
-from app.scraper.maps import PlaceRef
+from app.models import Job, PlaceRow, build_query, split_places
+from app.scraper.maps import PlaceRef, Search
 
 NO_SITE = SearchFilters(website="without", contact="phone_or_email")
 
@@ -214,7 +215,7 @@ def test_notice_when_google_cut_the_list_short():
     text = result_notice(_job(filters=NO_SITE, matched=35, links_found=120, stopped="end_of_list"))
     assert text == ("Google Maps stopped listing “plumbers” in Austin, TX after 120 results — it shows at most "
                     "about 120 per search, so there may be more. 35 of them match your filters (no website · "
-                    "phone or email). Search smaller areas (neighbourhoods or nearby towns) to find more.")
+                    "phone or email). Search the whole area (section by section) to find more.")
 
 
 def test_notice_for_other_stops():
@@ -224,3 +225,55 @@ def test_notice_for_other_stops():
     assert "MAX_SCANNED" in result_notice(_job(filters=NO_SITE, matched=3, links_found=1000, stopped="scan_limit"))
     free_text = Job(query="roofers near houston", limit=50, stats={"matched": 1, "links_found": 1, "stopped": "single"})
     assert result_notice(free_text) == "Google Maps shows a single place for “roofers near houston”."
+
+
+# ----------------------------------------------------------------------
+# several places / whole area
+# ----------------------------------------------------------------------
+def test_split_places():
+    assert split_places("Katy, TX; Pasadena,  TX ;\nKaty, TX;;") == ["Katy, TX", "Pasadena, TX"]
+    assert split_places("") == [] and split_places("Austin, TX") == ["Austin, TX"]
+
+
+def test_plan_searches():
+    def job(**kw):
+        return Job(query="q", limit=5, **kw)
+    assert plan_searches(job(business="roofing", place="Houston")) == [Search("roofing in Houston")]
+    assert plan_searches(job(business="roofing", place="Katy; Pasadena")) == [
+        Search("roofing in Katy"), Search("roofing in Pasadena")]
+    assert plan_searches(job(business="roofing", place="Katy; Pasadena", whole_area=True)) == [
+        Search("roofing", area="Katy"), Search("roofing", area="Pasadena")]
+    assert plan_searches(job(business="roofing")) == [Search("roofing")]
+    assert plan_searches(Job(query="roofers near houston", limit=5)) == [Search("roofers near houston")]
+
+
+def _area_job(filters=None, whole_area=True, place="Houston, TX", **stats) -> Job:
+    return Job(query=build_query("roofing", place), business="roofing", place=place, whole_area=whole_area,
+               limit=50, filters=filters or SearchFilters(), stats=stats)
+
+
+def test_notice_after_searching_the_whole_area():
+    assert result_notice(_area_job(NO_SITE, matched=35, links_found=812, sections=37, stopped="searched_all")) == (
+        "Searched all of Houston, TX for “roofing” (37 map sections): 812 businesses listed, 35 of them match "
+        "your filters (no website · phone or email) — that's all of them (you asked for 50).")
+    assert result_notice(_area_job(matched=41, links_found=41, sections=5, stopped="searched_all")) == (
+        "Only 41 businesses found in all of Houston, TX for “roofing” (5 map sections) — that's every listing "
+        "Google Maps has there (you asked for 50).")
+    assert result_notice(_area_job(NO_SITE, matched=0, links_found=0, sections=1, stopped="searched_all")) == (
+        "Google Maps has no results for “roofing” in Houston, TX.")
+    dense = result_notice(_area_job(NO_SITE, matched=0, links_found=900, sections=80, dense=2,
+                                    stopped="searched_all"))
+    assert "None of them match your filters" in dense and dense.endswith("A few very busy spots may hold more.")
+    assert result_notice(_area_job(NO_SITE, matched=12, links_found=2000, sections=100,
+                                   stopped="section_limit")) == (
+        "Stopped after 100 map sections of Houston, TX (MAX_SECTIONS setting) with 12 found for “roofing” "
+        "(you asked for 50). Raise MAX_SECTIONS or search a smaller area to cover the rest.")
+
+
+def test_notice_after_several_places():
+    text = result_notice(_area_job(NO_SITE, whole_area=False, place="Katy, TX; Pasadena, TX", matched=4,
+                                   links_found=230, searches=2, full_lists=2, stopped="searched_all"))
+    assert text.startswith("Searched Katy, TX; Pasadena, TX for “roofing” (2 searches): 230 businesses listed, "
+                           "4 of them match")
+    assert text.endswith("Some searches hit Google's limit of about 120 results — search the whole area "
+                         "(section by section) to find more.")
