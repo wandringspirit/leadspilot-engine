@@ -373,7 +373,8 @@ def test_notice_after_searching_the_whole_area():
     assert result_notice(_area_job(NO_SITE, matched=12, links_found=2000, sections=100,
                                    stopped="section_limit")) == (
         "Stopped after 100 map sections of Houston, TX (MAX_SECTIONS setting) with 12 found for “roofing” "
-        "(you asked for 50). Raise MAX_SECTIONS or search a smaller area to cover the rest.")
+        "(you asked for 50). Raise MAX_SECTIONS in the .env file (then restart) or search a smaller area to "
+        "cover the rest.")
 
 
 def test_notice_after_several_places():

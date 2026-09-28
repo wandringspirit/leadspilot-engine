@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     REGION_CODE: str = ""                 # optional Google "gl" param, e.g. "us" - biases results
     MAX_RESULTS: int = 500                # hard cap for a single job
     MAX_SCANNED: int = 5000               # distinct listings read per job while looking for matches
-    MAX_SECTIONS: int = 100               # map sections searched per job ("whole area" search)
+    MAX_SECTIONS: int = 200               # map sections searched per job ("whole area" search)
     DETAIL_CONCURRENCY: int = 3           # parallel tabs used for place pages
     SCROLL_PAUSE_MS: int = 1200           # wait between feed scrolls
     SCROLL_STALL_LIMIT: int = 6           # scrolls without new results -> stop

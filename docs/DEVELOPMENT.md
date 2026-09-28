@@ -110,7 +110,7 @@ Settings are read from environment variables, then from `.env` in the project ro
 | `REGION_CODE` | *(empty)* | Google `gl` parameter (`us`, `gb`, …) to bias results to a country |
 | `MAX_RESULTS` | `500` | hard cap for `limit` |
 | `MAX_SCANNED` | `5000` | most distinct listings read per job while looking for matches (a single Google search stops at about 120; a whole-area search reads many more) |
-| `MAX_SECTIONS` | `100` | most map sections searched per job by a whole-area search |
+| `MAX_SECTIONS` | `200` | most map sections searched per job by a whole-area search (each one is a Google search; a big city can need more) |
 | `DETAIL_CONCURRENCY` | `3` | tabs used in parallel for place pages |
 | `SCROLL_PAUSE_MS` | `1200` | pause after each feed scroll (plus up to 400 ms jitter) |
 | `SCROLL_STALL_LIMIT` | `6` | consecutive scrolls without new results before giving up |

@@ -456,7 +456,8 @@ def result_notice(job: Job) -> str:
             return f"Google Maps has no results for {term} in {where}."
         if stopped == "section_limit":
             return (f"Stopped after {sections} map sections of {where} (MAX_SECTIONS setting) with {found} found "
-                    f"for {term} ({asked}). Raise MAX_SECTIONS or search a smaller area to cover the rest.")
+                    f"for {term} ({asked}). Raise MAX_SECTIONS in the .env file (then restart) or search a smaller "
+                    "area to cover the rest.")
         scope = (f"all of {where} for {term} ({sections} map section{'' if sections == 1 else 's'})"
                  if job.whole_area else f"{where} for {term} ({stats.get('searches', 0)} searches)")
         if filters:

@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.5.1 – 2026-09-28
+
+### Changed
+- `MAX_SECTIONS` default raised from 100 to 200 map sections per job. A whole-area search of a big
+  city (Houston) ran into the cap after about an hour with fewer matches than asked for; a job
+  can now search twice as many sections (and take about twice as long).
+- The log warning and the short-result notice for the cap now say where to change it (the `.env`
+  file, then restart the server).
+
 ## 1.5.0 – 2026-09-28
 
 ### Added

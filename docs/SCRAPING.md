@@ -179,7 +179,12 @@ flowchart TD
 - A section whose search failed is split too, so its area is still covered.
 - `MAX_SECTION_ZOOM` (16, sections ~2 km wide) ends the splitting; a still-full section there is
   counted in `stats.dense` and the notice says a few very busy spots may hold more.
-- `MAX_SECTIONS` (default 100) caps the sections per job (`section_limit`).
+- `MAX_SECTIONS` (default 200) caps the sections per job (`section_limit`). Every section is one
+  more Google Maps search, so the cap keeps a search of a big city (Houston is ~130 km across and
+  can take thousands of sections at the smallest size) from running for many hours and from
+  sending so many searches from one IP address that Google blocks it. Sections are searched
+  level by level – all the large ones first – so a job that stops at the cap has covered the
+  whole area evenly, at a coarser size.
 - If the place's map cannot be read (no `/@…z` in the URL), the place is searched as one text
   search instead.
 
