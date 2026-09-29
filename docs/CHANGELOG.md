@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.5.2 – 2026-09-29
+
+### Changed
+- CSV download names from the panel end with the date the search was run (`DD_MM_YYYY`), e.g.
+  `roofing_in_houston_no_website_email_29_09_2026.csv`, so downloads of the same search from different
+  days are easy to tell apart.
+
 ## 1.5.1 – 2026-09-28
 
 ### Changed

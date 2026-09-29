@@ -176,8 +176,9 @@ enrichment is already in progress.
 | `extended` | `false` | `true` adds Address, Category, Website Type, Rating, Place ID, Maps URL, Latitude, Longitude, Email Source, Phone Source, Enrichment Status |
 
 Returns `text/csv; charset=utf-8` with a UTF-8 BOM and a
-`Content-Disposition: attachment; filename="<query>[_<filters>].csv"` header
-(`plumbers_in_austin_tx_no_website_phone_or_email.csv`). A copy is written to
+`Content-Disposition: attachment; filename="<query>[_<filters>][_extended]_<DD_MM_YYYY>.csv"` header
+(`plumbers_in_austin_tx_no_website_phone_or_email_29_09_2026.csv`; the date is the day the
+search was started, in the server's local time). A copy is written to
 `data/exports/<job id>.csv`.
 
 ```bash

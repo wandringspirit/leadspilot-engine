@@ -1,4 +1,6 @@
 """API tests - use a fresh JobManager on a temp directory, never touch the network."""
+from datetime import datetime, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -104,10 +106,11 @@ def test_list_get_delete_job(client):
 def test_export_csv(client):
     c, manager = client
     job = _seed_job(manager)
+    job.created_at = datetime(2026, 9, 27, 12, tzinfo=timezone.utc)  # the file is dated by the search, not the download
     res = c.get(f"/api/jobs/{job.id}/export.csv")
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/csv")
-    assert 'filename="roofing_companies_near_houston.csv"' in res.headers["content-disposition"]
+    assert 'filename="roofing_companies_near_houston_27_09_2026.csv"' in res.headers["content-disposition"]
     text = res.content.decode("utf-8-sig")
     lines = text.splitlines()
     assert lines[0] == "Name,City,State,Country,Email,Website,Phone,Phone Unformatted,Url,Rank,Review Count,Description"
@@ -305,7 +308,9 @@ def test_filtered_job_keeps_matches_and_explains_a_short_result(client, monkeypa
     summary = next(j for j in c.get("/api/jobs").json() if j["id"] == job_id)
     assert summary["found"] == 2 and summary["notice"] == job["notice"]
     res = c.get(f"/api/jobs/{job_id}/export.csv?extended=true")
-    assert 'filename="roofers_in_houston_tx_no_website_phone_or_email_extended.csv"' in res.headers["content-disposition"]
+    searched = datetime.fromisoformat(job["created_at"]).astimezone().strftime("%d_%m_%Y")
+    assert (f'filename="roofers_in_houston_tx_no_website_phone_or_email_extended_{searched}.csv"'
+            in res.headers["content-disposition"])
     assert ",Website Type," in res.content.decode("utf-8-sig").splitlines()[0]
 
 

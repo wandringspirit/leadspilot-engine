@@ -53,8 +53,9 @@ panel and returned by the API).
   newlines are wrapped in double quotes; quotes are doubled).
 - Rows are sorted by `Rank`, then by insertion order, so duplicated rows stay together.
 - `None` values become empty cells; floats are printed without trailing zeros (`4.8`).
-- The download file name is derived from the query
-  (`roofing_companies_near_houston.csv`, `…_extended.csv`).
+- The download file name is derived from the query and filters and ends with the date the search
+  was run
+  (`roofing_companies_near_houston_29_09_2026.csv`, `…_extended_29_09_2026.csv`).
 
 ## 4. Address parsing rules (`parse_address`)
 

@@ -120,7 +120,8 @@ async def enrich_job(job_id: str, req: EnrichRequest | None = None) -> JobSummar
 async def export_csv(job_id: str, extended: bool = Query(False)) -> Response:
     job = _job_or_404(job_id)
     suffix = job.filters.slug()
-    filename = _safe_filename(job.query) + (f"_{suffix}" if suffix else "") + ("_extended" if extended else "") + ".csv"
+    filename = (_safe_filename(job.query) + (f"_{suffix}" if suffix else "") + ("_extended" if extended else "")
+                + f"_{job.created_at.astimezone():%d_%m_%Y}.csv")  # the day the search ran (server's local date)
     payload = rows_to_csv_bytes(job.rows, extended=extended)
     try:  # keep a copy on disk for convenience
         (settings.exports_dir / f"{job.id}{'_extended' if extended else ''}.csv").write_bytes(payload)
