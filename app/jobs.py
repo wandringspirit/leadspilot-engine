@@ -46,6 +46,10 @@ class JobManager:
         self.jobs: dict[str, Job] = {}
         self._tasks: dict[str, asyncio.Task] = {}
         self._scrape_slots = asyncio.Semaphore(2)
+        # called (as a task of its own) when a scrape or an enrichment has finished - main.py uploads
+        # the CSV to Google Drive with it
+        self.on_finished: Callable[[Job], Awaitable[None]] | None = None
+        self._hooks: set[asyncio.Task] = set()
         self._load_from_disk()
 
     # ------------------------------------------------------------------
@@ -107,9 +111,10 @@ class JobManager:
     # ------------------------------------------------------------------
     def create_scrape(self, query: str, limit: int, *, business: str = "", place: str = "",
                       whole_area: bool = False, filters: SearchFilters | None = None, enrich: bool = False,
-                      headless: bool | None = None) -> Job:
+                      headless: bool | None = None, business_type_id: str = "") -> Job:
         job = Job(query=query.strip(), business=business.strip(), place=place.strip(), whole_area=whole_area,
-                  limit=limit, filters=filters or SearchFilters(), enrich=enrich)
+                  limit=limit, filters=filters or SearchFilters(), enrich=enrich,
+                  business_type_id=business_type_id.strip())
         # schedule first: if no event loop is running we must not leave a ghost job behind
         task = asyncio.create_task(self._run_scrape(job, headless=headless), name=job.id)
         self.jobs[job.id] = job
@@ -190,6 +195,22 @@ class JobManager:
                 job.finished_at = datetime.now(timezone.utc)
                 self.save(job)
                 self._tasks.pop(job.id, None)
+                self._finished(job)
+
+    def _finished(self, job: Job) -> None:
+        """Run ``on_finished`` for a job in a task of its own - it must never hold up or break the job."""
+        if self.on_finished is None:
+            return
+
+        async def call() -> None:
+            try:
+                await self.on_finished(job)  # type: ignore[misc]
+            except Exception:  # noqa: BLE001
+                log.exception("after job %s: the finished-job hook failed", job.id)
+
+        task = asyncio.create_task(call(), name=f"finished-{job.id}")
+        self._hooks.add(task)
+        task.add_done_callback(self._hooks.discard)
 
     def cancel(self, job_id: str) -> bool:
         task = self._tasks.get(job_id)
@@ -232,6 +253,7 @@ class JobManager:
         finally:
             self.save(job)
             self._tasks.pop(job.id, None)
+            self._finished(job)
 
     async def _enrich(self, job: Job, *, row_ids: list[str] | None, force: bool) -> None:
         """Look up emails/phones for the selected places and apply the results."""
@@ -456,7 +478,7 @@ def result_notice(job: Job) -> str:
             return f"Google Maps has no results for {term} in {where}."
         if stopped == "section_limit":
             return (f"Stopped after {sections} map sections of {where} (MAX_SECTIONS setting) with {found} found "
-                    f"for {term} ({asked}). Raise MAX_SECTIONS in the .env file (then restart) or search a smaller "
+                    f"for {term} ({asked}). Raise “Most map sections per search” in Settings or search a smaller "
                     "area to cover the rest.")
         scope = (f"all of {where} for {term} ({sections} map section{'' if sections == 1 else 's'})"
                  if job.whole_area else f"{where} for {term} ({stats.get('searches', 0)} searches)")

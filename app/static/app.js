@@ -8,7 +8,9 @@
   const $ = (id) => document.getElementById(id);
 
   const els = {
-    form: $("scrape-form"), business: $("business"), place: $("place"), queryPreview: $("query-preview"),
+    form: $("scrape-form"), businessType: $("business-type"), business: $("business"), businessHint: $("business-hint"),
+    place: $("place"), queryPreview: $("query-preview"), emailBtn: $("email-btn"), driveBtn: $("drive-btn"),
+    driveLine: $("drive-line"),
     wholeArea: $("whole-area"), progressArea: $("progress-area"), progressWeb: $("progress-web"),
     limit: $("limit"), limitHint: $("limit-hint"), contact: $("contact"), profiles: $("profiles"),
     profilesRow: $("profiles-row"), searchWeb: $("search-web"), searchWebRow: $("search-web-row"),
@@ -23,11 +25,11 @@
     rowCount: $("row-count"), resultsSubtitle: $("results-subtitle"), filter: $("filter"),
     enrichAllBtn: $("enrich-all-btn"), copyBtn: $("copy-btn"), downloadBtn: $("download-btn"),
     downloadExtBtn: $("download-ext-btn"), body: $("results-body"), toast: $("toast"),
-    health: $("health"), healthText: $("health-text"),
+    health: $("health"), healthText: $("health-text"), stopBtn: $("stop-btn"),
   };
   const websiteRadios = Array.from(document.querySelectorAll('input[name="website"]'));
 
-  const state = { config: null, jobs: [], current: null, pollTimer: null, filter: "" };
+  const state = { config: null, jobs: [], current: null, pollTimer: null, filter: "", types: [], drive: null };
 
   // ------------------------------------------------------------------
   // helpers
@@ -43,7 +45,18 @@
     try { data = text ? JSON.parse(text) : null; } catch { data = { detail: text }; }
     if (!res.ok) {
       const detail = data && data.detail;
-      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail || res.statusText));
+      let message;
+      if (Array.isArray(detail)) {   // FastAPI's validation errors: [{loc, msg}, …]
+        message = detail.map((d) => String(d.msg || d).replace(/^Value error, /, "")).join("; ");
+      } else if (detail && typeof detail === "object" && detail.message) {   // {message, fields} - Settings
+        message = detail.message;
+      } else {
+        message = typeof detail === "string" ? detail : JSON.stringify(detail || res.statusText);
+      }
+      const error = new Error(message);
+      error.status = res.status;
+      error.detail = detail;
+      throw error;
     }
     return data;
   }
@@ -93,11 +106,16 @@
   // ------------------------------------------------------------------
   // boot
   // ------------------------------------------------------------------
+  async function loadConfig() {
+    state.config = await api("/api/config");
+    els.limit.max = state.config.max_results;
+    els.headed.checked = !state.config.headless;
+    els.stopBtn.hidden = !(state.config.server && state.config.server.can_stop);
+  }
+
   async function init() {
     try {
-      state.config = await api("/api/config");
-      els.limit.max = state.config.max_results;
-      els.headed.checked = !state.config.headless;
+      await loadConfig();
       els.health.classList.add("ok");
       els.healthText.textContent = "API online";
     } catch (err) {
@@ -105,9 +123,169 @@
       els.healthText.textContent = "API offline";
       toast("Cannot reach the API: " + err.message, true);
     }
+    await Promise.all([loadBusinessTypes(), refreshDrive()]);
     await refreshJobs();
     const active = state.jobs.find((j) => ACTIVE.has(j.status)) || state.jobs[0];
     if (active) selectJob(active.id);
+  }
+
+  // ------------------------------------------------------------------
+  // tabs: Search / Outreach / Settings
+  // ------------------------------------------------------------------
+  const views = { search: $("view-search"), outreach: $("view-outreach"), settings: $("view-settings") };
+  const tabs = Array.from(document.querySelectorAll(".tabs .tab"));
+
+  function showView(name) {
+    if (!views[name]) name = "search";
+    if (views[name].hidden) window.scrollTo(0, 0);      // another tab: start at its top
+    for (const [key, view] of Object.entries(views)) view.hidden = key !== name;
+    for (const tab of tabs) {
+      const on = tab.dataset.view === name;
+      tab.classList.toggle("active", on);
+      tab.setAttribute("aria-selected", String(on));
+    }
+    try { localStorage.setItem("view", name); } catch { /* private mode etc. */ }
+    if (window.outreachPanel) window.outreachPanel.visible(name === "outreach");
+    if (window.settingsPanel) window.settingsPanel.visible(name === "settings");
+    if (name === "search") { loadBusinessTypes(); refreshDrive(); }
+  }
+
+  tabs.forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
+
+  // ------------------------------------------------------------------
+  // the server itself: Stop / Restart, and noticing when it's gone
+  // ------------------------------------------------------------------
+  const overlay = { box: $("server-overlay"), title: $("overlay-title"), text: $("overlay-text"),
+    wait: $("overlay-wait") };
+  const START_AGAIN = "Start it again by double-clicking the desktop shortcut (or start.bat in the project folder).";
+  const server = { failures: 0, waiting: false };
+
+  function showOverlay(title, text) {
+    overlay.title.textContent = title;
+    overlay.text.textContent = text;
+    overlay.wait.textContent = "This page reconnects by itself.";
+    overlay.box.hidden = false;
+  }
+
+  // wait until the panel answers again, then load it afresh (``url``: its new address after a port change)
+  async function waitForServer(url) {
+    if (server.waiting) return;
+    server.waiting = true;
+    const target = url && url.replace(/\/$/, "") !== location.origin ? url.replace(/\/$/, "") : "";
+    const since = Date.now();
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try {
+        if (target) {
+          await fetch(`${target}/api/health`, { mode: "no-cors", cache: "no-store" });   // another origin
+          location.href = `${target}/`;
+        } else {
+          const res = await fetch("/api/health", { cache: "no-store" });
+          if (!res.ok) throw new Error(res.statusText);
+          location.reload();
+        }
+        return;
+      } catch { /* not back yet */ }
+      if (Date.now() - since > 40000) {
+        overlay.wait.textContent = "Taking long? The panel's window shows what went wrong.";
+      }
+    }
+  }
+
+  async function stopServer() {
+    if (!confirm("Stop the panel?\n\nNothing is searched or sent while it's stopped. Campaigns carry on " +
+      "when you start it again with the desktop shortcut.")) return;
+    try {
+      await api("/api/server/stop", { method: "POST", body: "{}" });
+    } catch (err) { toast(err.message, true); return; }
+    showOverlay("The panel is stopped", START_AGAIN);
+    waitForServer();
+  }
+
+  async function restartServer() {
+    let url = "";
+    try {
+      ({ url } = await api("/api/server/restart", { method: "POST", body: "{}" }));
+    } catch (err) { toast(err.message, true); return; }
+    const moved = url && url.replace(/\/$/, "") !== location.origin;
+    showOverlay("Restarting…", `The panel starts again in a few seconds${moved ? ` at ${url}` : ""}.`);
+    waitForServer(url);
+  }
+
+  // the log poll runs every second or so: when it can't reach the server a few times in a row, say so
+  function serverUnreachable() {
+    server.failures += 1;
+    if (server.failures < 3 || !overlay.box.hidden) return;
+    els.health.classList.remove("ok");
+    els.health.classList.add("bad");
+    els.healthText.textContent = "API offline";
+    showOverlay("The panel isn't running", START_AGAIN);
+    waitForServer();
+  }
+
+  els.stopBtn.addEventListener("click", stopServer);
+
+  // ------------------------------------------------------------------
+  // business types (the search form's list - edited in the Outreach tab)
+  // ------------------------------------------------------------------
+  const typeOf = (job) => job && job.business_type_id ? state.types.find((t) => t.id === job.business_type_id) : null;
+
+  async function loadBusinessTypes() {
+    try {
+      state.types = await api("/api/business-types");
+    } catch (err) {
+      return;
+    }
+    let saved = els.businessType.value;
+    if (!els.businessType.dataset.loaded) {
+      try { saved = localStorage.getItem("businessType") || ""; } catch { saved = ""; }
+    }
+    els.businessType.innerHTML = "";
+    for (const type of state.types) {
+      const option = document.createElement("option");
+      option.value = type.id;
+      option.textContent = type.name;
+      els.businessType.appendChild(option);
+    }
+    const other = document.createElement("option");
+    other.value = ""; other.textContent = "Other – type your own";
+    els.businessType.appendChild(other);
+    els.businessType.value = state.types.some((t) => t.id === saved) ? saved : "";
+    if (!els.businessType.dataset.loaded) {
+      els.businessType.dataset.loaded = "1";
+      const type = state.types.find((t) => t.id === els.businessType.value);
+      if (type && !els.business.value) els.business.value = type.search || type.name;
+    }
+    updateBusinessHint();
+    updateQueryPreview();
+    if (state.jobs.length) renderJobList();
+  }
+
+  function updateBusinessHint() {
+    const type = state.types.find((t) => t.id === els.businessType.value);
+    els.businessHint.textContent = type
+      ? `Saved as a “${type.name}” search: its campaign gets the ${type.name} emails` +
+        (state.drive && state.drive.connected ? ` and the CSV goes to the Drive folder ${type.name}.` : ".")
+      : "Type what to search for; pick a business type above to connect the search with its emails.";
+  }
+
+  els.businessType.addEventListener("change", () => {
+    const type = state.types.find((t) => t.id === els.businessType.value);
+    if (type) {
+      els.business.value = type.search || type.name;
+    } else if (state.types.some((t) => (t.search || t.name) === els.business.value)) {
+      els.business.value = "";
+      els.business.focus();
+    }
+    try { localStorage.setItem("businessType", els.businessType.value); } catch { /* ignore */ }
+    updateBusinessHint();
+    updateQueryPreview();
+  });
+
+  async function refreshDrive() {
+    try { state.drive = await api("/api/drive"); } catch { state.drive = null; }
+    updateBusinessHint();
+    if (state.current) setToolbar(state.current.rows.length > 0, ACTIVE.has(state.current.status));
   }
 
   // ------------------------------------------------------------------
@@ -142,6 +320,12 @@
       const count = short ? `${job.found} of ${job.limit} found` : `${job.row_count} rows`;
       meta.textContent = `${job.status} · ${count} · ${fmtDate(job.created_at)}`;
       main.append(q);
+      const type = typeOf(job);
+      if (type) {
+        const chip = document.createElement("span");
+        chip.className = "chip small type"; chip.textContent = type.name; chip.title = "Business type";
+        main.append(chip, " ");
+      }
       const chips = [isFiltered(job) ? job.filters.label : "", job.whole_area ? "whole area" : "",
         searchesWeb(job) ? "web search" : ""].filter(Boolean);
       for (const text of chips) {
@@ -290,6 +474,22 @@
     els.enrichAllBtn.disabled = !hasRows || active || !missing;
     els.enrichAllBtn.title = active ? "Wait for the job to finish"
       : (!missing ? "Every row with a website already has an email and phone" : "Look up emails/phones on the website of every row that is missing one");
+    const emails = state.current ? state.current.rows.some((r) => r.email) : false;
+    els.emailBtn.disabled = !emails || active;
+    els.emailBtn.title = active ? "Wait for the search to finish"
+      : (!emails ? "No business of this search has an email" : "Create an email campaign for the businesses of this search");
+    const connected = !!(state.drive && state.drive.connected);
+    els.driveBtn.hidden = !connected;
+    els.driveBtn.disabled = !hasRows || active;
+    const job = state.current;
+    els.driveLine.hidden = !(job && job.drive_path);
+    els.driveLine.textContent = "";
+    if (job && job.drive_path) {
+      els.driveLine.append("Saved to Google Drive: ");
+      const a = document.createElement("a");
+      a.href = job.drive_link || "#"; a.target = "_blank"; a.rel = "noopener"; a.textContent = job.drive_path;
+      els.driveLine.append(a);
+    }
   }
 
   function renderRows(job) {
@@ -476,6 +676,7 @@
     els.formError.hidden = true;
     const payload = {
       business: els.business.value.trim(),
+      business_type_id: els.businessType.value,
       place: els.place.value.trim(),
       whole_area: els.wholeArea.checked,
       limit: Number(els.limit.value),
@@ -520,6 +721,22 @@
   }
 
   els.enrichAllBtn.addEventListener("click", () => enrichRows(null, false));
+
+  els.emailBtn.addEventListener("click", () => {
+    if (!state.current || !window.outreachPanel) return;
+    showView("outreach");
+    window.outreachPanel.newCampaign([state.current.id], state.current.business_type_id || "");
+  });
+
+  els.driveBtn.addEventListener("click", async () => {
+    if (!state.current) return;
+    els.driveBtn.disabled = true;
+    try {
+      const saved = await api(`/api/jobs/${state.current.id}/drive`, { method: "POST" });
+      toast(`Saved to Google Drive: ${saved.path}`);
+      await selectJob(state.current.id);
+    } catch (err) { toast(err.message, true); } finally { els.driveBtn.disabled = false; }
+  });
 
   els.copyBtn.addEventListener("click", async () => {
     if (!state.current) return;
@@ -635,9 +852,11 @@
       logs.cursor = data.next;
       lels.count.textContent = String(logs.lines);
       if (stick) lels.view.scrollTop = lels.view.scrollHeight;
+      server.failures = 0;
       if (data.truncated) { logs.inFlight = false; return pollLogs(); }
     } catch (err) {
-      // the server may be restarting - keep polling quietly
+      // the server may be restarting - keep polling quietly; gone for good: say so
+      if (err instanceof TypeError) serverUnreachable();
     } finally {
       logs.inFlight = false;
     }
@@ -710,9 +929,34 @@
     startLogPolling();
   }
 
+  // shared with outreach.js (loaded after this file)
+  window.panel = {
+    api, toast, fmtDate, jobTitle, showView, stopServer, restartServer,
+    jobs: () => state.jobs,
+    refreshJobs: async () => { await refreshJobs(); return state.jobs; },
+    refreshBusinessTypes: loadBusinessTypes,
+    refreshDrive,
+    refreshConfig: () => loadConfig().catch(() => {}),
+  };
+
+  // back from Google's consent page: /?drive=connected|error&message=…#outreach
+  function driveSignInResult() {
+    const params = new URLSearchParams(location.search);
+    const result = params.get("drive");
+    if (!result) return false;
+    const message = params.get("message") || "";
+    toast(result === "connected" ? `Google Drive connected${message ? ` (${message})` : ""}`
+      : `Google Drive was not connected: ${message}`, result !== "connected");
+    history.replaceState(null, "", location.pathname);
+    return true;
+  }
+
   restoreFilters();
   restoreWholeArea();
   updateFilterUi();
   updateQueryPreview();
-  init().then(() => { updateQueryPreview(); initLogs(); });
+  let firstView = "search";
+  try { firstView = localStorage.getItem("view") || "search"; } catch { /* ignore */ }
+  if (driveSignInResult()) firstView = "outreach";
+  init().then(() => { updateQueryPreview(); initLogs(); showView(firstView); });
 })();

@@ -4,7 +4,10 @@
 
 | Problem | Fix |
 | --- | --- |
-| `playwright: command not found` / `Executable doesn't exist at …chrome-win…` | Run `python -m playwright install chromium` inside the activated virtual environment. |
+| Double-clicking `start.bat` says *Python 3.11 or newer is needed* | Install it from <https://www.python.org/downloads/>, tick *Add python.exe to PATH*, then double-click `start.bat` again. |
+| *Installing failed* in the start window | usually no internet connection, or a proxy; the lines above it say which package. Fix that, then start again; `start.bat --reinstall` installs everything once more. |
+| The desktop shortcut is missing, or does nothing after the folder moved | `start.bat --shortcut` (from a terminal in the project folder) makes it again. |
+| `playwright: command not found` / `Executable doesn't exist at …chrome-win…` | Run `python -m playwright install chromium` inside the activated virtual environment (or `start.bat --reinstall`). |
 | Linux: Chromium fails to start with missing `libnss3` / `libatk` … | `python -m playwright install-deps chromium` (needs sudo) |
 | `ModuleNotFoundError: No module named 'app'` when running `cli.py` | Run from the project root (`cd google-maps-crawler`) with the venv activated. |
 | `RuntimeError: no running event loop` | Routes in `app/main.py` must be `async def` (see DEVELOPMENT.md §6). |
@@ -18,7 +21,7 @@
 | Fewer results than requested, notice *"Only N businesses found … that's every listing"* (`stats.stopped = end_of_list`) | Google's list for that search really ended | Nothing is wrong – that is all Google Maps lists. Try a related business type or a nearby area. |
 | Fewer results, notice *"Google Maps stopped listing … after 120 results"* | Google shows at most ~120 listings per search | Tick *Search the whole area* (`--whole-area`), or search several narrower places (`Katy, TX; Pasadena, TX`). |
 | Whole-area search takes a long time | every map section is a separate Google search; busy areas are split into many sections | Expected. Lower the number of results, search a smaller place, or lower `MAX_SECTIONS`. Progress shows the current section; cancelling keeps what was found. |
-| Notice *"Stopped after 200 map sections (MAX_SECTIONS setting)"* | the area needed more sections than allowed – every section is a Google search, and a big city can need thousands | Set a higher `MAX_SECTIONS` in `.env` and restart the server (more sections take longer and make a Google block more likely), or search smaller places – several suburbs separated by `;` get down to the small sections, where businesses without a website show up, much sooner. |
+| Notice *"Stopped after 200 map sections (MAX_SECTIONS setting)"* | the area needed more sections than allowed – every section is a Google search, and a big city can need thousands | Raise *Settings › Searching Google Maps › Most map sections per search* (more sections take longer and make a Google block more likely), or search smaller places – several suburbs separated by `;` get down to the small sections, where businesses without a website show up, much sooner. |
 | Whole-area search never splits (log: *section 1 … N listing(s)* with no *splitting*) although results are few | Google shows the same ~120 whatever the zoom, or its layout changed | Check a section URL from the log with `--headed`; see SCRAPING.md §6. |
 | Fewer results, notice *"stopped loading after N listings"* (`stopped = stalled`) | Feed stopped loading (slow network, throttling) | Retry; increase `SCROLL_PAUSE_MS` / `SCROLL_STALL_LIMIT`. |
 | A *No website* search finds only a few businesses | most businesses in that category have a website; only the ~120 listings Google shows per search can be checked | Check the subtitle (`… listings scanned (skipped: …)`); search more areas. Untick *Facebook, Instagram … don't count as a website* only if you want to exclude businesses that just have a social page. |
@@ -45,11 +48,47 @@
 | Phone found on the website differs from Maps | Maps phone is kept when present; website phones only fill empty cells | use the extended CSV (`Phone Source`) to see where it came from. |
 | Enrichment button disabled | job still running, or every row with a website already has email + phone | wait, or use the API with `force: true`. |
 
+## Email outreach
+
+| Symptom | Cause | What to do |
+| --- | --- | --- |
+| *Can't start yet: …* | something is missing – the message lists all of it (mailbox settings, `SENDER_ADDRESS`, `{Trade}`, a business without `{City}` …) | fix each item; settings in the Settings tab (*Fill in ›* in the Setup box takes you there), the rest in the campaign's emails / list |
+| Campaign **paused** by itself: *"the mailbox refused the login (535 …)"* | wrong `MAIL_USERNAME` / `MAIL_PASSWORD`; Gmail and Google Workspace refuse your normal password | make an **app password** (Google Account › Security › 2-Step Verification › App passwords), put it in `MAIL_PASSWORD`, restart, *Resume* |
+| Paused: *"the mail server refused the email: 550 5.7.x …"* / *"… sending limit …"* | the provider's spam filter or its daily sending limit | wait a day, lower `OUTREACH_DAILY_LIMIT`, check the email for spammy words / links; a new mailbox needs warming up |
+| Nothing goes out, no error | outside the send window (Mailbox box: *Send window … open now*?), the daily limit is reached (*Today N of N*), the campaign isn't *running*, or `OUTREACH_AUTOSEND=false` | the Mailbox box shows the next email's time; the window is in `OUTREACH_TIMEZONE` – convert it to yours. The server has to run during the window |
+| Mailbox box: *Replies checked … – failed* and nothing is sent | IMAP doesn't work (host, login, IMAP switched off in the mailbox) – without it replies can't be noticed, so no email goes out | check `IMAP_HOST` / `IMAP_PORT`, turn IMAP on in the mailbox settings; *↻ Check replies* shows the exact error |
+| *can't find the mail server smtp.… – check SMTP_HOST* | typo in the host name, or no internet | fix `SMTP_HOST` / `IMAP_HOST` (e.g. `smtp.gmail.com`, `imap.gmail.com`) |
+| A reply isn't recognised | it came from an address the business wasn't emailed at *and* doesn't answer one of the emails (a new email instead of *Reply*), or it landed in spam / another folder | *Leave out* the business by hand; set `IMAP_FOLDER` if replies are filtered into another folder |
+| A business got the follow-up although it replied | the reply arrived after the last check (at most 2 minutes before each email) | rare by design; answer them – the follow-ups stop with the next check |
+| *unknown time zone 'America/Chicago' … pip install tzdata* | Windows has no time-zone database | `pip install -r requirements.txt` (it includes `tzdata`) |
+| A business is missing from a campaign | it was left out – *N businesses left out – why* under the list says why (website, BBB / placeholder address, emailed before, in another campaign) | expected; a business emailed before is never emailed again (`data/contacted.json`) |
+| *✉ Send me this* says *Save first* | the test email is made from the saved text | press *Save*, then send the test |
+
+## Google Drive
+
+| Symptom | Cause | What to do |
+| --- | --- | --- |
+| Setup: *GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set* | no OAuth client yet | make one ([PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive)), paste both into *Settings › Google Drive*, Save |
+| *open the panel at http://127.0.0.1:8000 to connect Google Drive* | the panel was opened by another address (a LAN IP) – Google only sends the sign-in back to this computer | open <http://127.0.0.1:8000> on the computer running the server, connect there |
+| Google shows *Error 400: redirect_uri_mismatch* | the OAuth client is not of type **Desktop app** | make a *Desktop app* client and use its ID / secret |
+| Google shows *access_denied* / *app not verified* and stops | your account isn't a test user of the app, or you cancelled | add your account under *Audience › Test users*, or publish the app; on *"Google hasn't verified this app"* click *Advanced › Go to …* |
+| *Google refused the sign-in (it expired or was revoked) – connect Google Drive again* every week | the app is still in *Testing*: Google ends its sign-ins after 7 days | *Publish app* (In production) in the consent-screen settings, then connect again |
+| *DRIVE_FOLDER: the folder … can't be opened* | the URL / id is wrong, or the account has no access to it | open the folder in Drive with the connected account, copy its URL again; you need edit access to upload |
+| A search wasn't uploaded | Drive wasn't connected when it finished, `DRIVE_AUTO_UPLOAD=false`, or Google refused (the log says why) | *⇪ Save to Drive* in the results card |
+| *the file has no Name and no Email column* | the lead file isn't in the crawler's CSV format | give it a header row with at least `Name` and `Email` ([DRIVE.md](DRIVE.md#lead-files)) |
+| Files go to a new folder instead of your existing *Roofer* | `DRIVE_FOLDER` points somewhere else, or the business type's name differs from the folder's | set `DRIVE_FOLDER` to the folder that contains *Roofer* (empty = My Drive), or rename the business type |
+
 ## Panel
 
 | Symptom | Fix |
 | --- | --- |
-| "API offline" badge | the server is not running or runs on another port; start `python run.py` and open the printed URL. |
+| *The panel isn't running* over the page, or the "API offline" badge | the panel was stopped or its window closed. Double-click the desktop shortcut (or `start.bat`); the page reconnects by itself. |
+| Settings tab: *Can't load the settings: Not Found* | the panel running is older than the page – started before an update. Stop it (close its window, or Ctrl+C in it) and start it again with the desktop shortcut. |
+| Double-clicking the shortcut only opens the browser: *already running* | a panel runs already (its window may be minimised) – that is the one you get. To start fresh, stop it first (*⏻ Stop*). |
+| *Another program uses port 8000* in the start window | something else listens on the port. Close it, or press E and set another `PORT` (or `start.bat --port 8001` once). |
+| A setting can't be changed: *Set by the environment variable …* | that variable is set in Windows (*Edit environment variables for your account*) and wins over the Settings tab. Remove it there, then restart the panel. |
+| *Saved – used after a restart* | the Panel group's settings (address, port, data folder, log size) are only read at start: press *Restart now*. |
+| The panel froze while you selected text in its window | Windows pauses a program while text is being selected in its console window. Press Esc. (Started with `start.bat` / the shortcut, clicking the window doesn't select, so this can't happen.) |
 | Old layout / buttons after upgrading | hard-refresh (Ctrl+F5). Assets are version-stamped and sent with `no-cache`, but a stale tab from before the upgrade keeps its scripts. |
 | Live logs stay empty / stop updating | the view is *Paused* or collapsed, or the server restarted (the buffer lives in memory – it starts empty). Press *Resume*, expand the section, or reload the page. |
 | Live logs show "older lines dropped" | more than `LOG_BUFFER_SIZE` lines arrived between two polls; raise the setting or use *Save* regularly on very large jobs. |
@@ -61,7 +100,8 @@
 
 - **Live logs** section at the bottom of the panel: the same lines as the server console, filterable by
   level and by job, with tracebacks for failures. `GET /api/logs?level=WARNING` gives them as JSON.
-- Server log: the terminal running `run.py` (INFO level; every job failure logs a stack trace).
+- Server log: the window the desktop shortcut / `start.bat` opened, or the terminal running `run.py`
+  (INFO level; every job failure logs a stack trace).
 - Job files: `data/jobs/job_*.json` – contain the rows, progress, `stats.errors`.
 - Playwright debugging: set `PWDEBUG=1` to open the inspector, or `DEBUG=pw:api` for verbose
   protocol logs.

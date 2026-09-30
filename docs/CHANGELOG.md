@@ -3,6 +3,72 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.6.0 – 2026-09-30
+
+### Added
+- **One-click start** (Windows): double-click `start.bat` – or, after its first run, the
+  **desktop shortcut** it makes. The first run creates `.venv` and installs the packages and
+  Chromium; later runs only install again when `requirements.txt` changes. It starts the panel,
+  opens it in the browser and keeps its window as the panel's console. Elsewhere: `python3 start.py`.
+- **⏻ Stop** at the top right of the panel (and Ctrl+C in the start window) stops the panel. An
+  email that is on its way is finished and written down first, so it never goes out twice. A page
+  left open shows *The panel is stopped* and reconnects by itself when the panel runs again.
+- **Settings tab**: every setting in groups (Mailbox, You in the emails, When emails go out, Google
+  Drive, Searching, Finding emails, Panel, Advanced), each with a line of help. *Save* writes
+  `.env` – keeping its comments and the other lines – and the panel uses the new values at once;
+  address, port, data folder and log size after **Restart** (a button, when started with
+  `start.bat`). Passwords are never sent to the browser. *Use Gmail's servers* fills in Gmail's
+  SMTP / IMAP. What's still needed to send emails is marked, and counted on the tab.
+- The *Outreach* Setup box's **Fill in ›** buttons open the settings a step still needs.
+- **Email outreach** (new *Outreach* tab, [OUTREACH.md](OUTREACH.md)).
+  - **Campaigns:** made from one or more searches or from a lead file in Google Drive. Each has a
+    first email and up to 4 follow-ups, on the days you choose.
+  - **Sending:** from your own mailbox over SMTP, only in a send window (default Mon–Fri
+    08:00–12:00 America/Chicago), a few minutes apart, at most `OUTREACH_DAILY_LIMIT` a day.
+  - **Replies:** the inbox is read over IMAP before every email. A reply, an unsubscribe (the
+    `List-Unsubscribe` header) or a bounce stops that business's follow-ups; an out-of-office
+    reply doesn't.
+  - **Who is left out:** businesses with a website of their own, with only a BBB / placeholder
+    address, or emailed before. Each is listed with the reason, and nobody is ever emailed twice
+    (`data/contacted.json`).
+  - **Before Start:** nothing is sent. Pause any time. The campaigns pause themselves when the
+    mailbox refuses the login or an email.
+- **Business types** (Roofer, Plumber, HVAC … – add your own). Each holds what the search form
+  types into Google Maps, `{Trade}`, the Google Drive folder name, and its own emails.
+  - **The search form's Business type:** now a list of your types plus *Other*. A search remembers
+    its type, and its campaign starts with that type's emails.
+  - **The email editor:** every email is a block you can open and close – the text on the left,
+    the email filled in for a real business on the right, updated while you type. A ✓ in the
+    header shows it is filled in; **!** marks an unknown placeholder, an unclosed `[[ … ]]` or a
+    follow-up day out of order.
+  - **Placeholders:** `{Business}`, `{City}`, `{Trade}`, `{Rating}`, `{Reviews}`, `{Sender…}`, and
+    optional parts `[[ … ]]` / `[[A||B]]`. **✉ Send me this** sends any email to yourself as a
+    test.
+- **Google Drive** ([DRIVE.md](DRIVE.md)).
+  - **Searches:** each search's CSV is uploaded to `DRIVE_FOLDER/<business type>/` when it
+    finishes (again after an enrichment), and **⇪ Save to Drive** uploads it on demand.
+  - **Lead files:** campaigns can run from a CSV / Google Sheet in that folder, in the crawler's
+    format with at least `Name` and `Email` columns.
+  - **Campaign results:** kept in `<business type>/Outreach/` and updated while the campaign runs.
+  - **Sign-in:** with your own OAuth client (*Desktop app*); Google's answer comes back to the
+    panel.
+- **✉ Email these businesses** in the results card starts a campaign from the search.
+- **[PLAYBOOK.md](PLAYBOOK.md):** setting everything up in order – mailbox, Google Drive, business
+  types, search, campaign, every day. The *Outreach* tab's **Setup** box ticks the steps off and
+  says what is still missing.
+- New settings: `SMTP_*`, `IMAP_*`, `MAIL_USERNAME` / `MAIL_PASSWORD`, `SENDER_*`,
+  `OUTREACH_*`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, `DRIVE_FOLDER`, `DRIVE_AUTO_UPLOAD`.
+  `tzdata` is now a requirement (time zones on Windows).
+- `JobSummary` has `email_count`, `business_type_id`, `drive_path` and `drive_link`. The search
+  request takes `business_type_id`.
+- New routes: `GET` / `PATCH /api/settings`, `POST /api/server/stop`, `POST /api/server/restart`
+  (only for the panel opened on this computer); `/api/config` has `server`.
+
+### Changed
+- `run.py` no longer logs every HTTP request (the panel asks every few seconds); `--access-log`
+  turns it back on.
+- The *MAX_SECTIONS* notice points to the Settings tab.
+
 ## 1.5.2 – 2026-09-29
 
 ### Changed

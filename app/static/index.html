@@ -13,21 +13,36 @@
       <span class="brand-icon">📍</span>
       <div>
         <h1>Google Maps Lead Crawler</h1>
-        <p class="muted">Find businesses by type and city, filter by website and contact details, export CSV.</p>
+        <p class="muted">Find businesses by type and city, filter by website and contact details, export CSV, email them.</p>
       </div>
     </div>
-    <div class="health" id="health" title="API status"><span class="dot"></span><span id="health-text">connecting…</span></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab active" type="button" role="tab" id="tab-search" data-view="search" aria-selected="true">Search</button>
+      <button class="tab" type="button" role="tab" id="tab-outreach" data-view="outreach" aria-selected="false">Outreach
+        <span class="count" id="tab-outreach-count" title="Campaigns sending" hidden>0</span></button>
+      <button class="tab" type="button" role="tab" id="tab-settings" data-view="settings" aria-selected="false">Settings
+        <span class="count warn" id="tab-settings-count" title="Settings to fill in before emails can go out" hidden>0</span></button>
+    </nav>
+    <div class="topbar-end">
+      <div class="health" id="health" title="API status"><span class="dot"></span><span id="health-text">connecting…</span></div>
+      <button class="btn ghost small" type="button" id="stop-btn" hidden
+              title="Stop the panel – start it again with the desktop shortcut">⏻ Stop</button>
+    </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="view-search">
     <!-- ============ left column: form + history ============ -->
     <aside class="sidebar">
       <section class="card">
         <h2>New search</h2>
         <form id="scrape-form" autocomplete="off">
-          <label for="business">Business type
+          <label for="business-type">Business type
+            <select id="business-type" name="business_type"><option value="">Other – type your own</option></select>
+          </label>
+          <label for="business">Search Google Maps for
             <input id="business" name="business" type="text" required minlength="2" maxlength="120"
                    placeholder="e.g. plumbers, hair salon, dentist">
+            <small class="muted" id="business-hint"></small>
           </label>
           <label for="place">City / area
             <input id="place" name="place" type="text" required maxlength="500" placeholder="e.g. Austin, TX">
@@ -115,6 +130,7 @@
           <div>
             <h2>Results <span class="count" id="row-count">0</span></h2>
             <small class="muted" id="results-subtitle">Start a search or pick a job from the history.</small>
+            <small class="muted block" id="drive-line" hidden></small>
           </div>
           <div class="toolbar">
             <input type="search" id="filter" placeholder="Filter rows…" disabled>
@@ -124,6 +140,8 @@
             <button class="btn" id="copy-btn" disabled>Copy CSV</button>
             <a class="btn" id="download-btn" aria-disabled="true" download>⬇ Download CSV</a>
             <a class="btn ghost" id="download-ext-btn" aria-disabled="true" download title="Adds Address, Category, Website Type, Rating, Place ID, Maps URL, Lat/Lng, Email Source…">Extended CSV</a>
+            <button class="btn" id="drive-btn" hidden title="Upload this CSV to the business type's Google Drive folder">⇪ Save to Drive</button>
+            <button class="btn primary" id="email-btn" disabled title="Create an email campaign for the businesses of this search">✉ Email these businesses</button>
           </div>
         </div>
         <div class="notice alert" id="blocked" role="alert" hidden>
@@ -190,7 +208,240 @@
     </section>
   </main>
 
+  <!-- ================= Outreach tab: setup, campaigns, business types and their emails ================= -->
+  <main class="layout" id="view-outreach" hidden>
+    <aside class="sidebar">
+      <section class="card">
+        <div class="card-head"><h2>Setup</h2><small class="muted">in this order – docs/PLAYBOOK.md</small></div>
+        <ol class="checklist" id="setup-list"></ol>
+      </section>
+
+      <section class="card" id="mailbox-card">
+        <div class="card-head">
+          <h2>Mailbox</h2>
+          <button class="btn small" id="check-btn" title="Look for replies and bounces in your inbox now">↻ Check replies</button>
+        </div>
+        <dl class="facts" id="mailbox-facts"></dl>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Campaigns</h2>
+          <button class="btn primary small" id="new-campaign-btn">+ New</button>
+        </div>
+        <ul class="job-list" id="campaign-list"><li class="muted">No campaigns yet.</li></ul>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Business types</h2>
+          <button class="btn small" id="new-type-btn">+ New</button>
+        </div>
+        <small class="muted block">What you search for, and the emails those businesses get. The name is also the
+          Google Drive folder.</small>
+        <ul class="job-list" id="type-list"></ul>
+      </section>
+    </aside>
+
+    <section class="content">
+      <section class="card" id="outreach-intro">
+        <h2>Email the businesses you found</h2>
+        <ol class="intro-steps">
+          <li><strong>Search</strong> with a business type (Search tab) – e.g. <em>Roofer</em> in <em>Houston</em>, No website, Must have: Email.</li>
+          <li><strong>Check the emails</strong> of that business type (left, <em>Business types</em>): the first email and the follow-ups, and on which day each goes out.</li>
+          <li><strong>Create a campaign</strong> from the search – or from a lead file in the type's Google Drive folder – and look at the preview; send yourself a test.</li>
+          <li><strong>Start</strong>: the server emails the businesses in the send window, a few minutes apart, and stops the follow-ups for anyone who replies, bounces or unsubscribes.</li>
+        </ol>
+        <p class="muted">Nothing is ever sent before you press <em>Start</em> on a campaign.</p>
+      </section>
+
+      <!-- new campaign -->
+      <section class="card" id="new-campaign-card" hidden>
+        <div class="card-head"><h2>New campaign</h2></div>
+        <form id="campaign-form" autocomplete="off">
+          <label for="camp-type">Business type – its emails are copied into the campaign
+            <select id="camp-type"></select>
+          </label>
+          <fieldset class="filters">
+            <legend>Businesses from these searches</legend>
+            <div class="picks" id="camp-jobs"></div>
+          </fieldset>
+          <fieldset class="filters" id="camp-files-box">
+            <legend>… or from lead files in Google Drive</legend>
+            <div class="picks" id="camp-files"></div>
+            <small class="muted">CSV files or Google Sheets in the crawler's format (a header row with at least
+              <kbd>Name</kbd> and <kbd>Email</kbd>) in the business type's folder.</small>
+          </fieldset>
+          <label for="camp-name">Campaign name
+            <input id="camp-name" type="text" maxlength="120" placeholder="e.g. Roofer · Houston">
+          </label>
+          <small class="muted">One email address per business, its own: businesses with a website, only a BBB or
+            placeholder address, or emailed before are left out – you see who and why.</small>
+          <div class="row-start">
+            <button class="btn primary" type="submit" id="camp-create">Create campaign</button>
+            <button class="btn ghost" type="button" id="camp-cancel">Cancel</button>
+          </div>
+          <p class="error" id="camp-error" hidden></p>
+        </form>
+      </section>
+
+      <!-- a campaign -->
+      <section class="card" id="campaign-card" hidden>
+        <div class="card-head wrap">
+          <div class="title-line">
+            <h2 id="camp-title"></h2>
+            <span class="pill" id="camp-status"></span>
+            <span class="chip area" id="camp-type-chip" hidden></span>
+          </div>
+          <div class="toolbar">
+            <button class="btn primary" id="camp-start">▶ Start sending</button>
+            <button class="btn" id="camp-pause" hidden>❚❚ Pause</button>
+            <button class="btn" id="camp-drive" title="Save this campaign's results to Google Drive now">⇪ Save results to Drive</button>
+            <button class="btn danger" id="camp-delete">Delete</button>
+          </div>
+        </div>
+        <p class="muted" id="camp-summary"></p>
+        <div class="notice alert" id="camp-alert" role="alert" hidden>
+          <span class="notice-icon" aria-hidden="true">!</span>
+          <div><strong id="camp-alert-title">Can't start yet</strong><ul id="camp-alert-list"></ul></div>
+        </div>
+        <div class="stat-row" id="camp-stats"></div>
+      </section>
+
+      <!-- the emails of a campaign or a business type -->
+      <section class="card" id="editor-card" hidden>
+        <div class="card-head wrap">
+          <div>
+            <h2 id="editor-title">Emails</h2>
+            <small class="muted" id="editor-subtitle"></small>
+          </div>
+          <div class="toolbar">
+            <label class="inline" id="ed-load-row" hidden><span>Load emails of</span>
+              <select id="ed-load"></select></label>
+            <button class="btn small" id="ed-save-as" hidden>Save as business type…</button>
+            <button class="btn small danger" id="ed-delete-type" hidden>Delete business type</button>
+            <button class="btn primary" id="ed-save" disabled>Save</button>
+          </div>
+        </div>
+        <div class="editor-form" id="editor-form">
+          <div class="grid-2" id="ed-type-fields">
+            <label for="ed-name">Name (and Drive folder)
+              <input id="ed-name" type="text" maxlength="60"></label>
+            <label for="ed-search">Search Google Maps for
+              <input id="ed-search" type="text" maxlength="120" placeholder="e.g. roofing"></label>
+          </div>
+          <div class="grid-2">
+            <label for="ed-trade"><span class="with-mark"><span class="check-mark" id="ed-trade-mark"></span>
+              What the emails call these businesses <code>{Trade}</code></span>
+              <input id="ed-trade" type="text" maxlength="60" placeholder="e.g. roofers"></label>
+            <label for="preview-pick">Preview filled in for
+              <select id="preview-pick" title="Whose details the previews fill in"></select>
+              <small class="muted" id="preview-note"></small></label>
+          </div>
+          <div class="placeholder-bar" id="ed-chips" title="Click to insert at the cursor"></div>
+          <div class="steps" id="ed-steps"></div>
+          <div class="row-start">
+            <button class="btn small" type="button" id="ed-add-step">+ Add a follow-up</button>
+            <button class="btn ghost small" type="button" id="ed-expand">Open all</button>
+          </div>
+          <details class="step" id="ed-footer-box">
+            <summary class="step-summary">
+              <span class="check-mark" id="ed-footer-mark"></span><strong>Footer</strong>
+              <span class="muted step-glance">under every email – your postal address and how to opt out</span>
+            </summary>
+            <div class="step-grid">
+              <div class="step-edit"><textarea id="ed-footer" rows="4" aria-label="Footer"></textarea></div>
+              <div class="step-preview"><pre class="email-body footer-preview" id="ed-footer-preview"></pre></div>
+            </div>
+          </details>
+          <details class="help">
+            <summary>How the placeholders work</summary>
+            <div id="ed-help"></div>
+          </details>
+          <p class="error" id="ed-error" hidden></p>
+        </div>
+      </section>
+
+      <!-- the businesses of a campaign -->
+      <section class="card grow" id="leads-card" hidden>
+        <div class="card-head wrap">
+          <div>
+            <h2>Businesses <span class="count" id="lead-count">0</span></h2>
+            <small class="muted" id="leads-subtitle"></small>
+          </div>
+          <input type="search" id="lead-filter" placeholder="Filter…">
+        </div>
+        <div class="table-wrap">
+          <table class="leads">
+            <thead>
+              <tr>
+                <th>Business</th><th>Email</th><th>City</th><th class="num">Rating</th><th>Status</th>
+                <th>Emails</th><th>Next email</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="lead-body"></tbody>
+          </table>
+        </div>
+        <details class="left-out" id="left-out" hidden>
+          <summary id="left-out-summary"></summary>
+          <ul id="left-out-list"></ul>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <!-- ================= Settings tab: the .env file, and the panel itself ================= -->
+  <main class="layout" id="view-settings" hidden>
+    <aside class="sidebar">
+      <section class="card">
+        <div class="card-head"><h2>Settings</h2></div>
+        <nav class="settings-nav" id="settings-nav" aria-label="Setting groups"></nav>
+        <small class="muted block" id="settings-file"></small>
+      </section>
+      <section class="card">
+        <div class="card-head"><h2>Panel</h2></div>
+        <dl class="facts" id="server-facts"></dl>
+        <div class="row-start">
+          <button class="btn small" type="button" id="restart-btn" hidden
+                  title="Stop the panel and start it again – for settings like the port">↻ Restart</button>
+          <button class="btn small danger" type="button" id="stop-btn-2" hidden>⏻ Stop the panel</button>
+        </div>
+        <small class="muted block" id="server-note"></small>
+      </section>
+    </aside>
+
+    <section class="content">
+      <div class="notice" id="settings-pending" role="status" hidden>
+        <span class="notice-icon" aria-hidden="true">↻</span>
+        <div class="grow-1"><strong>Saved – used after a restart</strong><p id="settings-pending-text"></p></div>
+        <button class="btn primary small" type="button" id="settings-restart">Restart now</button>
+      </div>
+      <div class="notice alert" id="settings-file-error" role="alert" hidden>
+        <span class="notice-icon" aria-hidden="true">!</span><p id="settings-file-error-text"></p>
+      </div>
+      <form id="settings-form" autocomplete="off" novalidate>
+        <div id="settings-groups"><p class="muted">Loading the settings…</p></div>
+        <div class="save-bar" id="settings-bar" hidden>
+          <span id="settings-bar-text"></span>
+          <button class="btn ghost" type="button" id="settings-discard">Discard</button>
+          <button class="btn primary" type="submit" id="settings-save">Save</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- shown while the panel is stopped or restarting -->
+  <div class="overlay" id="server-overlay" hidden>
+    <div class="overlay-card" role="alertdialog" aria-labelledby="overlay-title" aria-describedby="overlay-text">
+      <h2 id="overlay-title">The panel is stopped</h2>
+      <p id="overlay-text"></p>
+      <small class="muted block" id="overlay-wait">This page reconnects by itself.</small>
+    </div>
+  </div>
+
   <div class="toast" id="toast" hidden></div>
   <script src="/static/app.js?v={{version}}"></script>
+  <script src="/static/outreach.js?v={{version}}"></script>
+  <script src="/static/settings.js?v={{version}}"></script>
 </body>
 </html>

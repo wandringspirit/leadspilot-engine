@@ -10,9 +10,13 @@ from __future__ import annotations
 
 import csv
 import io
-from typing import Iterable
+import re
+from typing import TYPE_CHECKING, Iterable
 
 from app.models import PlaceRow
+
+if TYPE_CHECKING:
+    from app.models import Job
 
 # (CSV header, PlaceRow attribute)
 DEFAULT_COLUMNS: list[tuple[str, str]] = [
@@ -71,3 +75,17 @@ def rows_to_csv_bytes(rows: Iterable[PlaceRow], *, extended: bool = False) -> by
 
 def column_headers(extended: bool = False) -> list[str]:
     return [h for h, _ in (EXTENDED_COLUMNS if extended else DEFAULT_COLUMNS)]
+
+
+def safe_filename(text: str) -> str:
+    """'Roofing companies near Houston!' -> 'roofing_companies_near_houston'."""
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "_", text).strip("_").lower()
+    return (cleaned or "results")[:60]
+
+
+def job_filename(job: "Job", *, extended: bool = False) -> str:
+    """The download (and Google Drive) name of a job's CSV:
+    'plumbers_in_austin_tx_no_website_phone_or_email_29_09_2026.csv' - the date the search ran."""
+    suffix = job.filters.slug()
+    return (safe_filename(job.query) + (f"_{suffix}" if suffix else "") + ("_extended" if extended else "")
+            + f"_{job.created_at.astimezone():%d_%m_%Y}.csv")

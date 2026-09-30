@@ -91,6 +91,7 @@ names are kept verbatim.
   "business": "plumbers",               // "" for free-text queries and jobs from before 1.2
   "place": "Austin, TX",                // several places are separated by ";"
   "whole_area": false,                  // true: each place searched map section by map section
+  "business_type_id": "bt_3f9a1c2d4e5f",  // the business type it was searched for ("" = typed in), §10
   "limit": 200,
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
                "search_web": false, "label": "no website · phone or email" },   // see §9
@@ -120,7 +121,10 @@ names are kept verbatim.
     "errors": [],
     "unlisted_websites": { "email domain": 1, "profile page": 3 },   // how they were found (§9)
     "web_searches": 0               // web searches run (filters.search_web)
-  }
+  },
+  "drive_file_id": "1AbC…",         // its CSV in Google Drive (DRIVE.md), "" until uploaded
+  "drive_link": "https://drive.google.com/file/d/1AbC…/view",
+  "drive_path": "Plumber/plumbers_in_austin_tx_no_website_phone_or_email_20_09_2026.csv"
 }
 ```
 
@@ -285,3 +289,87 @@ its own – skipped as `has a website not listed on Maps` when one is found
 websites found per check (`unlisted_websites`) and the web searches run (`web_searches`).
 Addresses on platform domains (`…@bbbemail.org`) are kept like any other email; they just are
 not taken for the business's own domain.
+
+## 10. Outreach
+
+The email campaigns ([OUTREACH.md](OUTREACH.md)) keep their data next to the jobs:
+
+```
+data/
+  business_types.json       the business types (only once one was changed - the defaults live in code)
+  campaigns/camp_<id>.json  a campaign with its leads
+  contacted.json            every address a first email went to: {address: {business, place_id,
+                            campaign_id, campaign, first_email, status}}
+  google_drive.json         the Google Drive sign-in (refresh token) - DRIVE.md
+```
+
+```mermaid
+classDiagram
+    class BusinessType {
+        +str id
+        +str name
+        +str search
+        +str trade
+        +list~Step~ steps
+        +str footer
+    }
+    class Step {
+        +int day
+        +str subject
+        +str body
+    }
+    class Campaign {
+        +str id
+        +str name
+        +str trade
+        +list~str~ job_ids
+        +list~DriveSource~ drive_files
+        +str business_type_id
+        +list~Step~ steps
+        +str footer
+        +CampaignStatus status
+        +str error
+        +list~Lead~ leads
+        +list~LeftOut~ left_out
+        +str drive_path
+    }
+    class Lead {
+        +str id
+        +str name
+        +str business
+        +str email
+        +list~str~ other_emails
+        +str city
+        +float rating
+        +int reviews
+        +LeadStatus status
+        +datetime next_due
+        +list~SentEmail~ sent
+        +list~InboundEmail~ inbound
+        +str note
+    }
+    BusinessType "1" *-- "1..5" Step
+    Campaign "1" *-- "1..5" Step : a copy of the type's
+    Campaign "1" *-- "many" Lead
+    Job "1" --> "0..1" BusinessType : business_type_id
+    Campaign "many" --> "many" Job : job_ids
+```
+
+| Lead `status` | Meaning |
+| --- | --- |
+| `queued` | nothing sent yet |
+| `sent` | in the sequence – `next_due` says when the next follow-up may go out |
+| `done` | every email sent, no reply |
+| `replied` | answered – no more emails |
+| `unsubscribed` | asked not to be emailed (unsubscribe link, a "stop" reply) |
+| `bounced` | the address doesn't exist |
+| `failed` | the mail server refused the address |
+| `skipped` | left out by you |
+
+A campaign's **results CSV** (uploaded to Drive, [DRIVE.md](DRIVE.md)) has one row per lead:
+`Business`, `Email`, `Status`, `Emails Sent` (`2 of 3`), `First Email`, `Last Email`, `Next Email`
+(in the send window's time zone), `Answered`, `Answer` (the reply's subject), `City`, `Phone`,
+`Rating`, `Reviews`, `Name On Maps`, `Place ID`, `Note`.
+
+A **lead file** a campaign runs from is a CSV in the format of §1 / §2 – at least `Name` and
+`Email` ([DRIVE.md](DRIVE.md#lead-files)).

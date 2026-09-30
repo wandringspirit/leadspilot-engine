@@ -15,10 +15,32 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | POST | `/api/jobs/{job_id}/cancel` | cancel a running scrape / enrichment |
 | POST | `/api/jobs/{job_id}/enrich` | look up emails / phones on websites |
 | GET | `/api/jobs/{job_id}/export.csv` | download the CSV |
+| POST | `/api/jobs/{job_id}/drive` | upload the CSV to Google Drive now |
 | GET | `/api/logs` | live log lines (ring buffer with a sequence cursor) |
-| GET | `/` | the web panel |
+| GET | `/api/outreach` | mailbox settings, send window, today's count, the last reply check |
+| POST | `/api/outreach/check` | check the mailbox for replies and bounces now |
+| GET / POST | `/api/business-types` | list / add business types |
+| GET / PATCH / DELETE | `/api/business-types/{type_id}` | one business type: read, change, delete |
+| GET | `/api/business-types/{type_id}/preview` | its emails for two made-up businesses |
+| POST | `/api/business-types/{type_id}/test` | send one of its emails to yourself |
+| GET / POST | `/api/campaigns` | list / create campaigns |
+| GET / PATCH / DELETE | `/api/campaigns/{campaign_id}` | one campaign: read, change its emails, delete |
+| POST | `/api/campaigns/{campaign_id}/start` | start (or resume) sending |
+| POST | `/api/campaigns/{campaign_id}/pause` | pause |
+| GET | `/api/campaigns/{campaign_id}/preview` | its emails as one business gets them |
+| POST | `/api/campaigns/{campaign_id}/test` | send one of its emails to yourself |
+| PATCH | `/api/campaigns/{campaign_id}/leads/{lead_id}` | rename a business in the emails, leave it out / include it |
+| POST | `/api/campaigns/{campaign_id}/drive` | upload its results to Google Drive now |
+| GET | `/api/drive` | Google Drive: set up? connected as whom? which folder? |
+| POST | `/api/drive/connect` | the Google consent page to open |
+| POST | `/api/drive/disconnect` | forget (and revoke) the Drive sign-in |
+| GET | `/api/drive/files` | lead files in a business type's Drive folder |
+| GET / PATCH | `/api/settings` | every setting (the Settings tab) / save some to `.env` |
+| POST | `/api/server/stop` | stop the panel (its Stop button) |
+| POST | `/api/server/restart` | restart it (only when started with `start.bat` / `start.py`) |
+| GET | `/` | the web panel (also receives Google's sign-in answer) |
 
-Errors use FastAPI's shape: `{"detail": "message"}` with `400`, `404`, `409` or `422`
+Errors use FastAPI's shape: `{"detail": "message"}` with `400`, `403`, `404`, `409` or `422`
 (validation) status codes.
 
 ## Typical flow
@@ -60,9 +82,14 @@ sequenceDiagram
   "detail_concurrency": 3,
   "enrich_max_pages": 6,
   "columns": ["Name", "City", "State", "Country", "Email", "Website", "Phone", "Phone Unformatted", "Url", "Rank", "Review Count", "Description"],
-  "extended_columns": ["Name", "…", "Enrichment Status"]
+  "extended_columns": ["Name", "…", "Enrichment Status"],
+  "server": { "can_stop": true, "can_restart": true, "url": "http://127.0.0.1:8000",
+              "env_file": "C:\\…\\google-maps-crawler\\.env" }
 }
 ```
+
+`server.can_stop`: started by `run.py` (or `start.bat`), so `POST /api/server/stop` works;
+`can_restart`: started by `start.bat` / `start.py`, which starts it again.
 
 ### POST `/api/scrape`
 
@@ -81,6 +108,7 @@ Request body:
 | `filters` | object | no | see below; omitted = keep every place |
 | `enrich` | bool | no (false) | run website enrichment automatically after scraping |
 | `headless` | bool | no | override `HEADLESS` for this job (`false` shows the browser) |
+| `business_type_id` | string | no | the saved business type the search is for: a campaign made from it starts with that type's emails, and its CSV goes to that type's Drive folder. `400` for an unknown id |
 
 ¹ `business` or `query` must be given (the resulting search needs at least 2 characters); `422` otherwise.
 
@@ -113,15 +141,19 @@ Response (`JobSummary`):
 ```json
 {
   "id": "job_5f0c2a1b9d3e", "query": "plumbers in Austin, TX", "business": "plumbers", "place": "Austin, TX",
-  "whole_area": false,
+  "whole_area": false, "business_type_id": "bt_3f9a1c2d4e5f",
   "filters": { "website": "without", "contact": "phone_or_email", "profiles_as_no_website": true,
                "search_web": false, "label": "no website · phone or email" },
   "limit": 30, "status": "queued",
   "progress": { "phase": "queued", "message": "", "current": 0, "total": 0, "percent": 0.0 },
-  "row_count": 0, "found": null, "notice": "",
-  "created_at": "…", "updated_at": "…", "finished_at": null, "error": null
+  "row_count": 0, "email_count": 0, "found": null, "notice": "",
+  "created_at": "…", "updated_at": "…", "finished_at": null, "error": null,
+  "drive_path": "", "drive_link": ""
 }
 ```
+
+`email_count` is the number of rows with an email; `drive_path` / `drive_link` say where the CSV is
+in Google Drive once it was uploaded (`"Plumber/plumbers_in_austin_tx_…_29_09_2026.csv"`).
 
 `found` is the number of places kept once the scrape has finished (rows can be more – one per
 email). `notice` explains a result smaller than `limit`, e.g. *"Only 35 businesses found for
@@ -185,6 +217,14 @@ search was started, in the server's local time). A copy is written to
 curl -o houston.csv "http://127.0.0.1:8000/api/jobs/job_5f0c2a1b9d3e/export.csv?extended=true"
 ```
 
+### POST `/api/jobs/{job_id}/drive`
+
+Uploads the job's CSV (the extended export) to its business type's Google Drive folder now – the
+same file again when it was uploaded before ([DRIVE.md](DRIVE.md)). Returns
+`{"path": "Plumber/plumbers_in_austin_tx_29_09_2026.csv", "link": "https://drive.google.com/…"}`.
+Errors: `400` Drive not connected, `409` the job is still running, `502` Google refused (the
+message says why).
+
 ### GET `/api/logs`
 
 Returns log lines from the in-memory ring buffer that feeds the panel's **Live logs**
@@ -222,10 +262,195 @@ curl "http://127.0.0.1:8000/api/logs?since=1520&level=WARNING&job_id=job_5f0c2a1
 - If `first_seq > since + 1` the buffer wrapped around and lines were dropped in between.
 - Exceptions include their traceback in `message` (multi-line).
 
+## Email outreach
+
+How campaigns work – who becomes a lead, templates, when emails go out, replies – is in
+[OUTREACH.md](OUTREACH.md). Errors use the usual shape; `400` explains a request that can't be
+carried out (e.g. an unknown placeholder, a campaign that can't start yet – the message lists
+everything missing), `409` a conflict (a running campaign can't be deleted), `502` the mailbox or
+Google refused.
+
+### GET `/api/outreach`
+
+```json
+{
+  "ready": true, "problems": [], "autosend": true, "running": 1,
+  "sender": "Pat <pat@getpatsweb.com>", "smtp": "smtp.gmail.com:587", "imap": "imap.gmail.com:993",
+  "window": "Mon–Fri 08:00–12:00 (America/Chicago)", "window_open": true,
+  "daily_limit": 30, "sent_today": 12, "next_send_at": "2026-09-29T15:42:10+00:00",
+  "last_check": { "at": "2026-09-29T15:40:03+00:00", "error": "", "emails": 41, "replies": 1, "bounces": 0 },
+  "contacted": 57,
+  "placeholders": { "Business": "the business name, without LLC / Inc. (editable per lead)", "…": "…" },
+  "min_reviews": 10, "min_rating": 4.0
+}
+```
+
+`problems` lists every missing setting in plain words (`"IMAP_HOST is not set …"`); no campaign
+can start while it isn't empty. Passwords are never returned.
+
+### POST `/api/outreach/check`
+
+Checks the inbox for replies and bounces now; returns `last_check` as above. `400` when the IMAP
+settings are missing, `502` when the mailbox refused (the message says why).
+
+### Business types
+
+`GET /api/business-types` – all, by name. A business type:
+
+```json
+{
+  "id": "bt_3f9a1c2d4e5f", "name": "Roofer", "search": "roofing", "trade": "roofers",
+  "steps": [
+    { "day": 0, "subject": "website for {Business}", "body": "Hi there,\n\nI came across {Business} …" },
+    { "day": 3, "subject": "", "body": "Hi there,\n\nJust bringing this back up …" },
+    { "day": 7, "subject": "", "body": "Hi there,\n\nLast note from me …" }
+  ],
+  "footer": "[[{SenderCompany}\n]]{SenderAddress}\nIf you'd rather not hear from me, just reply \"no\" …",
+  "created_at": "…", "updated_at": "…"
+}
+```
+
+- `POST /api/business-types` `{name, search?, trade?, steps?, footer?}` → `201`; omitted
+  `steps` / `footer` are the default emails. `409` when the name exists (case-insensitive).
+- `GET /api/business-types/{type_id}` → the type, `404` if unknown.
+- `PATCH /api/business-types/{type_id}` – any of `name`, `search`, `trade`, `steps` (1–5),
+  `footer`. `400` lists what is wrong with the emails (unknown placeholders, days not going up,
+  no `{SenderAddress}` in the footer …).
+- `DELETE /api/business-types/{type_id}` → `204`. Searches, campaigns and Drive files stay.
+- `GET /api/business-types/{type_id}/preview` → `{"from", "samples": [{"label", "to", "emails":
+  [{"step", "day", "subject", "body"}], "values": {…}}]}` – the emails for a made-up business with
+  good reviews and one with few. `values` are what the placeholders were filled with.
+- `POST /api/business-types/{type_id}/test` `{step: 1}` → sends that email, filled in for the
+  made-up business, to your own address with `[Test]` in front of the subject:
+  `{"to": "pat@getpatsweb.com", "subject": "[Test] website for Acme"}`.
+
+### POST `/api/campaigns`
+
+Creates a **draft** from searches and/or lead files in Google Drive – nothing is sent before
+`/start`.
+
+| Field | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `job_ids` | string[] | `[]` | searches whose businesses become the leads (`404` unknown, `409` still running) |
+| `drive_file_ids` | string[] | `[]` | lead files in Drive ([DRIVE.md](DRIVE.md#lead-files)); `400` when one isn't in the crawler's CSV format |
+| `business_type_id` | string | *(omitted)* | whose emails are copied in. Omitted: the searches' business type when they share one, else the default emails; `""`: the default emails |
+| `name` | string | `"<type or search> · <place>"` | |
+| `trade` | string | the type's | `{Trade}` |
+
+At least one search or file is needed (`422`). Returns the full campaign (`201`):
+
+```jsonc
+{
+  "id": "camp_7d2e9a0b1c3f", "name": "Plumber · Houston", "trade": "plumbers",
+  "job_ids": ["job_d38350fa59d5"], "drive_files": [],
+  "business_type_id": "bt_…", "business_type_name": "Plumber",
+  "steps": [ /* a copy of the type's */ ], "footer": "…",
+  "status": "draft",                      // draft | running | paused | finished
+  "error": "",                            // why it was paused automatically
+  "leads": [ {
+      "id": "l_4b1c…", "job_id": "job_d38350fa59d5", "place_id": "ChIJ…",
+      "name": "Acme Plumbing LLC", "business": "Acme Plumbing",
+      "email": "office@acmeplumbing.example", "other_emails": [], "city": "Houston",
+      "rating": 4.7, "reviews": 42, "phone": "(713) 555-0142", "category": "Plumber", "maps_url": "…",
+      "status": "queued",                 // queued | sent | done | replied | unsubscribed | bounced | failed | skipped
+      "next_due": null,                   // when the next follow-up may go out
+      "sent": [ { "step": 1, "sent_at": "…", "message_id": "<…@getpatsweb.com>", "subject": "…" } ],
+      "inbound": [ { "kind": "reply", "received_at": "…", "sender": "…", "subject": "Re: …", "message_id": "…" } ],
+      "note": ""
+  } ],
+  "left_out": [ { "name": "Enterprise Roofing & Skylights", "email": "info@bbbemail.org",
+                  "reason": "no address of its own: address of bbbemail.org, not of the business (info@bbbemail.org)" } ],
+  "created_at": "…", "updated_at": "…", "started_at": null, "finished_at": null,
+  "drive_file_id": "", "drive_link": "", "drive_path": "", "drive_hash": "", "drive_synced_at": null
+}
+```
+
+`GET /api/campaigns` lists them newest first, without leads but with `counts` (leads per status)
+and `emails_sent`.
+
+### The other campaign routes
+
+- `GET /api/campaigns/{campaign_id}` – the full campaign (`404` if unknown).
+- `PATCH /api/campaigns/{campaign_id}` – any of `name`, `trade`, `steps`, `footer`; allowed while
+  it runs (changes apply to the emails not sent yet; the next follow-ups are rescheduled when the
+  days change). `400` lists what is wrong with the emails.
+- `DELETE /api/campaigns/{campaign_id}` → `204`; `409` while it is running (pause first). The
+  businesses it emailed stay on the contacted list.
+- `POST /api/campaigns/{campaign_id}/start` → the campaign, `running`. `400` "Can't start yet: …"
+  with every problem (mailbox settings, the send window, the emails, `{Trade}`, a business missing
+  `{City}` …); `409` when it has finished.
+- `POST /api/campaigns/{campaign_id}/pause` → the campaign, `paused`.
+- `GET /api/campaigns/{campaign_id}/preview?lead_id=` → `{"lead_id", "business", "to", "from",
+  "missing", "emails": [{"step", "day", "subject", "body", "sent_at"}], "values": {…}}` – every email
+  as that business (default: the first still to email) gets it; `missing` names placeholders
+  without a value.
+- `POST /api/campaigns/{campaign_id}/test` `{lead_id?, step: 1}` → sends that email, filled in for
+  the business, to your own address (`[Test] …`); the campaign is not changed.
+- `PATCH /api/campaigns/{campaign_id}/leads/{lead_id}` `{business?, skipped?}` → the lead.
+  `skipped: true` sends it nothing (more); `false` includes it again. `409` when it has already
+  replied / bounced / finished, or another campaign emailed it.
+- `POST /api/campaigns/{campaign_id}/drive` → `{"path": "Plumber/Outreach/plumber_houston_a1b2c3.csv",
+  "link": "…"}` – uploads its results now ([DRIVE.md](DRIVE.md)).
+
+## Google Drive
+
+Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files: [DRIVE.md](DRIVE.md).
+
+- `GET /api/drive` → `{"configured": true, "connected": true, "email": "pat@gmail.com",
+  "folder": "Leads", "auto_upload": true, "problems": [], "last_error": ""}`.
+- `POST /api/drive/connect` → `{"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?…"}` –
+  open it in the browser; Google sends the browser back to `/` of this server, which stores the
+  sign-in and redirects to `/?drive=connected#outreach` (or `/?drive=error&message=…`). `400` when
+  `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are missing, or the panel isn't opened at
+  `127.0.0.1` / `localhost` (Google only sends the answer to this computer).
+- `POST /api/drive/disconnect` → `204`; revokes the token at Google and deletes it.
+- `GET /api/drive/files?business_type_id=` → `{"folder": "Roofer", "folder_link": "…", "files":
+  [{"id", "name", "modified", "link", "sheet"}]}` – the CSV files and Google Sheets in the type's
+  folder, newest first. `400` Drive not connected, `502` Google refused.
+
+## Settings and the server itself
+
+These routes answer only the panel opened on this computer: a request from another computer
+(`HOST=0.0.0.0`), from another web site (its `Origin`), or through another host name than
+`127.0.0.1` / `localhost` gets `403`.
+
+- `GET /api/settings` → `{"groups": [{"key": "mailbox", "title": "Mailbox", "help": "…", "advanced":
+  false}, …], "fields": [...], "env_file": "…/.env", "file_error": "", "pending": ["PORT"], "server":
+  {…}}`. One field per setting (`app/settings_editor.py` has their groups, labels and help):
+
+  ```json
+  { "name": "SMTP_PORT", "group": "mailbox", "label": "SMTP port", "help": "587 (STARTTLS) or 465 (SSL)",
+    "kind": "int", "value": "587", "default": "587", "placeholder": "", "choices": [], "min": 1,
+    "max": 65535, "needed": "", "restart": false, "saved": true, "locked": "", "pending": false }
+  ```
+
+  `kind` is `text`, `int`, `float`, `bool` (then `value` is `true` / `false`), `choice` or `secret`.
+  A secret (`MAIL_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `PROXY_SERVER`) never has its `value` sent:
+  `is_set` says whether it has one. `saved`: `.env` sets it. `locked`: the environment variable
+  that sets it on this computer, which wins over `.env`. `restart`: only read when the server
+  starts. `pending`: `.env` holds another value than the one in use until a restart.
+  `needed`: `email` / `drive` when that can't work without it. `file_error`: `.env` has a value
+  the server couldn't start with.
+- `PATCH /api/settings` `{"values": {"SMTP_HOST": "smtp.gmail.com", "SMTP_PORT": 465, "HEADLESS": false,
+  "SENDER_COMPANY": null}}` writes them to `.env` – only their lines change; `null` or `""` puts a
+  setting back to its default – and uses them at once, except the `restart` ones. → the same as
+  `GET` plus `"changed": [...]` (the settings whose value changed) and `"restart": [...]` (of
+  those, the ones used after a restart). `400` with `{"detail": {"message": "SMTP port: must be a
+  whole number", "fields": {"SMTP_PORT": "must be a whole number"}}}` when a value is no good –
+  nothing is written then.
+- `POST /api/server/stop` → `{"stopping": true}`; the server finishes open requests and the email
+  being sent, then exits. `409` when it wasn't started by `run.py` / `start.bat`.
+- `POST /api/server/restart` → `{"restarting": true, "url": "http://127.0.0.1:8000"}` (where it
+  will be, after a port change); the server exits with code 75 and `start.py` starts it again.
+  `409` unless it was started with `start.bat` / `start.py`.
+
+## The web panel
+
 ### GET `/`
 
 Serves the panel (`app/static/index.html`) with version-stamped asset URLs. Static files
-under `/static/` are sent with `Cache-Control: no-cache`.
+under `/static/` are sent with `Cache-Control: no-cache`. With `?state=…&code=…` from Google's
+consent page it finishes connecting Google Drive and redirects to the panel.
 
 ## Row object
 
@@ -254,7 +479,8 @@ Every element of `rows` is a `PlaceRow`; fields are described in
 ## Notes for integrators
 
 - The API is unauthenticated and binds to `127.0.0.1` by default. If you expose it on a
-  network, put it behind a reverse proxy with authentication.
+  network, put it behind a reverse proxy with authentication. The settings and server routes
+  refuse other computers either way.
 - Jobs are executed inside the API process; keep one instance per machine (two instances
   would each open their own browsers and compete for CPU).
 - Long polling / websockets are not provided; poll `GET /api/jobs/{id}` every 1–2 seconds

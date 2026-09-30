@@ -27,13 +27,17 @@ flowchart TB
         WSR[WebSearch<br/>app/enrichment/websearch.py]
         CSV[csv_export.py]
         LB[LogBuffer<br/>app/logbuffer.py]
+        OM[OutreachManager<br/>app/outreach]
+        DS[DriveSync<br/>app/drive]
     end
 
     subgraph External
         GM[(Google Maps)]
         WS[(Business websites)]
         SE[(DuckDuckGo / Bing)]
-        FS[(data/jobs/*.json<br/>data/exports/*.csv)]
+        FS[(data/jobs, campaigns, exports<br/>business_types, contacted)]
+        MB[(Your mailbox<br/>SMTP + IMAP)]
+        GD[(Google Drive)]
     end
 
     P <-->|fetch JSON| API
@@ -61,6 +65,13 @@ flowchart TB
     WE -.->|log records| LB
     JM -.->|log records| LB
     LB -->|GET /api/logs| API
+    API --> OM
+    OM <-->|send loop: emails out,<br/>replies / bounces in| MB
+    OM <--> FS
+    API --> DS
+    JM -.->|on_finished: upload the CSV| DS
+    DS -.->|campaign results| OM
+    DS <-->|REST, your OAuth client| GD
 ```
 
 Everything runs in **one Python process**. The FastAPI event loop hosts the API, the
@@ -69,11 +80,28 @@ no threads or worker processes are needed). The panel is plain HTML/JS served by
 process; it only talks to the JSON API, which means the CLI and any other client get exactly
 the same capabilities.
 
+Started with the desktop shortcut (`start.bat` → `start.py`), a small launcher process sits in
+front of it: it sets up what is missing, runs `run.py` as its child and opens the browser, passes
+Ctrl+C in its window on as a Stop request, and starts `run.py` again when it exits for the panel's
+Restart button:
+
+```mermaid
+flowchart LR
+    SC[Desktop shortcut /<br/>start.bat] --> L[start.py<br/>.venv, packages, Chromium]
+    L -->|child process| R[run.py<br/>the server]
+    L -->|opens| B[Browser: the panel]
+    B -->|Stop / Restart<br/>POST /api/server/…| R
+    R -->|exit 75 = restart| L
+    L -->|Ctrl+C in the window:<br/>POST /api/server/stop| R
+```
+
 ## 2. Components
 
 | Component | File | Responsibility |
 | --- | --- | --- |
 | **Settings** | `app/config.py` | Typed configuration from environment / `.env` (pydantic-settings). |
+| **Settings tab** | `app/settings_editor.py` | Every setting's group, label and help; reads `.env`, writes only the lines that change, validates, and puts new values into the running `settings` object (the few read only at start-up wait for a restart). |
+| **Server control** | `app/control.py`, `run.py`, `start.py` | Stop and Restart from the panel: `run.py` hands its uvicorn server to `control`; `start.py` restarts it when it exits with `RESTART_CODE`. |
 | **Models** | `app/models.py` | `PlaceRow` (one output row), `Job` (a search – business, place, filters – with its rows, status, progress and notice), request bodies. |
 | **Filters** | `app/filters.py` | `SearchFilters`: the *Website* and *Must have* rules as pure functions (used on the feed, on scraped places and to decide when an email lookup can help). |
 | **API** | `app/main.py` | REST routes, CSV download, static panel, cache headers. |
@@ -88,7 +116,11 @@ the same capabilities.
 | **WebSearch** | `app/enrichment/websearch.py` | DuckDuckGo / Bing result pages over plain HTTP (never Google), one search at a time, stops for the job when both engines refuse. |
 | **csv_export** | `app/export/csv_export.py` | Column layout (default + extended) and CSV serialisation. |
 | **LogBuffer** | `app/logbuffer.py` | `logging.Handler` that keeps the last `LOG_BUFFER_SIZE` records in a ring buffer with sequence numbers and tags them with the running job's id; backs `GET /api/logs`. |
-| **Panel** | `app/static/*` | Form, progress card, results table with per-row *Find* buttons, history list, CSV download / copy, live log viewer. |
+| **OutreachManager** | `app/outreach/manager.py` | Business types and campaigns (JSON under `data/`), the checks before a campaign starts, and the send loop: at most one email per 20 s round, inside the send window, under the daily limit, after a fresh reply check; replies / bounces / unsubscribes stop a lead's follow-ups. See [OUTREACH.md](OUTREACH.md). |
+| **templates / leads / schedule** | `app/outreach/*.py` | Pure helpers: filling the emails (`{placeholders}`, `[[optional parts]]`), which businesses become leads and why the others don't, the send window. |
+| **Mailbox** | `app/outreach/mailbox.py` | `smtplib` / `imaplib` in a worker thread; building the plain-text emails (threaded follow-ups, `List-Unsubscribe`) and reading what arrives (reply, auto-reply, bounce, unsubscribe). |
+| **DriveClient / DriveSync** | `app/drive/*.py` | Google Drive over httpx: the OAuth sign-in (PKCE, the answer comes back to `/`), folders per business type, uploading search CSVs and campaign results, reading lead files ([DRIVE.md](DRIVE.md)). |
+| **Panel** | `app/static/*` | *Search* tab: form with the business-type list, progress card, results table with per-row *Find* buttons, history list, CSV download / copy / *Save to Drive*, *Email these businesses*, live log viewer. *Outreach* tab (`outreach.js`): setup checklist, mailbox status, campaigns, business types and their email editor with live previews. |
 | **CLI** | `cli.py` | Same pipeline without the server. |
 
 ## 3. A scrape job, end to end
@@ -271,9 +303,14 @@ data/
   jobs/job_<id>.json        full Job (query, status, progress, rows, stats)
   exports/<job>.csv         last CSV download of a job (convenience copy)
   exports/<query>.csv       CLI output default location
+  campaigns/camp_<id>.json  a campaign with its leads, what was sent and what came back
+  business_types.json       the business types and their emails (after the first change)
+  contacted.json            every address that got a first email - never emailed again
+  google_drive.json         the Google Drive sign-in (a refresh token - keep it private)
 ```
 
-Nothing else is stored. Deleting `data/` resets the application.
+Nothing else is stored. Deleting `data/` resets the application – including the list of
+businesses already emailed, so keep `contacted.json` if you start over.
 
 ## 9. Design decisions
 
@@ -283,6 +320,8 @@ Nothing else is stored. Deleting `data/` resets the application.
 | **Capture Google's XHR records instead of scraping only the DOM** | Structured fields (city/state/country, E.164 phone, place id, description) come for free and are far more stable than obfuscated CSS class names. The DOM remains as fallback. |
 | **Visit every place page** (rather than trusting the list page) | The list records lack description and review count; the place XHR has everything. Cost: ~1–3 s per place, mitigated with parallel tabs. |
 | **Single process, asyncio tasks** for jobs | Simple to run (`python run.py`), no broker or database to install; fine for one user / a small team. |
+| **A launcher process around the server** (`start.py`) | Restart has to be a new process (settings like `PORT` are read at start-up), and something has to start it; the launcher also turns Ctrl+C into a key press, so cmd.exe doesn't ask *"Terminate batch job?"* and a click in the window can't freeze the server (QuickEdit). |
+| **Settings saved to `.env`, applied in place** | One file stays the source of truth for the panel, the CLI and hand edits; most values are read where they are used, so setting them on the shared `settings` object takes effect without a restart. |
 | **JSON files for persistence** | Human-readable, zero setup, easy to back up; jobs are small (hundreds of rows). |
 | **Vanilla JS panel, no build step** | Nothing to compile; the UI is a thin client over the API and can be edited with any text editor. |
 | **One row per email** | Matches how lead lists are consumed in spreadsheets / CRMs (one contact per row) — explicitly requested. |
@@ -296,6 +335,12 @@ Nothing else is stored. Deleting `data/` resets the application.
 | **UTF-8 BOM in CSV** | Excel on Windows otherwise mangles accented names. |
 | **Docs-consistency tests** | Columns, routes, settings and record indexes are cross-checked against the docs so the documentation cannot silently rot. |
 | **Polling instead of websockets for progress and logs** | One code path that works through any proxy, trivially testable with `TestClient`; a 1.2 s poll of a few KB is negligible next to the browser work. |
+| **Send from your own mailbox over SMTP, read replies over IMAP** | No third-party sending service or account; it works with Gmail / Workspace app passwords and most providers. IMAP is required because stopping the follow-ups for anyone who replied is the point – without it nothing is sent. |
+| **One email per round, in a window, with random gaps and a daily cap** | Looks like a person sending, keeps a new mailbox's reputation, and a campaign can't flood anyone if something goes wrong. Follow-ups are spaced from the email actually sent before, so a server that was off never sends two emails to one business back to back. |
+| **Campaigns copy the business type's emails** | Editing a business type for the next city never changes what a running campaign sends. |
+| **A contacted list outside the campaigns** | "Never email a business twice" survives deleting a campaign and holds across cities and business types. |
+| **Business type as the thread through everything** | One choice in the search form picks what Google Maps is searched for, the Drive folder, and the emails – the user's mental model ("roofers in Houston") instead of three settings. |
+| **Drive over plain REST with the user's own OAuth client** | No Google client libraries (heavy), no shared app credentials; the loopback redirect lands on the panel's own server, so connecting is one click once the client exists. Full Drive scope because the crawler writes into folders the user made and reads files the user put there. |
 
 ## 10. Scaling notes
 

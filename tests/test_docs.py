@@ -25,6 +25,9 @@ REQUIRED_DOCS = [
     "docs/DEVELOPMENT.md",
     "docs/TROUBLESHOOTING.md",
     "docs/CHANGELOG.md",
+    "docs/PLAYBOOK.md",
+    "docs/OUTREACH.md",
+    "docs/DRIVE.md",
 ]
 
 
@@ -74,6 +77,6 @@ def test_changelog_mentions_current_version():
 
 
 def test_mermaid_diagrams_present_in_architecture_docs():
-    for name in ("ARCHITECTURE.md", "SCRAPING.md", "ENRICHMENT.md"):
+    for name in ("ARCHITECTURE.md", "SCRAPING.md", "ENRICHMENT.md", "OUTREACH.md", "PLAYBOOK.md"):
         text = (DOCS / name).read_text(encoding="utf-8")
         assert "```mermaid" in text, f"docs/{name} should contain at least one mermaid diagram"

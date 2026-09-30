@@ -2,10 +2,17 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
 import pytest
+
+# The app's email loop and Drive uploads must never run in the tests: they would use the real
+# mailbox from .env and a Google Drive connected in data/. (Set before app.config is imported;
+# environment variables win over .env.)
+os.environ["OUTREACH_AUTOSEND"] = "false"
+os.environ["DRIVE_AUTO_UPLOAD"] = "false"
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

@@ -10,6 +10,12 @@ playwright install chromium
 python run.py --reload              # auto-restarts on code changes, panel at http://127.0.0.1:8000
 ```
 
+`start.bat` / `start.py` (the one-click start in the README) do the same setup by themselves, then
+run `run.py` as a child process: the panel's Restart button makes `run.py` exit with code 75
+(`app/control.py`) and `start.py` starts it again; its Stop button and Ctrl+C in the window end
+both. `run.py` logs no HTTP requests unless started with `--access-log` (the panel asks every few
+seconds).
+
 `.claude/launch.json` contains a `panel` configuration for editors / agents that can start
 dev servers from it.
 
@@ -23,6 +29,8 @@ for the browser's system libraries.
 app/
   __init__.py          version string
   config.py            Settings (pydantic-settings) – see reference below
+  settings_editor.py   the Settings tab: every setting's group, label and help (OPTIONS), .env read / write
+  control.py           the panel's Stop / Restart (run.py hands over its uvicorn server), browse_url()
   models.py            PlaceRow, Job, JobSummary, Progress, request bodies
   filters.py           SearchFilters - the website / contact rules (pure)
   main.py              FastAPI routes + static panel
@@ -40,19 +48,36 @@ app/
     sitefinder.py      SiteFinder - websites a Google Maps listing does not show
     websearch.py       WebSearch - DuckDuckGo / Bing result pages (never Google)
   export/
-    csv_export.py      DEFAULT_COLUMNS, EXTENDED_COLUMNS, rows_to_csv()
+    csv_export.py      DEFAULT_COLUMNS, EXTENDED_COLUMNS, rows_to_csv(), job_filename()
+    csv_import.py      rows_from_csv() - a lead file (the crawler's CSV format) back into rows
+  outreach/            email campaigns (docs/OUTREACH.md)
+    models.py          BusinessType, Campaign, Lead, Step, request bodies
+    templates.py       placeholders, [[optional parts]], compose(), the default emails / business types
+    leads.py           which businesses of a job become leads, and why the others don't
+    schedule.py        SendWindow - days, hours, time zone
+    mailbox.py         SMTP / IMAP (worker thread), build_message(), parse_headers(), classify()
+    manager.py         OutreachManager - persistence, the API's operations, the send loop, results_csv()
+  drive/               Google Drive (docs/DRIVE.md)
+    client.py          DriveClient - OAuth sign-in (PKCE, loopback) and the REST calls, over httpx
+    sync.py            DriveSync - folders per business type, uploads, lead files, campaign results
   static/
-    index.html, app.js, styles.css   the panel
+    index.html, app.js, styles.css   the panel (Search tab, Stop, the stopped / restarting screen)
+    outreach.js                       the Outreach tab
+    settings.js                       the Settings tab
+    icon.ico                          the desktop shortcut's icon
 cli.py                 CLI entry point
 run.py                 uvicorn launcher
+start.bat, start.py    one-click start: .venv, packages, Chromium, desktop shortcut, then run.py (restarts it)
 tests/                 pytest suite
 docs/                  this documentation
 data/                  runtime files (git-ignored)
 ```
 
-Dependency direction: `main → jobs → (scraper, enrichment, export) → models/config`.
-`scraper` and `enrichment` never import from `jobs` or `main`, so both can be used
-stand-alone (that is what `cli.py` does).
+Dependency direction: `main → jobs → (scraper, enrichment, export) → models/config`;
+`main → outreach → (enrichment helpers, models)` and `main → drive → (export, outreach)`.
+`scraper` and `enrichment` never import from `jobs`, `outreach`, `drive` or `main`, so both can be
+used stand-alone (that is what `cli.py` does). `JobManager` knows nothing about Drive: `main.py`
+hooks the upload in through `JobManager.on_finished`.
 
 ## 3. Running the pieces by hand
 
@@ -90,7 +115,11 @@ were skipped and why, how many searches / map sections ran, and why the scan sto
 ## 4. Configuration reference
 
 Settings are read from environment variables, then from `.env` in the project root
-(`app/config.py`). `tests/test_docs.py` checks that every setting is listed here.
+(`app/config.py`). The panel's Settings tab shows and changes all of them: it writes `.env` and
+applies new values at once, except `HOST`, `PORT`, `DATA_DIR` and `LOG_BUFFER_SIZE`, which are only
+read when the server starts. A setting that is also an environment variable can't be changed there.
+`tests/test_docs.py` checks that every setting is listed here, `tests/test_settings.py` that every
+one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 
 ### Server
 
@@ -134,6 +163,39 @@ Settings are read from environment variables, then from `.env` in the project ro
 | `WEB_SEARCH_ENGINE` | `duckduckgo` | engine asked first when a *No website* search also searches the web: `duckduckgo` or `bing` (the other is the fallback; Google is never used) |
 | `WEB_SEARCH_DELAY_S` | `3.0` | minimum pause between two web searches |
 
+### Email outreach ([OUTREACH.md](OUTREACH.md))
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SMTP_HOST` | *(empty)* | outgoing mail server, e.g. `smtp.gmail.com`; empty: nothing can be sent |
+| `SMTP_PORT` | `587` | `587` (STARTTLS) or `465` (SSL); a server without encryption is refused unless it is `localhost` |
+| `IMAP_HOST` | *(empty)* | incoming mail server, e.g. `imap.gmail.com` – needed to notice replies; without it nothing is sent |
+| `IMAP_PORT` | `993` | IMAP over SSL |
+| `IMAP_FOLDER` | `INBOX` | where replies arrive (opened read-only) |
+| `MAIL_USERNAME` | *(empty)* | the mailbox login for SMTP and IMAP, usually the address |
+| `MAIL_PASSWORD` | *(empty)* | its password – for Gmail / Google Workspace an app password (spaces are dropped) |
+| `SENDER_EMAIL` | *(empty = `MAIL_USERNAME`)* | the From address |
+| `SENDER_NAME` | *(empty)* | the From name and `{SenderName}` – required to start a campaign |
+| `SENDER_COMPANY` | *(empty)* | `{SenderCompany}` |
+| `SENDER_ADDRESS` | *(empty)* | `{SenderAddress}`, your postal address – required (CAN-SPAM), it goes in every footer |
+| `OUTREACH_AUTOSEND` | `true` | `false`: the server never sends on its own and checks replies only on request (the tests set it) |
+| `OUTREACH_TIMEZONE` | `America/Chicago` | time zone of the send window – your leads' (needs the `tzdata` package on Windows) |
+| `OUTREACH_DAYS` | `mon-fri` | days emails go out: `mon-fri`, `mon,wed,fri`, `mon-sat` … |
+| `OUTREACH_HOURS` | `8-12` | hours emails go out: `8-12` = 08:00 until 11:59 |
+| `OUTREACH_DAILY_LIMIT` | `30` | emails per day, all campaigns and follow-ups together |
+| `OUTREACH_MIN_GAP_S` / `OUTREACH_MAX_GAP_S` | `90` / `240` | random pause between two emails |
+| `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |
+| `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |
+
+### Google Drive ([DRIVE.md](DRIVE.md))
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `GOOGLE_CLIENT_ID` | *(empty)* | OAuth client ID of type *Desktop app* from the Google Cloud console |
+| `GOOGLE_CLIENT_SECRET` | *(empty)* | its client secret |
+| `DRIVE_FOLDER` | *(empty = My Drive)* | where the business-type folders go: a folder name / path in My Drive, or a folder's URL / id |
+| `DRIVE_AUTO_UPLOAD` | `true` | upload each search when it finishes and campaign results while they run (`false`: only the *Save to Drive* buttons; the tests set it) |
+
 ## 5. Tests
 
 ```bash
@@ -160,7 +222,16 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_cli.py` | `cli.py` end to end on an in-memory feed: business + place, filter flags, short-result note, a business left out for its unlisted website, a Google block (error line, CSV, exit code 3) |
 | `test_api.py` | every route through FastAPI's `TestClient`, business + place and filtered jobs run with a fake scraper, enricher and web search (a business left out for its unlisted website, web search switched off), a job Google blocked, notices, persistence (incl. pre-1.2 jobs), log tagging |
 | `test_logbuffer.py` | ring buffer semantics: cursor, limit/truncation, level filter, tracebacks, job-id tagging across asyncio tasks |
+| `test_outreach.py` | templates (placeholders, optional parts, business names), who becomes a lead, the send window (DST, weekends), building / reading emails (threading, replies, auto-replies, bounces, unsubscribes), the send loop on a fake mailbox and clock: pauses, daily limit, follow-ups, replies stopping them, auth errors pausing campaigns, nobody emailed twice, business types |
+| `test_outreach_api.py` | the outreach and Drive routes through `TestClient`: business types, campaigns from searches and from a Drive file, start / pause / delete, test emails, connecting Drive (Google's redirect), uploads |
+| `test_drive.py` | lead files (the crawler's CSV and hand-made ones), sign-in and token refresh, folders per business type, uploads that update in place, shared folders – against a fake Google (`httpx.MockTransport`) |
+| `test_settings.py` | the Settings tab: every setting listed, values written to `.env` and read back exactly (quotes, `#`, backslashes), the rest of the file kept, validation, environment variables winning, a broken `.env`; the settings / stop / restart routes and who may call them; `start.py` installing only when `requirements.txt` changed and finding a running panel |
 | `test_docs.py` | documentation consistency (see §7) |
+
+The suite never sends an email or touches Google Drive: `tests/conftest.py` sets
+`OUTREACH_AUTOSEND=false` and `DRIVE_AUTO_UPLOAD=false` before the app is imported, so the
+server's loops don't run with the mailbox / Drive from your `.env`, and the outreach tests use a
+fake mailbox, a fake clock and a fake Google.
 
 Live checks against Google are deliberately not part of the suite (they are slow and
 non-deterministic). Use the CLI for a manual smoke test:
@@ -202,7 +273,10 @@ requires the event loop of the request), document it in `docs/API.md`, add a tes
 
 ### Add a setting
 
-Add the field to `Settings`, an entry to `.env.example`, and a row to §4 above.
+Add the field to `Settings`, an entry to `.env.example`, a row to §4 above, and an `Option` (its
+group, label and help) to `OPTIONS` in `app/settings_editor.py` – `test_settings.py` fails until
+you do. If it is only read at start-up, mark it `restart=True`; if an object keeps its own copy,
+refresh that in `_apply_settings()` (`app/main.py`).
 
 ## 7. Keeping docs in sync
 
@@ -214,6 +288,7 @@ Documentation drift is caught by `tests/test_docs.py`:
 | `DATA_MODEL.md` lists every CSV column | a column is added to `csv_export.py` |
 | `API.md` lists every `/api` route | a route is added to `main.py` |
 | `DEVELOPMENT.md` lists every setting | a field is added to `Settings` |
+| the Settings tab lists every setting (`test_settings.py`) | a field is added to `Settings` without an `Option` |
 | `SCRAPING.md` lists every record index | `IDX` in `records.py` changes |
 | `CHANGELOG.md` mentions `app.__version__` | the version is bumped without a changelog entry |
 | architecture docs contain Mermaid diagrams | diagrams are removed |

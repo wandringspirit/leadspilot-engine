@@ -503,8 +503,8 @@ class MapsScraper:
         queue, kept = [root], []
         while queue and self.stats.matched < self._limit and not self._halted:
             if self.stats.sections >= self.cfg.MAX_SECTIONS:
-                log.warning("Stopped after %d map section(s) - the MAX_SECTIONS limit; set MAX_SECTIONS in the "
-                            ".env file to search more", self.stats.sections)
+                log.warning("Stopped after %d map section(s) - the MAX_SECTIONS limit; raise “Most map sections per "
+                            "search” in Settings to search more", self.stats.sections)
                 self._halted = "section_limit"
                 break
             section = queue.pop(0)

@@ -115,6 +115,8 @@ class ScrapeRequest(BaseModel):
     filters: SearchFilters = Field(default_factory=SearchFilters)
     enrich: bool = Field(False, description="Look up emails/phones on websites after scraping")
     headless: bool | None = Field(None, description="Override HEADLESS setting for this job")
+    business_type_id: str = Field("", max_length=40, description="The saved business type this search is for "
+                                                                 "(its emails are used for a campaign)")
 
     @model_validator(mode="after")
     def _needs_a_search(self) -> "ScrapeRequest":
@@ -144,6 +146,7 @@ class Job(BaseModel):
     business: str = ""                  # empty for free-text queries (and jobs from before 1.2)
     place: str = ""                     # one place, or several separated by ';'
     whole_area: bool = False            # each place searched section by section
+    business_type_id: str = ""          # the saved business type the search was for ('' = typed in)
     limit: int
     filters: SearchFilters = Field(default_factory=SearchFilters)
     enrich: bool = False
@@ -156,6 +159,9 @@ class Job(BaseModel):
     updated_at: datetime = Field(default_factory=_now)
     finished_at: datetime | None = None
     stats: dict[str, Any] = Field(default_factory=dict)
+    drive_file_id: str = ""             # the CSV's copy in Google Drive (docs/DRIVE.md)
+    drive_link: str = ""
+    drive_path: str = ""                # e.g. "Roofer/roofing_in_houston_no_website_email_29_09_2026.csv"
 
     # ---- helpers --------------------------------------------------------
     def touch(self) -> None:
@@ -164,11 +170,11 @@ class Job(BaseModel):
     def summary(self) -> "JobSummary":
         return JobSummary(
             id=self.id, query=self.query, business=self.business, place=self.place,
-            whole_area=self.whole_area, filters=self.filters, limit=self.limit, status=self.status,
-            progress=self.progress, row_count=len(self.rows),
-            found=self.stats.get("matched"), notice=self.notice,
+            whole_area=self.whole_area, business_type_id=self.business_type_id, filters=self.filters,
+            limit=self.limit, status=self.status, progress=self.progress, row_count=len(self.rows),
+            email_count=sum(1 for r in self.rows if r.email), found=self.stats.get("matched"), notice=self.notice,
             created_at=self.created_at, updated_at=self.updated_at,
-            finished_at=self.finished_at, error=self.error,
+            finished_at=self.finished_at, error=self.error, drive_path=self.drive_path, drive_link=self.drive_link,
         )
 
 
@@ -195,14 +201,18 @@ class JobSummary(BaseModel):
     business: str = ""
     place: str = ""
     whole_area: bool = False
+    business_type_id: str = ""
     filters: SearchFilters = Field(default_factory=SearchFilters)
     limit: int
     status: JobStatus
     progress: Progress
     row_count: int
+    email_count: int = Field(0, description="Rows with an email")
     found: int | None = Field(None, description="Places kept (rows can be more: one per email); null until scraped")
     notice: str = ""
     created_at: datetime
     updated_at: datetime
     finished_at: datetime | None = None
     error: str | None = None
+    drive_path: str = ""
+    drive_link: str = ""

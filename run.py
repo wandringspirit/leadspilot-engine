@@ -1,21 +1,44 @@
-"""Start the web panel: ``python run.py`` then open http://127.0.0.1:8000."""
+"""Start the web panel: ``python run.py`` then open http://127.0.0.1:8000.
+
+start.bat (start.py) does this for you, after setting everything up, and opens the browser. The panel's
+Stop button ends this process; its Restart button makes it exit with app.control.RESTART_CODE, and
+start.py starts it again.
+"""
 from __future__ import annotations
 
 import argparse
+import sys
 
 import uvicorn
 
 from app.config import settings
+from app.control import control
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description="Google Maps Lead Crawler web panel")
     parser.add_argument("--host", default=settings.HOST)
     parser.add_argument("--port", type=int, default=settings.PORT)
     parser.add_argument("--reload", action="store_true", help="auto-reload on code changes (development)")
+    parser.add_argument("--access-log", action="store_true",
+                        help="log every HTTP request too (the panel asks every few seconds: many lines)")
     args = parser.parse_args()
-    uvicorn.run("app.main:app", host=args.host, port=args.port, reload=args.reload, log_level="info")
+    if args.reload:
+        uvicorn.run("app.main:app", host=args.host, port=args.port, reload=True, log_level="info",
+                    access_log=args.access_log)
+        return 0
+
+    from app.main import app
+
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="info",
+                                           access_log=args.access_log))
+    control.server = server                    # the panel's Stop / Restart buttons
+    try:
+        server.run()                           # exits the process with 3 when it can't start (port taken ...)
+    except KeyboardInterrupt:                  # uvicorn raises Ctrl+C again once it has shut down cleanly
+        pass
+    return control.exit_code
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

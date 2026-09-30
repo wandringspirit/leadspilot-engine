@@ -2,8 +2,13 @@
 
 Search Google Maps for a type of business in a city (for example *plumbers* in *Austin, TX*),
 keep only the businesses you want — e.g. **no website of their own, but a phone or an email** —
-look up missing **emails / phone numbers on each business website**, and export everything as a
-spreadsheet-ready **CSV** — from a web panel or the command line.
+look up missing **emails / phone numbers on each business website**, export everything as a
+spreadsheet-ready **CSV** (and to **Google Drive**, a folder per business type), and **email the
+businesses** a first email and follow-ups from your own mailbox — from a web panel or the command
+line.
+
+**Setting it all up?** Follow the [playbook](docs/PLAYBOOK.md): mailbox → Google Drive → business
+types → search → campaign, in that order.
 
 ```
 Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Url | Rank | Review Count | Description
@@ -46,13 +51,49 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
   Sheets) plus an *extended* export with the extra fields.
 - **Live logs** – a terminal-style section in the panel shows what the scraper and the email
   finder are doing as it happens (filter by level or by the current job, pause, clear, save).
+- **Business types** – *Roofer*, *Plumber*, *HVAC* … (add your own): one choice in the search form
+  sets what Google Maps is searched for, the Google Drive folder, and the emails a campaign for
+  these businesses gets.
+- **Email outreach** – campaigns from one or more searches or from a lead file in Drive: a first
+  email and up to 4 follow-ups on the days you choose, per business type, edited in the panel
+  with a live preview. Sent from your own mailbox (SMTP) in a send window, a few minutes apart,
+  with a daily limit; any **reply, bounce or unsubscribe stops the follow-ups** (IMAP). Businesses
+  with a website of their own, only a BBB / placeholder address, or emailed before are left out
+  automatically. Nothing is sent before you press *Start*. See [docs/OUTREACH.md](docs/OUTREACH.md).
+- **Google Drive** – each search's CSV lands in `<your folder>/<business type>/`, campaigns can
+  run from a CSV / Google Sheet there, and each campaign's results are kept next to them. See
+  [docs/DRIVE.md](docs/DRIVE.md).
 - **CLI** for scripted or scheduled runs (`python cli.py dentists "Austin, TX" --website without -n 50`).
 - **JSON API** (FastAPI, OpenAPI docs at `/docs`) so the crawler can be driven by other tools.
 - Jobs are persisted on disk, survive restarts, can be cancelled, and partial results are kept.
 
 ## Quick start
 
-Requirements: **Python 3.11+**, ~400 MB disk for Chromium.
+Requirements: **Python 3.11+** ([python.org](https://www.python.org/downloads/) – tick *Add python.exe
+to PATH* while installing), ~400 MB disk for Chromium.
+
+**Windows, one click:** double-click **`start.bat`** in the project folder. The first time it sets
+everything up – a virtual environment, the Python packages and Chromium, a few minutes – and puts a
+**Google Maps Lead Crawler** shortcut on your desktop. From then on double-click that shortcut: the
+panel opens in your browser.
+
+The window that opens with it is the panel's console: the log shows there, and it has to stay open
+while campaigns are sending (minimise it). To stop the panel press **⏻ Stop** at the top right of the
+panel, or **Ctrl+C** in that window. When `requirements.txt` changes (after an update), the next start
+installs what's new by itself.
+
+**macOS / Linux:** `python3 start.py` does the same, without the shortcut.
+
+| `start.bat` / `start.py` option | What it does |
+| --- | --- |
+| `--port 8001` | use another port this time (for good: *Settings › Panel › Port*) |
+| `--no-browser` | don't open the panel in the browser |
+| `--reinstall` | install the packages and Chromium again |
+| `--shortcut` | make the desktop shortcut again (e.g. after moving the folder) |
+
+### Manual setup
+
+The same by hand, on any system:
 
 1. Create and activate a virtual environment:
 
@@ -84,7 +125,13 @@ python run.py
 
 ## Using the panel
 
-1. **Business type** – what you are looking for: `plumbers`, `hair salon`, `dentist`.
+The panel has three tabs: **Search** (below), **Outreach** (email campaigns, business types and
+their emails, the mailbox and Google Drive – see [the playbook](docs/PLAYBOOK.md)) and **Settings**
+(every setting, explained – see [Configuration](#configuration)).
+
+1. **Business type** – pick a saved type (*Roofer*, *Plumber* …): it fills in what to search for,
+   and the search's campaign and Drive folder follow from it. *Other* lets you type any search
+   (`hair salon`, `dentist`).
 2. **City / area** – where: `Austin, TX`, `Manchester`, `downtown Seattle`; several places
    separated by `;`. The panel shows the search it will run.
 3. **Search the whole area, not just Google's top ~120** (ticked by default, remembered) – searches
@@ -112,7 +159,11 @@ python run.py
    businesses found for “plumbers” in Austin, TX — that's every listing Google Maps has for this
    search (you asked for 200)."*
 8. **⬇ Download CSV** gives the 12-column file shown above; **Extended CSV** adds address,
-   category, website type, rating, place id, coordinates and where each email was found.
+   category, website type, rating, place id, coordinates and where each email was found. With
+   Google Drive connected, the CSV is also uploaded to the business type's folder when the search
+   finishes (**⇪ Save to Drive** uploads it again).
+9. **✉ Email these businesses** starts a campaign for them in the *Outreach* tab: check who is on
+   the list, check the emails (a live preview for each business), send yourself a test, *Start*.
 
 The **History** list keeps every job (stored as JSON under `data/jobs/`); click one to
 reload its rows, `✕` deletes it.
@@ -155,7 +206,11 @@ check – the CSV still holds what was found before, and the error line says wha
 
 ## Configuration
 
-Copy `.env.example` to `.env` and adjust. The most useful switches:
+Everything is in the panel's **Settings** tab, grouped and explained. Saving writes the `.env` file in
+the project folder, and the panel uses the new values at once – except its own address, port, data
+folder and log size, which need *Restart* (in the tab). You can also edit `.env` yourself
+(`.env.example` shows the format) and restart; an environment variable of your computer wins over
+both. The most useful switches:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -167,6 +222,10 @@ Copy `.env.example` to `.env` and adjust. The most useful switches:
 | `ENRICH_MAX_PAGES` | `6` | pages fetched per website when looking for contacts |
 | `ENRICH_BROWSER_FALLBACK` | `true` | render JS-only / bot-blocking sites with Chromium |
 | `WEB_SEARCH_DELAY_S` | `3.0` | pause between web searches (*Also search the web …*) |
+| `SMTP_HOST` / `IMAP_HOST` / `MAIL_USERNAME` / `MAIL_PASSWORD` | *(empty)* | your mailbox, for email campaigns ([playbook §1](docs/PLAYBOOK.md#1-your-mailbox-emails-go-out-from-it-replies-come-back-to-it)) |
+| `SENDER_NAME` / `SENDER_ADDRESS` | *(empty)* | who the emails are from; your postal address goes in every footer |
+| `OUTREACH_HOURS` / `OUTREACH_DAILY_LIMIT` | `8-12` / `30` | when emails go out (in `OUTREACH_TIMEZONE`) and how many a day |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `DRIVE_FOLDER` | *(empty)* | Google Drive ([playbook §2](docs/PLAYBOOK.md#2-google-drive)) |
 
 Every setting is listed in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#configuration-reference).
 
@@ -196,6 +255,8 @@ app/
   models.py            PlaceRow / Job pydantic models
   filters.py           search filters (website / contact rules)
   config.py            settings (env / .env)
+  settings_editor.py   the Settings tab: every setting's group and help, reading and writing .env
+  control.py           the panel's Stop / Restart buttons
   scraper/
     maps.py            Playwright Google Maps scraper
     area.py            map sections for whole-area searches
@@ -206,9 +267,12 @@ app/
     extractors.py      email / phone extraction & filtering
     sitefinder.py      finds websites a Google Maps listing does not show
     websearch.py       DuckDuckGo / Bing web search (never Google)
-  export/csv_export.py CSV column layout and writer
-  static/              the web panel (index.html, app.js, styles.css)
+  export/csv_export.py CSV column layout and writer (csv_import.py reads lead files back)
+  outreach/            email campaigns: business types, templates, leads, send window, mailbox, send loop
+  drive/               Google Drive: sign-in, folders per business type, uploads, lead files
+  static/              the web panel (index.html, app.js, outreach.js, settings.js, styles.css, icon.ico)
 cli.py                 command line entry point
+start.bat, start.py    one-click start: sets up what's missing, starts the panel, opens the browser
 run.py                 starts the web server
 tests/                 pytest suite (unit, API, docs-consistency)
 docs/                  documentation (see below)
@@ -219,7 +283,10 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 
 | Document | What it covers |
 | --- | --- |
+| [docs/PLAYBOOK.md](docs/PLAYBOOK.md) | **setting everything up, in order**: mailbox, Google Drive, business types, search, campaign, every day |
 | [docs/README.md](docs/README.md) | documentation index |
+| [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
+| [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |
 | [docs/ENRICHMENT.md](docs/ENRICHMENT.md) | how emails / phones are discovered on websites, the duplicate-row rule, and how websites a listing doesn't show are found |
@@ -252,4 +319,6 @@ tests that fail when a column, API route or setting is added without updating th
   come from their listing's description or their social / booking page, so most of them will
   have a phone but no email.
 - Emails are collected from public business websites. Make sure your outreach complies with
-  the laws that apply to you (CAN-SPAM, GDPR, PECR, …) and with Google's terms of service.
+  the laws that apply to you (CAN-SPAM, GDPR, PECR, CASL …) and with Google's terms of service. The
+  campaigns put your postal address and an opt-out line in every email and never email an
+  address twice after it answered, bounced or unsubscribed ([docs/OUTREACH.md](docs/OUTREACH.md#7-staying-on-the-right-side-of-the-rules)).

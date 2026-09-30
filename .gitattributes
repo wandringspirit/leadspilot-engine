@@ -3,3 +3,5 @@
 *.png binary
 *.jpg binary
 *.ico binary
+# cmd.exe reads batch files with Windows line endings
+*.bat text eol=crlf
