@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes how the Google Maps Lead Crawler is put together, how data flows
+This document describes how the Leads Pilot Engine is put together, how data flows
 through it and why it is built the way it is. Read [SCRAPING.md](SCRAPING.md) and
 [ENRICHMENT.md](ENRICHMENT.md) for the internals of the two crawlers.
 

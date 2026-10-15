@@ -84,7 +84,7 @@ sequenceDiagram
   "columns": ["Name", "City", "State", "Country", "Email", "Website", "Phone", "Phone Unformatted", "Url", "Rank", "Review Count", "Description"],
   "extended_columns": ["Name", "…", "Enrichment Status"],
   "server": { "can_stop": true, "can_restart": true, "url": "http://127.0.0.1:8000",
-              "env_file": "C:\\…\\google-maps-crawler\\.env" }
+              "env_file": "C:\\…\\leadspilot-engine\\.env" }
 }
 ```
 

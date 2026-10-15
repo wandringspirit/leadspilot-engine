@@ -1,4 +1,4 @@
-/* Google Maps Lead Crawler - Settings tab: every setting of the .env file, grouped and explained. Saving
+/* Leads Pilot Engine - Settings tab: every setting of the .env file, grouped and explained. Saving
  * writes .env, and the server uses the new values right away (the Panel group's after a restart). Also the
  * panel's Restart and Stop buttons. Talks to /api/settings and /api/server/* (docs/API.md); shares its
  * helpers with app.js through window.panel. */

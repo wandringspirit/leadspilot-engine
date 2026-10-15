@@ -30,7 +30,7 @@ flowchart LR
 Install Python 3.11 or newer from <https://www.python.org/downloads/> and tick *Add python.exe to
 PATH* while installing. Then double-click **`start.bat`** in the project folder. The first time
 takes a few minutes: it makes a virtual environment, installs the Python packages and Chromium, and
-puts a **Google Maps Lead Crawler** shortcut on your desktop. The panel opens in your browser.
+puts a **Leads Pilot Engine** shortcut on your desktop. The panel opens in your browser.
 
 From then on **double-click the desktop shortcut** to start the panel. (Right-click it › *Pin to
 taskbar* for one click.) The black window that opens with it is the panel's console: the log shows

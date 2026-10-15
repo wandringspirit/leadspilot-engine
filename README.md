@@ -1,4 +1,4 @@
-# Google Maps Lead Crawler
+# Leads Pilot Engine
 
 Search Google Maps for a type of business in a city (for example *plumbers* in *Austin, TX*),
 keep only the businesses you want — e.g. **no website of their own, but a phone or an email** —
@@ -74,7 +74,7 @@ to PATH* while installing), ~400 MB disk for Chromium.
 
 **Windows, one click:** double-click **`start.bat`** in the project folder. The first time it sets
 everything up – a virtual environment, the Python packages and Chromium, a few minutes – and puts a
-**Google Maps Lead Crawler** shortcut on your desktop. From then on double-click that shortcut: the
+**Leads Pilot Engine** shortcut on your desktop. From then on double-click that shortcut: the
 panel opens in your browser.
 
 The window that opens with it is the panel's console: the log shows there, and it has to stay open

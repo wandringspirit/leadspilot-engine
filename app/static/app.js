@@ -1,4 +1,4 @@
-/* Google Maps Lead Crawler - panel logic (vanilla JS, no build step).
+/* Leads Pilot Engine - panel logic (vanilla JS, no build step).
  * Talks to the JSON API documented in docs/API.md. */
 (() => {
   "use strict";

@@ -16,7 +16,7 @@ from app.control import control
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Google Maps Lead Crawler web panel")
+    parser = argparse.ArgumentParser(description="Leads Pilot Engine web panel")
     parser.add_argument("--host", default=settings.HOST)
     parser.add_argument("--port", type=int, default=settings.PORT)
     parser.add_argument("--reload", action="store_true", help="auto-reload on code changes (development)")

@@ -9,7 +9,7 @@
 | The desktop shortcut is missing, or does nothing after the folder moved | `start.bat --shortcut` (from a terminal in the project folder) makes it again. |
 | `playwright: command not found` / `Executable doesn't exist at …chrome-win…` | Run `python -m playwright install chromium` inside the activated virtual environment (or `start.bat --reinstall`). |
 | Linux: Chromium fails to start with missing `libnss3` / `libatk` … | `python -m playwright install-deps chromium` (needs sudo) |
-| `ModuleNotFoundError: No module named 'app'` when running `cli.py` | Run from the project root (`cd google-maps-crawler`) with the venv activated. |
+| `ModuleNotFoundError: No module named 'app'` when running `cli.py` | Run from the project root (`cd leadspilot-engine`) with the venv activated. |
 | `RuntimeError: no running event loop` | Routes in `app/main.py` must be `async def` (see DEVELOPMENT.md §6). |
 
 ## Scraping

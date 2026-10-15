@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.7.0 – 2026-10-15
+
+### Added
+- **Website generator** (`sites/`): `python sites/render.py <trade pack> <lead>` builds a
+  business's preview website in `data/sites/<lead>` from a design, a trade pack (its services,
+  photos, roof check, FAQ …) and the lead's details. The first trade is roofers. The "sites"
+  preview server shows them at <http://127.0.0.1:4173>.
+
+### Changed
+- The project is now called **Leads Pilot Engine** (GitHub: `wandringspirit/leadspilot-engine`,
+  formerly *Google Maps Lead Crawler*). The panel, its start window and the desktop shortcut carry
+  the new name. A shortcut made before keeps the old name; `start.bat --shortcut` makes the new one.
+
 ## 1.6.0 – 2026-09-30
 
 ### Added

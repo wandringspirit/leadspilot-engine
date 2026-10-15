@@ -40,7 +40,7 @@ ENV_FILE = Path(settings.model_config["env_file"])    # the .env the Settings ta
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    log.info("Google Maps Lead Crawler %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
+    log.info("Leads Pilot Engine %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
     outreach.start_loop()
     if settings.DRIVE_AUTO_UPLOAD:
@@ -52,7 +52,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="Google Maps Lead Crawler",
+    title="Leads Pilot Engine",
     version=__version__,
     description="Scrape Google Maps listings, enrich them with emails/phones from the business website, export CSV.",
     lifespan=lifespan,

@@ -1,4 +1,4 @@
-/* Google Maps Lead Crawler - Outreach tab: the setup checklist, the mailbox, campaigns, business types and
+/* Leads Pilot Engine - Outreach tab: the setup checklist, the mailbox, campaigns, business types and
  * their emails (vanilla JS, no build step). Talks to /api/outreach, /api/campaigns, /api/business-types and
  * /api/drive (docs/API.md); shares its helpers with app.js through window.panel. */
 (() => {

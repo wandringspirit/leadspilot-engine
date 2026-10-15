@@ -76,7 +76,7 @@ def test_health_and_config(client):
 def test_index_serves_panel(client):
     c, _ = client
     res = c.get("/")
-    assert res.status_code == 200 and "Google Maps Lead Crawler" in res.text
+    assert res.status_code == 200 and "Leads Pilot Engine" in res.text
 
 
 def test_scrape_validation(client):

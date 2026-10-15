@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT))
 from app import __version__                                     # noqa: E402 - plain Python, no packages
 from app.control import LAUNCHER_ENV, RESTART_CODE, browse_url   # noqa: E402
 
-NAME = "Google Maps Lead Crawler"
+NAME = "Leads Pilot Engine"
 VENV = ROOT / ".venv"
 REQUIREMENTS = ROOT / "requirements.txt"
 INSTALLED = VENV / "installed-requirements.txt"   # requirements.txt as it was when last installed

@@ -3,7 +3,7 @@ rem One-click start for the panel: double-click this file, or the desktop shortc
 rem "start.bat --shortcut" makes. The first run sets everything up (a few minutes) - see start.py.
 setlocal
 cd /d "%~dp0"
-title Google Maps Lead Crawler
+title Leads Pilot Engine
 
 if exist ".venv\Scripts\python.exe" (
     ".venv\Scripts\python.exe" start.py %*
