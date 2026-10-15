@@ -2,6 +2,8 @@
 
 ```
 DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL, or My Drive itself)
+  Leads Pilot - campaigns.csv      the master sheet: every campaign on one page (app/outreach/master.py)
+  Leads Pilot - activity.csv       everything that happened: searches, campaigns, emails, replies
   Roofer/                          one folder per business type (its name)
     roofing_in_houston_no_website_email_29_09_2026.csv    each search, when it finishes
     my_cleaned_list.csv            a lead file you put there - a campaign can run from it
@@ -13,7 +15,7 @@ DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL,
 
 A search's CSV is the extended export (the default columns first, then the
 extra ones); it is written again after an enrichment. Campaign results are
-uploaded when they changed, at most every ``RESULTS_EVERY``. Folders are made
+and the master sheet are uploaded when they changed, at most every ``RESULTS_EVERY``. Folders are made
 when missing and remembered for the session.
 """
 from __future__ import annotations
@@ -23,7 +25,7 @@ import hashlib
 import logging
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from app.config import Settings
 from app.drive.client import SHEET_TYPE, DriveClient, DriveError, folder_id_from
@@ -40,6 +42,7 @@ log = logging.getLogger(__name__)
 OUTREACH_FOLDER = "Outreach"
 RESULTS_EVERY = timedelta(minutes=5)     # campaign results are uploaded at most this often
 LOOP_S = 60
+MASTER_FILES = {"campaigns": "Leads Pilot - campaigns.csv", "activity": "Leads Pilot - activity.csv"}
 LEAD_FILE_TYPES = ("text/csv", "text/comma-separated-values", "application/vnd.ms-excel", SHEET_TYPE)
 
 
@@ -56,6 +59,8 @@ class DriveSync:
         self.last_error = ""
         self._folders: dict[tuple[str, ...], dict] = {}
         self._task: asyncio.Task | None = None
+        # the master sheet's files: part -> {id, link, hash, at}
+        self.master: dict[str, dict] = {}
 
     @property
     def connected(self) -> bool:
@@ -74,6 +79,8 @@ class DriveSync:
             "auto_upload": self.cfg.DRIVE_AUTO_UPLOAD,
             "problems": problems,
             "last_error": self.last_error,
+            "master": {part: {"name": MASTER_FILES[part], "link": file.get("link", ""), "at": file.get("at")}
+                       for part, file in self.master.items()},
         }
 
     # ------------------------------------------------------------------
@@ -172,9 +179,30 @@ class DriveSync:
             log.info("Google Drive: saved the results of %r to %s", campaign.name, path)
         return uploaded
 
-    def start_loop(self, outreach: "OutreachManager") -> None:
+    async def sync_master(self, parts: dict[str, bytes], *, force: bool = False) -> int:
+        """Upload the master sheet's files that changed (``parts``: campaigns / activity -> CSV)."""
+        now = datetime.now(timezone.utc)
+        uploaded = 0
+        for part, content in parts.items():
+            known = self.master.get(part, {})
+            digest = hashlib.sha1(content).hexdigest()
+            if not force and (digest == known.get("hash")
+                              or (known.get("at") and now - datetime.fromisoformat(known["at"]) < RESULTS_EVERY)):
+                continue
+            file = await self._upload((), MASTER_FILES[part], content, known.get("id", ""))
+            self.master[part] = {"id": file.get("id", ""), "link": file.get("webViewLink", ""), "hash": digest,
+                                 "at": now.isoformat()}
+            uploaded += 1
+        if uploaded:
+            log.info("Google Drive: master sheet saved (%s)", ", ".join(MASTER_FILES[p] for p in parts))
+        return uploaded
+
+    def start_loop(self, outreach: "OutreachManager",
+                   master: "Callable[[], dict[str, bytes]] | None" = None) -> None:
+        """Keep campaign results (and, with ``master`` - it makes the master sheet's files - the master
+        sheet) up to date in Drive."""
         if self._task is None or self._task.done():
-            self._task = asyncio.create_task(self._loop(outreach), name="drive")
+            self._task = asyncio.create_task(self._loop(outreach, master), name="drive")
 
     async def stop_loop(self) -> None:
         if self._task is not None:
@@ -183,13 +211,15 @@ class DriveSync:
                 await self._task
             self._task = None
 
-    async def _loop(self, outreach: "OutreachManager") -> None:
+    async def _loop(self, outreach: "OutreachManager", master: "Callable[[], dict[str, bytes]] | None") -> None:
         while True:
             await asyncio.sleep(LOOP_S)
             if not self.connected:
                 continue
             try:
                 await self.sync_campaigns(outreach)
+                if master is not None:
+                    await self.sync_master(master())
                 self.last_error = ""
             except DriveError as exc:
                 self.last_error = str(exc)

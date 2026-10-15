@@ -5,6 +5,7 @@
 | [PLAYBOOK.md](PLAYBOOK.md) | **set everything up in order** – mailbox, Google Drive, business types, search, campaign – and know what to do every day |
 | [../README.md](../README.md) | install and use the tool (panel, CLI, quick configuration) |
 | [OUTREACH.md](OUTREACH.md) | know how the email campaigns work: business types, templates, who gets emailed, when, replies, bounces |
+| [AUTOPILOT.md](AUTOPILOT.md) | let the tool find businesses and start campaigns by itself, and read the master sheet in Google Drive |
 | [SITES.md](SITES.md) | know how each business's preview website is made, who gets one, how long it stays online and how it is uploaded |
 | [DRIVE.md](DRIVE.md) | know where files go in Google Drive, what a lead file needs, how the sign-in works |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | understand the components, data flow, job state machine and the reasoning behind the design |

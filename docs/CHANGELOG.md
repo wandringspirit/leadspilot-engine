@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.10.0 – 2026-10-15
+
+### Added
+- **Autopilot** ([AUTOPILOT.md](AUTOPILOT.md)) finds businesses and starts their campaigns by itself.
+  It works through a list of places (20 in Texas to start) for one business type. When fewer than 10
+  businesses are waiting for a first email, it searches the next place and makes and starts that
+  place's campaign. It searches at most twice a day. It stops itself, pausing the campaigns, when 2 of
+  the last 20 businesses emailed bounced, and it also stops when Google blocks a search. Off until you
+  switch it on in the Outreach tab.
+- **Activity log**: every search, campaign, email, reply and bounce, in the Outreach tab and
+  `GET /api/activity`.
+- **Master sheet** in Google Drive: `Leads Pilot - campaigns.csv` has a row per campaign (emailed,
+  waiting, replied, bounced, emails sent …), and `Leads Pilot - activity.csv` holds the activity log.
+
 ## 1.9.0 – 2026-10-15
 
 ### Added

@@ -63,6 +63,9 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
 - **Preview websites** – every business a campaign emails gets its own website at
   `sites.leadspilot.co/<business>/`, and its first email waits until the website is online. See
   [docs/SITES.md](docs/SITES.md).
+- **Autopilot** – searches the next place on a list and starts its campaign whenever the
+  businesses to email run low; it stops itself on bounces or a Google block. A **master sheet** in
+  Google Drive shows every campaign and everything that happened. See [docs/AUTOPILOT.md](docs/AUTOPILOT.md).
 - **Google Drive** – each search's CSV lands in `<your folder>/<business type>/`, campaigns can
   run from a CSV / Google Sheet there, and each campaign's results are kept next to them. See
   [docs/DRIVE.md](docs/DRIVE.md).
@@ -289,6 +292,7 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/PLAYBOOK.md](docs/PLAYBOOK.md) | **setting everything up, in order**: mailbox, Google Drive, business types, search, campaign, every day |
 | [docs/README.md](docs/README.md) | documentation index |
 | [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
+| [docs/AUTOPILOT.md](docs/AUTOPILOT.md) | the autopilot (searches and campaigns by themselves) and the master sheet |
 | [docs/SITES.md](docs/SITES.md) | preview websites: how each business's site is made, who gets one, how long it stays online |
 | [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |

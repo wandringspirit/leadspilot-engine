@@ -322,6 +322,7 @@
 
   function show(kind) {
     els.intro.hidden = kind !== "intro";
+    for (const id of ["autopilot-card", "activity-card"]) $(id).hidden = kind !== "intro";
     els.newCard.hidden = kind !== "new";
     els.campCard.hidden = kind !== "campaign";
     els.leadsCard.hidden = kind !== "campaign";
@@ -1175,7 +1176,7 @@
   // polling while the tab is open
   // ------------------------------------------------------------------
   async function poll() {
-    await Promise.all([loadStatus(), loadCampaigns()]);
+    await Promise.all([loadStatus(), loadCampaigns(), window.autopilotPanel ? window.autopilotPanel.refresh() : null]);
     if (state.view.kind === "campaign" && state.campaign) {
       try {
         state.campaign = await api(`/api/campaigns/${state.campaign.id}`);

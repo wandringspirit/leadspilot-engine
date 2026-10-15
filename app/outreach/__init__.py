@@ -12,6 +12,9 @@ bounce or unsubscribe stops the follow-ups for that business.
 * ``mailbox.py``   SMTP to send, IMAP to notice replies; message building and parsing
 * ``manager.py``   OutreachManager: persistence, the API's operations, the send loop
 * ``sites.py``     SiteService: each lead's preview website, built, uploaded, first emails wait for it
+* ``autopilot.py`` Autopilot: searches the next place and starts its campaign when businesses run low
+* ``activity.py``  the activity log: what happened, in order
+* ``master.py``    the master sheet: every campaign on one page, and the activity log, as CSV
 
 See docs/OUTREACH.md.
 """

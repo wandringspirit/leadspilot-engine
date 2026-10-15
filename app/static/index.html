@@ -244,6 +244,63 @@
     </aside>
 
     <section class="content">
+      <!-- autopilot: searches the next place and starts its campaign by itself (docs/AUTOPILOT.md) -->
+      <section class="card" id="autopilot-card">
+        <div class="card-head wrap">
+          <div class="title-line">
+            <h2>Autopilot</h2>
+            <span class="pill" id="ap-state"></span>
+          </div>
+          <div class="toolbar">
+            <button class="btn primary" id="ap-toggle">Switch on</button>
+            <button class="btn" id="ap-edit-btn" aria-expanded="false">Places and limits</button>
+          </div>
+        </div>
+        <p class="muted" id="ap-summary"></p>
+        <div class="notice alert" id="ap-stopped" role="alert" hidden>
+          <span class="notice-icon" aria-hidden="true">!</span>
+          <div><strong>The autopilot stopped itself</strong><p id="ap-stopped-text"></p></div>
+        </div>
+        <div class="stat-row" id="ap-stats"></div>
+        <form class="editor-form" id="ap-form" hidden autocomplete="off">
+          <div class="grid-2">
+            <label for="ap-type">Looks for (its emails are used)
+              <select id="ap-type"></select></label>
+            <label for="ap-limit">Businesses wanted per search
+              <input id="ap-limit" type="number" min="1" max="500"></label>
+            <label for="ap-min">Search when fewer than this many wait for a first email
+              <input id="ap-min" type="number" min="1" max="500"></label>
+            <label for="ap-per-day">Searches a day, at most
+              <input id="ap-per-day" type="number" min="1" max="10"></label>
+          </div>
+          <label for="ap-places">Places, searched in this order – one per line, e.g. <em>Katy, TX</em>
+            <textarea id="ap-places" rows="8"></textarea></label>
+          <label for="ap-next">Next place to search
+            <select id="ap-next"></select></label>
+          <div class="row-start">
+            <button class="btn primary" type="submit">Save</button>
+            <button class="btn ghost" type="button" id="ap-cancel">Cancel</button>
+          </div>
+        </form>
+        <details class="ap-runs" id="ap-runs-box">
+          <summary>Recent searches</summary>
+          <ul class="activity" id="ap-runs"></ul>
+        </details>
+      </section>
+
+      <!-- everything that happened; the master sheet in Google Drive -->
+      <section class="card" id="activity-card">
+        <div class="card-head wrap">
+          <h2>Activity</h2>
+          <div class="toolbar" id="master-links">
+            <a class="btn small" href="/api/master/campaigns.csv">⇩ Campaigns sheet</a>
+            <a class="btn small" href="/api/master/activity.csv">⇩ Activity sheet</a>
+          </div>
+        </div>
+        <small class="muted block" id="master-note"></small>
+        <ul class="activity" id="activity-list"></ul>
+      </section>
+
       <section class="card" id="outreach-intro">
         <h2>Email the businesses you found</h2>
         <ol class="intro-steps">
@@ -442,6 +499,7 @@
   <div class="toast" id="toast" hidden></div>
   <script src="/static/app.js?v={{version}}"></script>
   <script src="/static/outreach.js?v={{version}}"></script>
+  <script src="/static/autopilot.js?v={{version}}"></script>
   <script src="/static/settings.js?v={{version}}"></script>
 </body>
 </html>

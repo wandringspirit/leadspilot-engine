@@ -24,7 +24,10 @@ from app.export.csv_export import column_headers, job_filename, rows_to_csv_byte
 from app.jobs import ACTIVE_STATES, JobManager
 from app.logbuffer import LEVELS, install as install_log_buffer, log_buffer
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
+from app.outreach.activity import ActivityLog
+from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.manager import OutreachError, OutreachManager
+from app.outreach.master import activity_csv, campaigns_csv
 from app.outreach.sites import SiteService
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
@@ -44,11 +47,13 @@ async def lifespan(_: FastAPI):
     log.info("Leads Pilot Engine %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
     outreach.start_loop()
+    autopilot.start_loop()
     if sites is not None and sites.unpublished():
         sites.request_upload()                  # an upload that hadn't happened when the server stopped
     if settings.DRIVE_AUTO_UPLOAD:
-        drive.start_loop(outreach)
+        drive.start_loop(outreach, master=_master_files)
     yield
+    await autopilot.stop_loop()
     await outreach.stop_loop()
     await drive.stop_loop()
     if sites is not None:
@@ -64,12 +69,24 @@ app = FastAPI(
 )
 manager = JobManager(settings)
 sites = SiteService(settings) if settings.PREVIEW_SITES else None
-outreach = OutreachManager(settings, sites=sites)
+activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
+outreach = OutreachManager(settings, sites=sites, activity=activity)
+autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 
 
+def _master_files() -> dict[str, bytes]:
+    """The master sheet's two files (app/outreach/master.py)."""
+    return {"campaigns": campaigns_csv(outreach.list_campaigns()), "activity": activity_csv(activity.entries())}
+
+
 async def _job_finished(job: Job) -> None:
-    """A search (or an enrichment) finished: put its CSV in Google Drive (DRIVE_AUTO_UPLOAD)."""
+    """A search (or an enrichment) finished: the autopilot makes its campaign, and its CSV goes to Google
+    Drive (DRIVE_AUTO_UPLOAD)."""
+    try:
+        await autopilot.job_finished(job)
+    except Exception:  # noqa: BLE001 - the Drive upload below still happens
+        log.exception("Autopilot: could not act on the finished search %s", job.id)
     if settings.DRIVE_AUTO_UPLOAD and drive.connected and job.rows:
         try:
             await _save_job_to_drive(job)
@@ -253,6 +270,34 @@ async def outreach_status() -> dict:
 async def outreach_check() -> dict:
     """Check the mailbox for replies and bounces now."""
     return await _outreach(outreach.check_now())
+
+
+@app.get("/api/autopilot")
+async def autopilot_status() -> dict:
+    """The autopilot: on or off, its places, what it's waiting for, its recent searches."""
+    return autopilot.status()
+
+
+@app.patch("/api/autopilot")
+async def update_autopilot(req: AutopilotUpdate) -> dict:
+    """Switch the autopilot on or off, change its business type, places or limits."""
+    return _outreach_call(autopilot.update, req)
+
+
+@app.get("/api/activity")
+async def get_activity(limit: int = Query(100, ge=1, le=5000)) -> list[dict]:
+    """What happened, newest first: searches, campaigns, emails, replies, bounces."""
+    return activity.entries(limit)
+
+
+@app.get("/api/master/{part}.csv")
+async def master_csv(part: str) -> Response:
+    """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log)."""
+    files = _master_files()
+    if part not in files:
+        raise HTTPException(404, "the master sheet has campaigns.csv and activity.csv")
+    return Response(content=files[part], media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="leads-pilot-{part}.csv"'})
 
 
 @app.get("/api/business-types", response_model=list[BusinessType])
@@ -497,7 +542,7 @@ async def _apply_settings(names: set[str]) -> None:
             await outreach.stop_loop()
     if "DRIVE_AUTO_UPLOAD" in names:
         if settings.DRIVE_AUTO_UPLOAD:
-            drive.start_loop(outreach)
+            drive.start_loop(outreach, master=_master_files)
         else:
             await drive.stop_loop()
     if names & {"DRIVE_FOLDER", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:

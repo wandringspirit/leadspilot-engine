@@ -19,6 +19,9 @@ a business's first email waits until its website is online. A business type with
 with emails that link it (``{Website}``); what they send - the first email, the link, the last email - and
 a reply decide how long the website stays online.
 
+Campaigns made, started, paused and finished, every email sent, every reply and bounce go into the
+activity log (``activity``, ``app/outreach/activity.py``) - for the panel and the master sheet.
+
 Emails carry no ``List-Unsubscribe`` header unless ``OUTREACH_UNSUBSCRIBE_HEADER`` is on: a one-to-one
 email with one has looked like a mailing to Gmail. Every footer says how to opt out by replying.
 
@@ -43,6 +46,7 @@ from pydantic import TypeAdapter
 
 from app.config import Settings
 from app.models import Job, JobStatus, PlaceRow, split_places
+from app.outreach.activity import ActivityLog
 from app.outreach.leads import leads_from_jobs
 from app.outreach.mailbox import (MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
                                   build_message, classify, imap_problems, mailbox_problems, new_message_id,
@@ -100,8 +104,9 @@ def steps_problems(steps: list[Step], footer: str) -> list[str]:
 class OutreachManager:
     def __init__(self, cfg: Settings, *, mailbox: MailboxClient | None = None,
                  clock: Callable[[], datetime] | None = None, rng: random.Random | None = None,
-                 sites: SiteService | None = None) -> None:
+                 sites: SiteService | None = None, activity: ActivityLog | None = None) -> None:
         self.cfg = cfg
+        self.activity = activity                 # None: nothing is written down (tests)
         self.mailbox: MailboxClient = mailbox or Mailbox(cfg)
         self.sites = sites                       # None: no preview websites, first emails don't wait
         self.clock = clock or (lambda: datetime.now(timezone.utc))
@@ -162,6 +167,11 @@ class OutreachManager:
         if self.sites is not None and self.sites.has_design(type_name):
             return {"steps": [Step(**step) for step in SITE_STEPS], "footer": SITE_FOOTER}
         return {"steps": default_steps(), "footer": DEFAULT_FOOTER}
+
+    def _note(self, what: str, detail: str = "", campaign: Campaign | None = None, lead: Lead | None = None) -> None:
+        if self.activity is not None:
+            self.activity.add(what, detail, campaign=campaign.name if campaign else "",
+                              business=lead.business if lead else "", email=lead.email if lead else "")
 
     def _save(self, campaign: Campaign) -> None:
         campaign.updated_at = self.clock()
@@ -346,6 +356,7 @@ class OutreachManager:
                 self.sites.request_upload()
             log.info("Campaign %r created: %d business(es) to email, %d left out", campaign.name, len(leads),
                      len(left_out))
+            self._note("Campaign created", f"{len(leads)} business(es) to email, {len(left_out)} left out", campaign)
             return campaign
 
     async def update(self, campaign: Campaign, req: CampaignUpdate) -> Campaign:
@@ -391,6 +402,7 @@ class OutreachManager:
             self._save(campaign)
             waiting = sum(lead.status in OPEN_STATUSES for lead in campaign.leads)
             log.info("Campaign %r started: %d business(es) to email", campaign.name, waiting)
+            self._note("Campaign started", f"{waiting} business(es) to email", campaign)
             return campaign
 
     async def pause(self, campaign: Campaign) -> Campaign:
@@ -399,6 +411,7 @@ class OutreachManager:
                 campaign.status = CampaignStatus.PAUSED
                 self._save(campaign)
                 log.info("Campaign %r paused", campaign.name)
+                self._note("Campaign paused", "by you", campaign)
             return campaign
 
     # -- Google Drive: app/drive/sync.py uploads, the campaign keeps where to -------
@@ -658,6 +671,7 @@ class OutreachManager:
         except RecipientRefused as exc:
             lead.status, lead.next_due, lead.note = LeadStatus.FAILED, None, str(exc)
             log.warning("Email %d to %s <%s> not sent: %s", step, lead.business, lead.email, exc)
+            self._note("Email refused", f"email {step}: {exc}", campaign, lead)
             self._mark_contacted(campaign, lead, "failed", now)       # never try this address again
             self._finish_if_done(campaign, now)
             self._save(campaign)
@@ -686,6 +700,7 @@ class OutreachManager:
         self._schedule(campaign, lead)
         log.info("Sent email %d of %d to %s <%s> (campaign %r)", step, len(campaign.steps), lead.business,
                  lead.email, campaign.name)
+        self._note("Email sent", f"email {step} of {len(campaign.steps)}: {subject}", campaign, lead)
         self._finish_if_done(campaign, now)
         self._save(campaign)
         self._after_send(now)
@@ -728,12 +743,22 @@ class OutreachManager:
             counts = campaign.counts()
             log.info("Campaign %r finished: %d replied, %d without a reply, %d bounced", campaign.name,
                      counts["replied"], counts["done"], counts["bounced"])
+            self._note("Campaign finished", f"{counts['replied']} replied, {counts['done']} without a reply, "
+                                            f"{counts['bounced']} bounced", campaign)
 
-    def _pause_all(self, reason: str) -> None:
+    def pause_running(self, reason: str) -> int:
+        """Pause every running campaign with ``reason`` (the autopilot's safety stop); how many."""
+        return self._pause_all(reason)
+
+    def _pause_all(self, reason: str) -> int:
+        paused = 0
         for campaign in self.campaigns.values():
             if campaign.status == CampaignStatus.RUNNING:
                 campaign.status, campaign.error = CampaignStatus.PAUSED, reason
                 self._save(campaign)
+                self._note("Campaign paused", reason, campaign)
+                paused += 1
+        return paused
 
     # ------------------------------------------------------------------
     # Replies and bounces
@@ -788,9 +813,12 @@ class OutreachManager:
             if kind == "auto_reply":
                 log.info("Automatic reply from %s <%s> (%s) - the follow-ups continue", lead.business,
                          message.sender, message.subject)
+                self._note("Automatic reply", message.subject, campaign, lead)
                 continue
             lead.status, lead.next_due = _STOPPED_BY[kind], None
             lead.note = message.subject or kind
+            self._note({"reply": "Reply", "bounce": "Bounce", "unsubscribe": "Unsubscribe"}[kind],
+                       message.subject or "", campaign, lead)
             if kind == "reply" and lead.site and self.sites is not None:
                 self.sites.record(lead.site, "replied_at", now)     # online while you talk
             self._mark_contacted(campaign, lead, lead.status.value, now)

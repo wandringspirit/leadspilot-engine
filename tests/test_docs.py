@@ -27,6 +27,7 @@ REQUIRED_DOCS = [
     "docs/CHANGELOG.md",
     "docs/PLAYBOOK.md",
     "docs/OUTREACH.md",
+    "docs/AUTOPILOT.md",
     "docs/DRIVE.md",
     "docs/SITES.md",
 ]

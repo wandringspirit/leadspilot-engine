@@ -19,6 +19,9 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | GET | `/api/logs` | live log lines (ring buffer with a sequence cursor) |
 | GET | `/api/outreach` | mailbox settings, send window, today's count, the last reply check |
 | POST | `/api/outreach/check` | check the mailbox for replies and bounces now |
+| GET / PATCH | `/api/autopilot` | the autopilot: status / switch it on or off, places, limits |
+| GET | `/api/activity` | what happened, newest first |
+| GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv` |
 | GET / POST | `/api/business-types` | list / add business types |
 | GET / PATCH / DELETE | `/api/business-types/{type_id}` | one business type: read, change, delete |
 | GET | `/api/business-types/{type_id}/preview` | its emails for two made-up businesses |
@@ -399,12 +402,29 @@ and `emails_sent`.
 - `POST /api/campaigns/{campaign_id}/drive` → `{"path": "Plumber/Outreach/plumber_houston_a1b2c3.csv",
   "link": "…"}` – uploads its results now ([DRIVE.md](DRIVE.md)).
 
+## Autopilot
+
+Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.md)).
+
+- `GET /api/autopilot` → `{"enabled", "business_type_id", "business_type_name", "places": ["Katy, TX", …],
+  "next_place", "next": "Sugar Land, TX", "min_waiting", "searches_per_day", "limit", "stopped": "",
+  "on_since", "waiting": 4, "searches_today": 1, "searching": "", "searching_job_id": "",
+  "holding": "why it isn't searching now", "runs": [{"place", "job_id", "started_at", "finished_at",
+  "found", "campaign_id", "emailing", "note"}]}` – `runs` newest first.
+- `PATCH /api/autopilot` `{enabled?, business_type_id?, places?, next_place?, min_waiting?,
+  searches_per_day?, limit?}` → the status. Switching it on clears `stopped` and starts the bounce
+  count afresh; `400` without a business type, `404` unknown business type.
+- `GET /api/activity?limit=100` → `[{"at", "what", "detail", "campaign", "business", "email"}]`,
+  newest first.
+- `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master sheet's files.
+
 ## Google Drive
 
 Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files: [DRIVE.md](DRIVE.md).
 
 - `GET /api/drive` → `{"configured": true, "connected": true, "email": "pat@gmail.com",
-  "folder": "Leads", "auto_upload": true, "problems": [], "last_error": ""}`.
+  "folder": "Leads", "auto_upload": true, "problems": [], "last_error": "", "master": {"campaigns":
+  {"name", "link", "at"}, "activity": {…}}}` – `master`: the master sheet's files once uploaded.
 - `POST /api/drive/connect` → `{"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?…"}` –
   open it in the browser; Google sends the browser back to `/` of this server, which stores the
   sign-in and redirects to `/?drive=connected#outreach` (or `/?drive=error&message=…`). `400` when
