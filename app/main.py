@@ -27,7 +27,7 @@ from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, 
 from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.manager import OutreachError, OutreachManager
-from app.outreach.master import activity_csv, campaigns_csv
+from app.outreach.master import activity_table, campaigns_table, to_csv
 from app.outreach.sites import SiteService
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
@@ -51,7 +51,7 @@ async def lifespan(_: FastAPI):
     if sites is not None and sites.unpublished():
         sites.request_upload()                  # an upload that hadn't happened when the server stopped
     if settings.DRIVE_AUTO_UPLOAD:
-        drive.start_loop(outreach, master=_master_files)
+        drive.start_loop(outreach, master=_master_tables)
     yield
     await autopilot.stop_loop()
     await outreach.stop_loop()
@@ -75,9 +75,9 @@ autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 
 
-def _master_files() -> dict[str, bytes]:
-    """The master sheet's two files (app/outreach/master.py)."""
-    return {"campaigns": campaigns_csv(outreach.list_campaigns()), "activity": activity_csv(activity.entries())}
+def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
+    """The master sheet's two tables (app/outreach/master.py)."""
+    return {"campaigns": campaigns_table(outreach.list_campaigns()), "activity": activity_table(activity.entries())}
 
 
 async def _job_finished(job: Job) -> None:
@@ -293,10 +293,10 @@ async def get_activity(limit: int = Query(100, ge=1, le=5000)) -> list[dict]:
 @app.get("/api/master/{part}.csv")
 async def master_csv(part: str) -> Response:
     """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log)."""
-    files = _master_files()
-    if part not in files:
+    tables = _master_tables()
+    if part not in tables:
         raise HTTPException(404, "the master sheet has campaigns.csv and activity.csv")
-    return Response(content=files[part], media_type="text/csv; charset=utf-8",
+    return Response(content=to_csv(tables[part]), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="leads-pilot-{part}.csv"'})
 
 
@@ -542,7 +542,7 @@ async def _apply_settings(names: set[str]) -> None:
             await outreach.stop_loop()
     if "DRIVE_AUTO_UPLOAD" in names:
         if settings.DRIVE_AUTO_UPLOAD:
-            drive.start_loop(outreach, master=_master_files)
+            drive.start_loop(outreach, master=_master_tables)
         else:
             await drive.stop_loop()
     if names & {"DRIVE_FOLDER", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:

@@ -5,6 +5,7 @@ The crawler keeps its files in your Google Drive, one folder per business type:
 - **Searches:** each search's CSV;
 - **Lead files:** lists a campaign can run from, including ones you put there yourself;
 - **Campaign results:** each campaign's results.
+- **The master sheet:** every campaign on one page, and everything that happened ([AUTOPILOT.md](AUTOPILOT.md#3-the-master-sheet)).
 
 Setting it up step by step: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive).
 

@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.11.0 – 2026-10-15
+
+### Changed
+- The master sheet is a **Google Sheet** with a Campaigns tab and an Activity tab. It has a purple
+  header that stays at the top, filter buttons, and rows coloured by status or by what happened. It
+  needs the Google Sheets API switched on in the Google Cloud project. Until then it is the two CSV
+  files, and the panel switches over by itself.
+
 ## 1.10.0 – 2026-10-15
 
 ### Added

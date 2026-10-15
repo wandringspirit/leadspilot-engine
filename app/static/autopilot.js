@@ -160,17 +160,20 @@
   function renderMaster(drive) {
     for (const old of els.masterLinks.querySelectorAll(".drive-link")) old.remove();
     const files = (drive && drive.master) || {};
-    for (const [part, label] of [["campaigns", "Campaigns sheet"], ["activity", "Activity sheet"]]) {
+    for (const [part, label] of [["activity", "Activity sheet"], ["campaigns", "Campaigns sheet"],
+      ["sheet", "Master sheet"]]) {
       if (!files[part] || !files[part].link) continue;
-      const a = el("a", "btn small drive-link", `↗ ${label} in Drive`);
+      const a = el("a", `btn small drive-link${part === "sheet" ? " primary" : ""}`, `↗ ${label} in Drive`);
       a.href = files[part].link; a.target = "_blank"; a.rel = "noopener";
       els.masterLinks.prepend(a);
     }
+    const saved = files.sheet || files.campaigns;
     els.masterNote.textContent = !drive || !drive.connected
       ? "Connect Google Drive and the master sheet – every campaign on one page, and this log – is kept there."
       : !drive.auto_upload ? "Uploading to Drive is off (Settings › Google Drive) – download the sheets here."
-      : files.campaigns ? `The master sheet in Google Drive (${drive.folder}) is updated within 5 minutes of a change.`
-      : `The master sheet goes to Google Drive (${drive.folder}) within a few minutes.`;
+      : (saved ? `The master sheet in Google Drive (${drive.folder}) is updated within 5 minutes of a change.`
+        : `The master sheet goes to Google Drive (${drive.folder}) within a few minutes.`) +
+        (drive.sheets_off ? ` For now as CSV files: ${drive.sheets_off}.` : "");
   }
 
   async function refresh() {

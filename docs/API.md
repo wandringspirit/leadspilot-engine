@@ -424,7 +424,9 @@ Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files:
 
 - `GET /api/drive` → `{"configured": true, "connected": true, "email": "pat@gmail.com",
   "folder": "Leads", "auto_upload": true, "problems": [], "last_error": "", "master": {"campaigns":
-  {"name", "link", "at"}, "activity": {…}}}` – `master`: the master sheet's files once uploaded.
+  {"name", "link", "at"}, "activity": {…}}, "sheets_off": "…"}` – `master`: where the master sheet
+  went: `{"sheet": {…}}` (the Google Sheet) or the two CSV files, with `sheets_off` saying why
+  (the Google Sheets API is off).
 - `POST /api/drive/connect` → `{"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?…"}` –
   open it in the browser; Google sends the browser back to `/` of this server, which stores the
   sign-in and redirects to `/?drive=connected#outreach` (or `/?drive=error&message=…`). `400` when
