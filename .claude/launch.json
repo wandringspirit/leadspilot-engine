@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["run.py", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "name": "sites",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "data/sites"],
+      "port": 4173
     }
   ]
 }

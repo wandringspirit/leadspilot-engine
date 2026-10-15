@@ -1,0 +1,42 @@
+{
+  "business": "Summit Ridge Roofing LLC",
+  "city": "Dallas",
+  "state": "TX",
+  "phone": "(214) 555-0187",
+  "email": "office@summitridgeroofing.example",
+  "rating": 4.8,
+  "reviews": 63,
+  "maps_url": "https://www.google.com/maps",
+  "service_area": [
+    {
+      "name": "Dallas",
+      "lat": 32.7767,
+      "lon": -96.797
+    },
+    {
+      "name": "Garland",
+      "lat": 32.9126,
+      "lon": -96.6389
+    },
+    {
+      "name": "Mesquite",
+      "lat": 32.7668,
+      "lon": -96.5992
+    },
+    {
+      "name": "Richardson",
+      "lat": 32.9483,
+      "lon": -96.7299
+    },
+    {
+      "name": "Irving",
+      "lat": 32.814,
+      "lon": -96.9489
+    },
+    {
+      "name": "Plano",
+      "lat": 33.0198,
+      "lon": -96.6989
+    }
+  ]
+}

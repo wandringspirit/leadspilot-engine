@@ -1,0 +1,379 @@
+{
+  "trade": "roofer",
+  "design": "bold",
+  "label": "Roofing",
+  "noun": "roofer",
+  "accents": [
+    {
+      "name": "safety orange",
+      "accent": "#FF5B1F",
+      "accent_text": "#B83A0A",
+      "accent_soft": "#FFE3D6"
+    },
+    {
+      "name": "amber",
+      "accent": "#F4A41C",
+      "accent_text": "#94570A",
+      "accent_soft": "#FDEBC8"
+    },
+    {
+      "name": "signal red",
+      "accent": "#F0452B",
+      "accent_text": "#B42A15",
+      "accent_soft": "#FDDCD5"
+    }
+  ],
+  "headlines": [
+    [
+      "Roofs built to take a",
+      "{{ state_name }} storm."
+    ],
+    [
+      "The roof over {{ city }}",
+      "starts here."
+    ],
+    [
+      "Leak today?",
+      "Dry tonight."
+    ]
+  ],
+  "hero_photos": [
+    {
+      "src": "assets/roofer/hero-texas.jpg",
+      "states": [
+        "TX"
+      ],
+      "rain": 0.45,
+      "alt": "Roofer working on a shingle roof as a storm clears at sunset, Texas flag by the garage",
+      "pos": "58% 42%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1574109900177-28860a7b4e5e",
+      "alt": "Storm clouds breaking over a house at dusk",
+      "pos": "50% 70%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1791252716105-a63dbeb040d8",
+      "alt": "Dark storm clouds rolling over a single-storey home",
+      "pos": "50% 60%"
+    },
+    {
+      "src": "assets/roofer/hero-texas-house.jpg",
+      "role": "cta",
+      "alt": "",
+      "pos": "60% 55%"
+    }
+  ],
+  "hero_sub": "Repairs, full replacements and storm damage for homes across {{ city }} and nearby. We get on the roof, show you photos of what we find, and put the price in writing before any work starts.",
+  "cta_primary": "Book a free inspection",
+  "marquee": [
+    "Roof repair",
+    "Roof replacement",
+    "Storm & hail damage",
+    "Leak detection",
+    "Gutters",
+    "Free inspections"
+  ],
+  "stats_extra": {
+    "value": "Free",
+    "label": "roof inspections"
+  },
+  "services": [
+    {
+      "slug": "roof-repair",
+      "icon": "hammer",
+      "title": "Roof Repair",
+      "blurb": "Missing shingles, lifted flashing, a drip in the hallway. Fixed properly, not patched and forgotten.",
+      "photo": "https://images.unsplash.com/photo-1635424824849-1b09bdcc55b1",
+      "alt": "Roofer fixing shingles with a nail gun"
+    },
+    {
+      "slug": "roof-replacement",
+      "icon": "layers",
+      "title": "Roof Replacement",
+      "blurb": "A full tear-off and a new roof system, usually finished in a day or two, with the yard cleaned up after.",
+      "photo": "https://images.unsplash.com/photo-1633759593085-1eaeb724fc88",
+      "alt": "Roofer tearing off old shingles"
+    },
+    {
+      "slug": "storm-damage",
+      "icon": "bolt",
+      "title": "Storm & Hail Damage",
+      "blurb": "Hail bruises, wind-lifted shingles, dented vents. We document everything with photos you can send to your insurer.",
+      "photo": "https://images.unsplash.com/photo-1791252716105-a63dbeb040d8",
+      "alt": "Storm clouds over a house"
+    },
+    {
+      "slug": "leak-detection",
+      "icon": "drop",
+      "title": "Leak Detection",
+      "blurb": "Water travels before it drips. We trace the leak back to where it actually gets in.",
+      "photo": "https://images.unsplash.com/photo-1653274575974-04a2e73bd23b",
+      "alt": "Rain drops splashing"
+    },
+    {
+      "slug": "gutters",
+      "icon": "gutter",
+      "title": "Gutters",
+      "blurb": "New gutters, repairs and clean-outs that keep water off your fascia and away from your foundation.",
+      "photo": "https://images.unsplash.com/photo-1560872247-cadc53160b00",
+      "alt": "Gutter running along a roof edge"
+    },
+    {
+      "slug": "inspections",
+      "icon": "search",
+      "title": "Free Inspections",
+      "blurb": "A top-to-bottom check with photos and a straight answer: repair, replace, or leave it alone for now.",
+      "photo": "https://images.unsplash.com/photo-1632759145351-1d592919f522",
+      "alt": "Roofer standing on a roof inspecting it"
+    }
+  ],
+  "explorer": {
+    "kind": "photo",
+    "kicker": "Interactive roof check",
+    "title": "Know your roof before you call anyone.",
+    "intro": "Tap a marker on the roof to see what goes wrong there, and the signs you can spot from the ground.",
+    "spots": [
+      {
+        "key": "shingles",
+        "label": "Shingles",
+        "x": 34,
+        "y": 31,
+        "service": "roof-repair",
+        "what": "Sun, wind and age dry shingles out until they curl, crack or blow off, leaving the layer underneath open to rain.",
+        "signs": [
+          "Curled, cracked or missing shingles",
+          "Bald patches where the granules have worn off",
+          "Granules collecting in the gutters"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "flashing",
+        "label": "Flashing",
+        "x": 59,
+        "y": 36,
+        "service": "leak-detection",
+        "what": "The metal strips around chimneys, walls and skylights. Most leaks start here, not in the middle of the roof.",
+        "signs": [
+          "Rust or gaps around the chimney",
+          "Water stains on the ceiling near a wall",
+          "Sealant that's cracked or peeling"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "ridge",
+        "label": "Ridge & vents",
+        "x": 37,
+        "y": 16,
+        "service": "roof-repair",
+        "what": "Without airflow, attic heat cooks shingles from underneath and pushes up cooling bills in a {{ state_name }} summer.",
+        "signs": [
+          "A very hot, stuffy attic",
+          "Shingles ageing faster on one side",
+          "Damaged or missing ridge caps"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "gutters",
+        "label": "Gutters",
+        "x": 89,
+        "y": 57,
+        "service": "gutters",
+        "what": "Blocked or sagging gutters spill water down the walls, rot the fascia boards and send water toward the foundation.",
+        "signs": [
+          "Water pouring over the edge in rain",
+          "Gutters pulling away from the house",
+          "Peeling paint or rot behind them"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "valleys",
+        "label": "Valleys",
+        "service": "leak-detection",
+        "what": "Where two slopes meet, the rain from both runs down one channel. Worn or badly cut valleys are one of the most common places for a leak to start.",
+        "signs": [
+          "Ceiling stains below where two roof slopes meet",
+          "Leaves and debris piling up in the valley",
+          "Cracked or lifted shingles along the valley line"
+        ],
+        "x": 45.7,
+        "y": 23,
+        "side": "right"
+      },
+      {
+        "key": "hail",
+        "label": "Hail damage",
+        "x": 73,
+        "y": 45,
+        "service": "storm-damage",
+        "what": "Hail knocks the granules off and bruises the mat underneath. It often looks minor from the ground and isn't.",
+        "signs": [
+          "Dark round marks on the shingles",
+          "Dents in vents, gutters or downspouts",
+          "A storm in the last few months"
+        ],
+        "side": "right"
+      }
+    ],
+    "photo": "assets/roofer/roof-check.jpg",
+    "crop": [
+      5,
+      1,
+      95,
+      91
+    ],
+    "alt": "A two-story stone house with a dark shingle roof and a brick chimney, with the parts of the roof marked"
+  },
+  "process": [
+    {
+      "title": "You call or book online",
+      "text": "Tell us what's going on. We'll set a time that suits you, usually within a few days."
+    },
+    {
+      "title": "We inspect the roof",
+      "text": "We get up there, check every part of it, and photograph anything that needs attention."
+    },
+    {
+      "title": "You get a written quote",
+      "text": "A clear price and what it covers, with the photos, before any work begins. No pressure."
+    },
+    {
+      "title": "Done right, cleaned up",
+      "text": "We do the work, clear away the debris and walk you through the finished roof."
+    }
+  ],
+  "why": {
+    "photo": "https://images.unsplash.com/photo-1635424709961-f3a150459ad4",
+    "alt": "Two roofers in safety harnesses working on shingles",
+    "title": "A roofer who shows you, not just tells you.",
+    "points": [
+      {
+        "icon": "pin",
+        "title": "Local to {{ city }}",
+        "text": "We work in {{ city }} and the towns around it, so we're never far away when you need us."
+      },
+      {
+        "icon": "camera",
+        "title": "Photos of everything",
+        "text": "You see exactly what we see on your roof, so you never have to take our word for it."
+      },
+      {
+        "icon": "doc",
+        "title": "Prices in writing",
+        "text": "A clear written quote before we start. The number we agree is the number you pay."
+      },
+      {
+        "icon": "broom",
+        "title": "Clean site, every time",
+        "text": "Nails, scraps and old shingles cleared before we leave. Your yard stays your yard."
+      }
+    ]
+  },
+  "gallery": [
+    {
+      "src": "https://images.unsplash.com/photo-1710139323182-69622cad5c3b",
+      "alt": "Homes with new architectural shingle roofs",
+      "tag": "Architectural shingles"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1786550860403-4a58f184643e",
+      "alt": "Single-storey home with a grey hip roof at dusk",
+      "tag": "Hip roof"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1635424824800-692767998d07",
+      "alt": "Roofer sealing a roof",
+      "tag": "Repair & sealing"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1727777266423-6a33048e4894",
+      "alt": "Close-up of new shingle rows",
+      "tag": "Shingle detail"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1634750009079-6bf7bede038b",
+      "alt": "Crew working on a roof tear-off",
+      "tag": "Tear-off"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1638529241329-aa063b0e9f62",
+      "alt": "Brick house under a stormy sky",
+      "tag": "Storm season"
+    }
+  ],
+  "faq": [
+    {
+      "q": "How do I know if I need a repair or a whole new roof?",
+      "a": "It depends on the roof's age, how widespread the damage is and the state of the decking underneath. After the inspection we'll tell you plainly which one makes sense, and show you the photos that back it up."
+    },
+    {
+      "q": "Will my insurance cover hail or storm damage?",
+      "a": "Many policies cover storm and hail damage, but it depends on yours. We photograph and document everything we find so you can send it straight to your insurance company."
+    },
+    {
+      "q": "How long does a roof replacement take?",
+      "a": "Most homes take one to two days once the materials arrive. Bigger or more complex roofs can take longer, and we'll give you a timeline with your quote."
+    },
+    {
+      "q": "How long does a shingle roof last in {{ state_name }}?",
+      "a": "Usually somewhere between 15 and 25 years, depending on the shingles, how well the attic is ventilated, and how many storms it has taken."
+    },
+    {
+      "q": "My roof is leaking right now. What should I do?",
+      "a": "Move anything valuable out of the way, put a bucket under the drip, and call us. Please don't climb onto a wet roof yourself."
+    },
+    {
+      "q": "Do you charge for inspections?",
+      "a": "No. The inspection is free, and so is the written quote that comes with it."
+    }
+  ],
+  "quote_options": [
+    {
+      "value": "leak",
+      "label": "It's leaking",
+      "icon": "drop"
+    },
+    {
+      "value": "storm",
+      "label": "Storm or hail damage",
+      "icon": "bolt"
+    },
+    {
+      "value": "replace",
+      "label": "I need a new roof",
+      "icon": "layers"
+    },
+    {
+      "value": "check",
+      "label": "Just want it checked",
+      "icon": "search"
+    }
+  ],
+  "cta_title": [
+    "Storm on the way?",
+    "Leak already here?"
+  ],
+  "footer_blurb": "Roof repairs, replacements and storm damage for homes in {{ city }} and the surrounding area.",
+  "nav_explorer": "Roof check",
+  "area_title": [
+    "Roofing across {{ city }}",
+    "and nearby."
+  ],
+  "quote_kicker": "Free inspection",
+  "quote_title": [
+    "Get your roof checked.",
+    "Free."
+  ],
+  "quote_question": "What's going on with the roof?",
+  "logo_strip": [
+    "Roofing Company",
+    "Roofing Co",
+    "Roofing",
+    "Roofers",
+    "Roof"
+  ]
+}

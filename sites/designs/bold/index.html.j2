@@ -1,0 +1,429 @@
+{% set t = trade %}
+{% macro stars(r, cls="") %}<span class="stars {{ cls }}" style="--r:{{ r }}" aria-hidden="true"><span class="stars-row">{% for _ in range(5) %}<svg><use href="#i-star"/></svg>{% endfor %}</span><span class="stars-row stars-fill">{% for _ in range(5) %}<svg><use href="#i-star"/></svg>{% endfor %}</span></span>{% endmacro %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ business }} | {{ t.label }} in {{ city }}{% if state %}, {{ state }}{% endif %}</title>
+<meta name="description" content="{{ t.footer_blurb }}{% if phone %} Call {{ phone }}.{% endif %}">
+{% if preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<meta name="theme-color" content="#0A1120">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="{{ hero.src | img(1400) }}" imagesrcset="{{ hero.src | srcset }}" imagesizes="100vw">
+<link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add("js");setTimeout(function(){if(!window.siteReady)document.documentElement.classList.remove("js")},4000)</script>
+<style>:root{--accent:{{ accent.accent }};--accent-text:{{ accent.accent_text }};--accent-soft:{{ accent.accent_soft }}}</style>
+<script type="application/ld+json">
+{{ {"@context": "https://schema.org", "@type": "RoofingContractor", "name": business, "telephone": phone, "email": email,
+    "address": {"@type": "PostalAddress", "addressLocality": city, "addressRegion": state},
+    "areaServed": area} | tojson }}
+</script>
+</head>
+<body{% if preview %} class="is-preview"{% endif %}>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 5l7 7-7 7"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 17 17 7M8 7h9v9"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 12-8.4 8.4a2.1 2.1 0 0 1-3-3L12 9m5.6-3.4L14.5 2.5 11 6l3.1 3.1m3.5-3.5 2.4-.4 1.5 1.5-.4 2.4-2.4 2.4-4.6-4.6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m12 2 10 5-10 5L2 7zm-10 10 10 5 10-5M2 17l10 5 10-5"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 2.7s-6.5 7.1-6.5 11.8a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.7 12 2.7z"/></symbol>
+    <symbol id="i-gutter" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2 6h20v3a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3zm15 6v6a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm10 2-4.3-4.3"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 0v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-broom" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19.4 2.6 12 10m-6.5 1.5 7 7M4 13l-2 7 5.5-1.5M5.5 11.5 9 8l7 7-3.5 3.5"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2-5.3A8.4 8.4 0 1 1 21 11.5z"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm18 2-10 7L2 6"/></symbol>
+    <symbol id="i-roof" viewBox="0 0 32 32"><path fill="currentColor" d="M16 3 1 15.2l3 3.6 12-9.8 12 9.8 3-3.6zm-7 13.5V29h5.5v-7h3v7H23V16.5L16 11z"/></symbol>
+  </defs>
+</svg>
+
+<div class="top" data-top>
+  {% if preview %}
+  <div class="pv" role="region" aria-label="Website preview">
+    <span class="pv-dot" aria-hidden="true"></span>
+    <p class="pv-msg"><span class="pv-long">Free preview of your new website. It goes offline in</span><span class="pv-short">Ends in</span></p>
+    <p class="pv-timer" data-ends="{{ preview_ends }}" aria-live="off">
+      <span><b data-u="d">7</b>d</span><span><b data-u="h">00</b>h</span><span><b data-u="m">00</b>m</span><span class="pv-s"><b data-u="s">00</b>s</span>
+    </p>
+    <a class="pv-keep" href="{{ keep_href }}">Keep this site</a>
+  </div>
+  {% endif %}
+  <div class="bar" aria-hidden="true"><span data-progress></span></div>
+  <header class="hd">
+    <div class="wrap hd-in">
+      <a class="logo" href="#top" aria-label="{{ business }}, home">
+        <span class="logo-badge" aria-hidden="true"><svg><use href="#i-roof"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="#services">Services</a>
+        <a href="#explore">{{ t.nav_explorer }}</a>
+        <a href="#why">Why us</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#area">Service area</a>
+      </nav>
+      <div class="hd-cta">
+        {% if phone %}<a class="hd-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        <a class="btn btn-accent btn-sm" href="#quote" data-magnetic>Free inspection</a>
+        <button class="burger" type="button" aria-expanded="false" aria-controls="menu" data-burger><span></span><span></span><span class="sr">Menu</span></button>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="menu" id="menu" hidden data-menu>
+  <nav aria-label="Mobile">
+    {% for href, label in [("#services", "Services"), ("#explore", t.nav_explorer), ("#why", "Why us"), ("#reviews", "Reviews"), ("#area", "Service area"), ("#quote", "Free inspection")] %}
+    <a href="{{ href }}" style="--i:{{ loop.index0 }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% if phone %}<a class="btn btn-accent btn-lg" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call {{ phone }}</a>{% endif %}
+</div>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero" data-hero>
+    <div class="hero-media">
+      <img src="{{ hero.src | img(1400) }}" srcset="{{ hero.src | srcset }}" sizes="100vw" alt="{{ hero.alt }}" style="object-position:{{ hero.pos }}" width="2000" height="1250" fetchpriority="high">
+    </div>
+    <canvas class="rain" data-rain="{{ hero.rain | default(1) }}" aria-hidden="true"></canvas>
+    <div class="flash" data-flash aria-hidden="true"></div>
+    <div class="hero-shade" aria-hidden="true"></div>
+    <div class="wrap hero-in">
+      <p class="chip chip-glass hero-chip"><span class="live-dot" aria-hidden="true"></span>{{ t.label }} in {{ city }}{% if state %}, {{ state }}{% endif %}</p>
+      <h1 class="hero-title">
+        {% set n = namespace(i=0) %}
+        {% for line in headline %}
+        <span class="line{% if loop.last %} line-accent{% endif %}">{% for w in line.split() %}<span class="wm"><span class="wi" style="--i:{{ n.i }}">{{ w }}</span></span>{% set n.i = n.i + 1 %}{% if not loop.last %} {% endif %}{% endfor %}{% if loop.last %}<svg class="scribble" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true"><path d="M3 14c50-8 120-11 180-8 40 2 80 5 114 1"/></svg>{% endif %}</span>
+        {% endfor %}
+      </h1>
+      <p class="hero-sub">{{ t.hero_sub }}</p>
+      <div class="hero-ctas">
+        {% if phone %}<a class="btn btn-accent btn-lg" href="{{ phone_href }}" data-magnetic><svg aria-hidden="true"><use href="#i-phone"/></svg>Call {{ phone }}</a>{% endif %}
+        <a class="btn btn-glass btn-lg" href="#quote">{{ t.cta_primary }}<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </div>
+      {% if rating and reviews %}
+      <a class="rate-card" href="{{ reviews_url }}" target="_blank" rel="noopener">
+        <span class="rate-num">{{ "%.1f" | format(rating) }}</span>
+        <span class="rate-meta">
+          {{ stars(rating) }}
+          <span>{{ reviews }} Google reviews</span>
+        </span>
+        <svg class="rate-go" aria-hidden="true"><use href="#i-out"/></svg>
+      </a>
+      {% endif %}
+    </div>
+    <a class="scroll-cue" href="#services" aria-label="Scroll to services"><span></span></a>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="mq" aria-hidden="true">
+    <div class="mq-track">
+      {% for _ in range(2) %}
+      <div class="mq-set">{% for item in t.marquee %}<span>{{ item }}</span><svg><use href="#i-roof"/></svg>{% endfor %}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <section class="stats wrap" aria-label="At a glance">
+    {% if rating and reviews %}
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ rating }}" data-decimals="1">{{ "%.1f" | format(rating) }}</span><svg class="stat-star" aria-hidden="true"><use href="#i-star"/></svg></p><p class="stat-label">Google rating</p></div>
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ reviews }}">{{ reviews }}</span></p><p class="stat-label">reviews from local homeowners</p></div>
+    {% endif %}
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ area | length }}">{{ area | length }}</span></p><p class="stat-label">{{ "city" if area | length == 1 else "cities" }} we cover</p></div>
+    <div class="stat" data-reveal><p class="stat-num">{{ t.stats_extra.value }}</p><p class="stat-label">{{ t.stats_extra.label }}</p></div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="sec svc" id="services">
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">What we do</p>
+        <h2 class="h2">Every part of your roof, <em>handled.</em></h2>
+      </div>
+      <div class="bento">
+        {% for s in t.services %}
+        <a class="card card-{{ loop.index }}" href="#quote" data-service="{{ s.slug }}" data-tilt data-reveal style="--d:{{ loop.index0 }}">
+          <img src="{{ s.photo | img(900, 700) }}" alt="{{ s.alt }}" loading="lazy" width="900" height="700">
+          <span class="card-shade" aria-hidden="true"></span>
+          <span class="card-num" aria-hidden="true">0{{ loop.index }}</span>
+          <span class="card-body">
+            <svg class="card-icon" aria-hidden="true"><use href="#i-{{ s.icon }}"/></svg>
+            <span class="card-title">{{ s.title }}</span>
+            <span class="card-text">{{ s.blurb }}</span>
+            <span class="card-go">Get a quote <svg aria-hidden="true"><use href="#i-arrow"/></svg></span>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ROOF CHECK -->
+  {% set x = t.explorer %}
+  <section class="sec xp" id="explore">
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">{{ x.kicker }}</p>
+        <h2 class="h2">{{ x.title }}</h2>
+        <p class="lead">{{ x.intro }}</p>
+      </div>
+      <div class="xp-grid">
+        <div class="xp-stage" data-reveal>
+          <div class="xp-zoom" data-zoom>
+            <img src="{{ x.photo | img(1400) }}" srcset="{{ x.photo | srcset }}" sizes="(max-width: 900px) 100vw, 60vw" alt="{{ x.alt }}" loading="lazy" width="1920" height="1088">
+            {% for s in x.spots %}
+            <button class="pin pin-{{ s.side }}{% if loop.first %} is-on{% endif %}" type="button" style="left:{{ s.x }}%;top:{{ s.y }}%" data-spot="{{ s.key }}" data-x="{{ s.x }}" data-y="{{ s.y }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><span class="pin-dot" aria-hidden="true">{{ loop.index }}</span><span class="pin-label"><b>0{{ loop.index }}</b> {{ s.label }}</span></button>
+            {% endfor %}
+          </div>
+          <p class="xp-hint" aria-hidden="true"><span class="live-dot"></span>Tap a marker</p>
+        </div>
+        <div class="xp-panel" data-reveal>
+          {% for s in x.spots %}
+          <article class="xp-card" data-card="{{ s.key }}"{% if not loop.first %} hidden{% endif %}>
+            <p class="xp-count">0{{ loop.index }} <span>/ 0{{ x.spots | length }}</span></p>
+            <h3>{{ s.label }}</h3>
+            <p class="xp-what">{{ s.what }}</p>
+            <p class="xp-sub">Signs to look for</p>
+            <ul>{% for sign in s.signs %}<li><svg aria-hidden="true"><use href="#i-check"/></svg>{{ sign }}</li>{% endfor %}</ul>
+            <a class="link-go" href="#quote" data-pick="{{ s.service }}">Not sure? We'll check it for free <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+          {% endfor %}
+          <div class="xp-nav">
+            <button class="xp-arrow xp-prev" type="button" data-xp-step="-1" aria-label="Previous part of the roof"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <span class="xp-dots" aria-hidden="true">{% for s in x.spots %}<i data-dot="{{ s.key }}"{% if loop.first %} class="is-on"{% endif %}></i>{% endfor %}</span>
+            <button class="xp-arrow" type="button" data-xp-step="1" aria-label="Next part of the roof"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROCESS -->
+  <section class="sec proc" data-proc>
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">How it works</p>
+        <h2 class="h2">From first call to <em>clean driveway.</em></h2>
+      </div>
+      <div class="steps-wrap">
+      <span class="steps-line" aria-hidden="true"><span></span></span>
+      <ol class="steps">
+        {% for p in t.process %}
+        <li class="step" data-reveal style="--d:{{ loop.index0 }}">
+          <span class="step-num">0{{ loop.index }}</span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.text }}</p>
+        </li>
+        {% endfor %}
+      </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY US -->
+  <section class="sec why" id="why">
+    <div class="wrap why-grid">
+      <figure class="why-media" data-reveal>
+        <div class="why-img"><img src="{{ t.why.photo | img(1100, 1300) }}" alt="{{ t.why.alt }}" loading="lazy" width="1100" height="1300" data-parallax></div>
+        <figcaption class="why-badge"><svg aria-hidden="true"><use href="#i-pin"/></svg><span>Based in<br><b>{{ city }}{% if state %}, {{ state }}{% endif %}</b></span></figcaption>
+      </figure>
+      <div class="why-copy">
+        <div data-reveal>
+          <p class="kicker">Why {{ business }}</p>
+          <h2 class="h2">{{ t.why.title }}</h2>
+        </div>
+        <ul class="why-list">
+          {% for p in t.why.points %}
+          <li data-reveal style="--d:{{ loop.index0 }}">
+            <span class="why-icon"><svg aria-hidden="true"><use href="#i-{{ p.icon }}"/></svg></span>
+            <span><b>{{ p.title }}</b>{{ p.text }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORK -->
+  <section class="sec work">
+    <div class="wrap work-head" data-reveal>
+      <div>
+        <p class="kicker">Our work</p>
+        <h2 class="h2">Built to last. <em>Built to look good.</em></h2>
+      </div>
+      {% if preview %}<p class="chip chip-note">Sample photos. Your own jobs go here.</p>{% endif %}
+    </div>
+    <div class="work-rail" data-rail tabindex="0" aria-label="Photo gallery, scroll sideways">
+      {% for g in t.gallery %}
+      <figure class="shot" data-reveal style="--d:{{ loop.index0 }}">
+        <img src="{{ g.src | img(800, 1000) }}" alt="{{ g.alt }}" loading="lazy" width="800" height="1000" draggable="false">
+        <figcaption>{{ g.tag }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    <div class="wrap"><div class="rail-bar" aria-hidden="true"><span data-rail-bar></span></div></div>
+  </section>
+
+  <!-- REVIEWS -->
+  {% if rating and reviews %}
+  <section class="sec rev" id="reviews">
+    <div class="wrap rev-in" data-reveal>
+      <div class="ring" style="--r:{{ rating }}" data-ring>
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="54" class="ring-bg"/><circle cx="60" cy="60" r="54" class="ring-fg" pathLength="100"/></svg>
+        <p><span data-count="{{ rating }}" data-decimals="1">{{ "%.1f" | format(rating) }}</span><small>out of 5</small></p>
+      </div>
+      <div class="rev-copy">
+        <p class="kicker">Reviews</p>
+        <h2 class="h2">{{ reviews }} homeowners have had their say.</h2>
+        <p class="stars-wrap" data-reveal>{{ stars(rating, "stars-lg") }}</p>
+        <p class="lead">Rated {{ "%.1f" | format(rating) }} out of 5 on Google. Read what they say, in their own words.</p>
+        <a class="btn btn-dark btn-lg" href="{{ reviews_url }}" target="_blank" rel="noopener">Read our Google reviews<svg aria-hidden="true"><use href="#i-out"/></svg></a>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- SERVICE AREA -->
+  <section class="sec area" id="area">
+    <div class="wrap area-grid{% if not area_map %} is-plain{% endif %}">
+      <div data-reveal>
+        <p class="kicker">Service area</p>
+        <h2 class="h2">{{ t.area_title[0] }} <em>{{ t.area_title[1] }}</em></h2>
+        <p class="lead">Not sure if you're in our area? Call us. If we can't help, we'll tell you straight away.</p>
+        <ul class="chips">{% for c in area %}<li data-reveal style="--d:{{ loop.index0 }}"><svg aria-hidden="true"><use href="#i-pin"/></svg>{{ c }}</li>{% endfor %}</ul>
+      </div>
+      {% if area_map %}
+      {% set m = area_map %}
+      <figure class="map" data-reveal>
+        <div class="map-canvas" aria-hidden="true">
+          <svg class="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {% for r in m.rings %}<circle cx="{{ m.home.x }}" cy="{{ m.home.y }}" r="{{ r.r }}"/>{% endfor %}
+            {% for c in m.towns %}<line x1="{{ m.home.x }}" y1="{{ m.home.y }}" x2="{{ c.x }}" y2="{{ c.y }}" pathLength="1" style="--d:{{ loop.index0 }}"/>{% endfor %}
+          </svg>
+          {% for r in m.rings if r.ly is not none %}<span class="map-ring" style="left:{{ m.home.x }}%;top:{{ r.ly }}%">{{ r.label }}</span>{% endfor %}
+          {% for c in m.towns %}
+          <span class="town town-{{ c.side }}" style="left:{{ c.x }}%;top:{{ c.y }}%;--d:{{ loop.index0 }}"><i></i><span><b>{{ c.name }}</b><small>{{ c.mi }} mi</small></span></span>
+          {% endfor %}
+          <span class="map-home" style="left:{{ m.home.x }}%;top:{{ m.home.y }}%"><span class="map-pulse"></span><svg><use href="#i-roof"/></svg><b>{{ m.home.name }}</b></span>
+          <span class="map-north">N</span>
+        </div>
+        <figcaption>Straight-line distances from {{ m.home.name }}.</figcaption>
+      </figure>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- QUOTE -->
+  <section class="sec quote" id="quote">
+    <div class="wrap quote-grid">
+      <div class="quote-copy" data-reveal>
+        <p class="kicker">{{ t.quote_kicker }}</p>
+        <h2 class="h2">{{ t.quote_title[0] }} <em>{{ t.quote_title[1] }}</em></h2>
+        <p class="lead">Three quick questions and we'll call you back to set a time. Rather talk now? Call us.</p>
+        {% if phone %}<a class="big-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        {% if email %}<a class="quote-mail" href="mailto:{{ email }}"><svg aria-hidden="true"><use href="#i-mail"/></svg>{{ email }}</a>{% endif %}
+      </div>
+      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-business="{{ business }}" novalidate data-reveal>
+        <div class="qf-progress" aria-hidden="true"><span data-qf-bar></span></div>
+        <p class="qf-count" aria-live="polite">Step <b data-qf-step>1</b> of 3</p>
+        <fieldset class="qf-step" data-step="1">
+          <legend>{{ t.quote_question }}</legend>
+          <div class="qf-opts">
+            {% for o in t.quote_options %}
+            <label class="opt"><input type="radio" name="problem" value="{{ o.label }}" data-val="{{ o.value }}" required><span><svg aria-hidden="true"><use href="#i-{{ o.icon }}"/></svg>{{ o.label }}</span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <fieldset class="qf-step" data-step="2" hidden>
+          <legend>Where's the property?</legend>
+          <label class="field"><span>Street address or ZIP code</span><input name="address" autocomplete="street-address" required></label>
+          <label class="field"><span>How soon do you need us?</span>
+            <select name="when"><option>As soon as possible</option><option>This week</option><option>In the next month</option><option>Just planning ahead</option></select>
+          </label>
+        </fieldset>
+        <fieldset class="qf-step" data-step="3" hidden>
+          <legend>Who should we call?</legend>
+          <label class="field"><span>Your name</span><input name="name" autocomplete="name" required></label>
+          <label class="field"><span>Phone number</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
+        </fieldset>
+        <p class="qf-error" data-qf-error role="alert" hidden></p>
+        <div class="qf-nav">
+          <button class="btn btn-ghost" type="button" data-qf-back hidden>Back</button>
+          <button class="btn btn-accent btn-lg" type="submit" data-qf-next>Next<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="qf-done" data-qf-done hidden>
+          <svg class="qf-tick" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="m15 27 7 7 15-16"/></svg>
+          <h3>Thanks<span data-qf-name></span>. We've got it.</h3>
+          <p>{{ business }} will call you back shortly to set a time.{% if phone %} Can't wait? Call <a href="{{ phone_href }}">{{ phone }}</a>.{% endif %}</p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sec faq">
+    <div class="wrap faq-grid">
+      <div data-reveal>
+        <p class="kicker">Questions</p>
+        <h2 class="h2">Straight answers.</h2>
+        <p class="lead">Something else on your mind?{% if phone %} Call <a class="nowrap" href="{{ phone_href }}">{{ phone }}</a>.{% endif %}</p>
+      </div>
+      <div class="faq-list">
+        {% for f in t.faq %}
+        <details data-reveal style="--d:{{ loop.index0 }}"><summary>{{ f.q }}<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><p>{{ f.a }}</p></div></details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta{% if cta_photo %} has-photo{% endif %}">
+    {% if cta_photo %}<img class="cta-photo" src="{{ cta_photo.src | img(1400) }}" srcset="{{ cta_photo.src | srcset }}" sizes="100vw" alt="" loading="lazy" width="2000" height="1133" style="object-position:{{ cta_photo.pos }}">{% endif %}
+    <canvas class="cta-rain" data-rain="0.35" aria-hidden="true"></canvas>
+    <div class="wrap cta-in" data-reveal>
+      <h2 class="cta-title">{{ t.cta_title[0] }}<br><em>{{ t.cta_title[1] }}</em></h2>
+      <div class="hero-ctas">
+        {% if phone %}<a class="btn btn-accent btn-xl" href="{{ phone_href }}" data-magnetic><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        <a class="btn btn-glass btn-xl" href="#quote">{{ t.cta_primary }}</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="wrap ft-grid">
+    <div>
+      <a class="logo" href="#top" aria-label="{{ business }}, back to top"><span class="logo-badge" aria-hidden="true"><svg><use href="#i-roof"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span></a>
+      <p>{{ t.footer_blurb }}</p>
+    </div>
+    <div><p class="ft-h">Services</p><ul>{% for s in t.services %}<li><a href="#services">{{ s.title }}</a></li>{% endfor %}</ul></div>
+    <div><p class="ft-h">Areas</p><ul>{% for c in area %}<li>{{ c }}</li>{% endfor %}</ul></div>
+    <div><p class="ft-h">Contact</p><ul>
+      {% if phone %}<li><a href="{{ phone_href }}">{{ phone }}</a></li>{% endif %}
+      {% if email %}<li><a href="mailto:{{ email }}">{{ email }}</a></li>{% endif %}
+      <li>{{ city }}{% if state %}, {{ state }}{% endif %}</li>
+    </ul></div>
+  </div>
+  <div class="wrap ft-base"><p>&copy; {{ year }} {{ business }}</p>{% if preview %}<p>Preview built by Leads Pilot</p>{% endif %}</div>
+</footer>
+
+<div class="mbar" data-mbar>
+  {% if phone %}<a class="btn btn-accent" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call</a>
+  <a class="btn btn-glass" href="{{ sms_href }}"><svg aria-hidden="true"><use href="#i-chat"/></svg>Text</a>{% endif %}
+  <a class="btn btn-glass" href="#quote">Free quote</a>
+</div>
+
+<script src="site.js" defer></script>
+</body>
+</html>
