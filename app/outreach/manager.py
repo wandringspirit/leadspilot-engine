@@ -15,7 +15,12 @@ or a bounce stops that business's follow-ups. When the mailbox refuses the
 login or the email, every running campaign is paused with the reason.
 
 With preview websites on (``sites``, docs/SITES.md) a new campaign builds every business's website, and
-a business's first email waits until its website is online.
+a business's first email waits until its website is online. A business type with a website design starts
+with emails that link it (``{Website}``); what they send - the first email, the link, the last email - and
+a reply decide how long the website stays online.
+
+Emails carry no ``List-Unsubscribe`` header unless ``OUTREACH_UNSUBSCRIBE_HEADER`` is on: a one-to-one
+email with one has looked like a mailing to Gmail. Every footer says how to opt out by replying.
 
 See docs/OUTREACH.md.
 """
@@ -47,8 +52,8 @@ from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate
                                  LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
 from app.outreach.schedule import SendWindow, WindowError, day_label
 from app.outreach.sites import SiteService
-from app.outreach.templates import (DEFAULT_BUSINESS_TYPES, DEFAULT_FOOTER, PLACEHOLDERS, compose, lead_values,
-                                    missing_fields, template_errors, used_fields)
+from app.outreach.templates import (DEFAULT_BUSINESS_TYPES, DEFAULT_FOOTER, PLACEHOLDERS, SITE_FOOTER, SITE_STEPS,
+                                    compose, lead_values, links_site, missing_fields, template_errors, used_fields)
 
 log = logging.getLogger(__name__)
 
@@ -140,7 +145,7 @@ class OutreachManager:
                 log.warning("unreadable %s (%s) - showing the default business types", self._types_file, exc)
         if types is None:
             # a fresh install: the defaults live in memory until the first change is saved
-            types = [BusinessType(name=name, search=search, trade=trade)
+            types = [BusinessType(name=name, search=search, trade=trade, **self._default_emails(name))
                      for name, search, trade in DEFAULT_BUSINESS_TYPES]
         self.business_types = {t.id: t for t in types}
         if self._contacted_file.is_file():
@@ -151,6 +156,12 @@ class OutreachManager:
         if self.campaigns:
             running = sum(c.status == CampaignStatus.RUNNING for c in self.campaigns.values())
             log.info("loaded %d campaign(s), %d running", len(self.campaigns), running)
+
+    def _default_emails(self, type_name: str) -> dict:
+        """The emails a new business type starts with: ones that link its website when it has a design."""
+        if self.sites is not None and self.sites.has_design(type_name):
+            return {"steps": [Step(**step) for step in SITE_STEPS], "footer": SITE_FOOTER}
+        return {"steps": default_steps(), "footer": DEFAULT_FOOTER}
 
     def _save(self, campaign: Campaign) -> None:
         campaign.updated_at = self.clock()
@@ -240,8 +251,9 @@ class OutreachManager:
         async with self._guard():
             name = " ".join(req.name.split())
             self._unique_name(name)
-            steps = req.steps or default_steps()
-            footer = DEFAULT_FOOTER if req.footer is None else req.footer
+            defaults = self._default_emails(name)
+            steps = req.steps or defaults["steps"]
+            footer = defaults["footer"] if req.footer is None else req.footer
             problems = steps_problems(steps, footer)
             if problems:
                 raise OutreachError("; ".join(problems))
@@ -404,7 +416,7 @@ class OutreachManager:
         problems = steps_problems(campaign.steps, campaign.footer)
         if campaign.sites and self.sites is not None and not self.sites.has_design(campaign.business_type_name):
             problems.append(f"there's no website design for {campaign.business_type_name or 'these businesses'} "
-                            "yet, and the first email says their website is built")
+                            "yet, and the emails send their website")
         waiting = [lead for lead in campaign.leads if lead.status in OPEN_STATUSES]
         if not waiting:
             problems.append("there is no business left to email")
@@ -639,7 +651,8 @@ class OutreachManager:
         me = sender_address(self.cfg)
         message_id = new_message_id(me)
         message = build_message(sender=sender_header(self.cfg), to=lead.email, subject=subject, body=body,
-                                message_id=message_id, earlier_ids=[s.message_id for s in lead.sent], unsubscribe=me)
+                                message_id=message_id, earlier_ids=[s.message_id for s in lead.sent],
+                                unsubscribe=me if self.cfg.OUTREACH_UNSUBSCRIBE_HEADER else "")
         try:
             await self.mailbox.send(message)
         except RecipientRefused as exc:
@@ -668,14 +681,23 @@ class OutreachManager:
         lead.sent.append(SentEmail(step=step, sent_at=now, message_id=message_id, subject=subject))
         if step == 1:
             self._mark_contacted(campaign, lead, "emailed", now)
-            if lead.site and self.sites is not None:
-                self.sites.first_email(lead.site, now)
+        if lead.site and self.sites is not None:
+            self._site_dates(campaign, lead, step, now)
         self._schedule(campaign, lead)
         log.info("Sent email %d of %d to %s <%s> (campaign %r)", step, len(campaign.steps), lead.business,
                  lead.email, campaign.name)
         self._finish_if_done(campaign, now)
         self._save(campaign)
         self._after_send(now)
+
+    def _site_dates(self, campaign: Campaign, lead: Lead, step: int, now: datetime) -> None:
+        """Email ``step`` went out: write down what it means for the lead's website (``sites/deploy.py``)."""
+        if step == 1:
+            self.sites.record(lead.site, "first_email_at", now)
+        if links_site(campaign, step):
+            self.sites.record(lead.site, "link_sent_at", now)
+            if step == len(campaign.steps):          # it says the website comes down tomorrow
+                self.sites.record(lead.site, "last_email_at", now)
 
     def _after_send(self, now: datetime) -> None:
         low, high = sorted((max(0, self.cfg.OUTREACH_MIN_GAP_S), max(0, self.cfg.OUTREACH_MAX_GAP_S)))
@@ -769,6 +791,8 @@ class OutreachManager:
                 continue
             lead.status, lead.next_due = _STOPPED_BY[kind], None
             lead.note = message.subject or kind
+            if kind == "reply" and lead.site and self.sites is not None:
+                self.sites.record(lead.site, "replied_at", now)     # online while you talk
             self._mark_contacted(campaign, lead, lead.status.value, now)
             if kind == "bounce":
                 bounces += 1
@@ -884,9 +908,9 @@ def _sample_leads() -> list[tuple[str, Lead]]:
     """Made-up businesses for the business-type preview: one with good reviews, one with few."""
     return [
         ("4.8 stars, 57 reviews", Lead(email="owner@example.com", business="Acme", name="Acme LLC",
-                                       city="Houston", rating=4.8, reviews=57)),
+                                       city="Houston", rating=4.8, reviews=57, site="acme")),
         ("few reviews", Lead(email="owner@example.com", business="Acme", name="Acme LLC",
-                             city="Houston", rating=5.0, reviews=3)),
+                             city="Houston", rating=5.0, reviews=3, site="acme")),
     ]
 
 

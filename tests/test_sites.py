@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.models import Job, JobStatus, PlaceRow
+from app.outreach.mailbox import MailboxMessage
 from app.outreach.manager import OutreachManager
 from app.outreach.models import CampaignCreate
 from app.outreach.sites import SiteService, _wrangler_problem
@@ -36,14 +37,18 @@ def sites_dir(tmp_path_factory):
 # --------------------------------------------------------------------------
 # how long a site stays online
 # --------------------------------------------------------------------------
-def test_a_site_stays_up_30_days_unused_21_after_the_first_email_and_7_after_the_link():
+def test_how_long_a_site_stays_up():
     built = {"built_at": "2026-10-01T00:00:00+00:00"}
     assert ends_at(built) == datetime(2026, 10, 31, tzinfo=timezone.utc)
     emailed = {**built, "first_email_at": "2026-10-05T00:00:00+00:00"}
     assert ends_at(emailed) == datetime(2026, 10, 26, tzinfo=timezone.utc)
-    linked = {**emailed, "link_sent_at": "2026-10-06T00:00:00+00:00"}
-    assert ends_at(linked) == datetime(2026, 10, 13, tzinfo=timezone.utc)
-    assert ends_at({**linked, "hold": True}) is None
+    linked = {**emailed, "link_sent_at": "2026-10-05T00:00:00+00:00"}
+    assert ends_at(linked) == datetime(2026, 10, 19, tzinfo=timezone.utc)
+    last = {**linked, "last_email_at": "2026-10-11T00:00:00+00:00"}       # "comes down tomorrow"
+    assert ends_at(last) == datetime(2026, 10, 13, tzinfo=timezone.utc)
+    replied = {**last, "replied_at": "2026-10-12T00:00:00+00:00"}
+    assert ends_at(replied) == datetime(2026, 11, 11, tzinfo=timezone.utc)
+    assert ends_at({**replied, "hold": True}) is None
 
 
 def test_prepare_uploads_only_sites_still_up(tmp_path):
@@ -180,8 +185,39 @@ async def test_a_campaign_builds_its_websites_and_first_emails_wait_for_them(tmp
 
         await manager._send(*pick, now)
         site = load_manifest(sites.dir)["texas-home-roofing"]
-        assert site["first_email_at"] == now.isoformat(timespec="seconds")
+        assert site["first_email_at"] == site["link_sent_at"] == now.isoformat(timespec="seconds")
         assert "https://sites.leadspilot.co/texas-home-roofing/" in manager.results(campaign).decode("utf-8-sig")
+    finally:
+        await sites.stop()
+
+
+async def test_the_roofer_emails_link_the_site_and_set_its_end(tmp_path):
+    manager, sites, _, clock = site_manager(tmp_path)
+    roofer = next(t for t in manager.list_business_types() if t.name == "Roofer")
+    job = roofers_job()
+    campaign = await manager.create(CampaignCreate(job_ids=[job.id], business_type_id=roofer.id), [job])
+    try:
+        assert await sites.upload()
+        await manager.start(campaign)
+        lead = campaign.leads[0]
+        link = "https://sites.leadspilot.co/texas-home-roofing/"
+        for step in (1, 2, 3):
+            await manager._send(campaign, lead, clock())
+            message = manager.mailbox.sent[-1]
+            assert link in message.get_content() and message["List-Unsubscribe"] is None
+            clock.advance(days=3)
+        assert str(manager.mailbox.sent[0]["Subject"]) == "Texas Home Roofing website"
+        assert "comes down tomorrow" in manager.mailbox.sent[-1].get_content()
+        site = load_manifest(sites.dir)["texas-home-roofing"]
+        last = datetime.fromisoformat(site["last_email_at"])
+        assert ends_at(site) == last + timedelta(days=2)
+
+        # a reply keeps it up while you talk
+        manager.mailbox.inbox.append(MailboxMessage(sender="texashomeroof@gmail.com", subject="Re: website",
+                                                    message_id="<r@x>", received_at=clock()))
+        await manager._check(clock())
+        site = load_manifest(sites.dir)["texas-home-roofing"]
+        assert ends_at(site) == datetime.fromisoformat(site["replied_at"]) + timedelta(days=30)
     finally:
         await sites.stop()
 

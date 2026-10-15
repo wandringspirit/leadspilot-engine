@@ -10,9 +10,11 @@ the ones that haven't ended into ``data/deploy/public/<slug>/``, with ``_status.
 date and whether it is on hold - which the Worker reads on every request. Files that didn't change
 aren't uploaded again.
 
-How long a site stays online (``ends_at``): 7 days after its link was sent; else 21 days after the first
-email (the last email promises the preview for two more weeks after day 7); else 30 days after it was
-built. A site on hold - the business wants to keep it - stays until the hold is lifted.
+How long a site stays online (``ends_at``), from the latest thing that happened: 30 days after the
+business replied; 2 days after the last email, which links the site and says it comes down tomorrow;
+14 days after the first email with the link (room for the follow-ups to be late); 21 days after a first
+email without it; else 30 days after it was built. A site on hold - the business wants to keep it - stays
+until the hold is lifted.
 
 Once, before the first upload, log in to Cloudflare (it opens the browser), in sites/worker:
 
@@ -33,7 +35,9 @@ SITES = ROOT.parent / "data" / "sites"
 PUBLIC = ROOT.parent / "data" / "deploy" / "public"    # wrangler.jsonc's assets directory
 WORKER = ROOT / "worker"
 WRANGLER = WORKER / "node_modules" / "wrangler" / "bin" / "wrangler.js"
-LINK_DAYS = 7
+REPLY_DAYS = 30
+LAST_EMAIL_DAYS = 2
+LINK_DAYS = 14
 EMAIL_DAYS = 21
 UNUSED_DAYS = 30
 
@@ -42,7 +46,8 @@ def ends_at(site: dict) -> datetime | None:
     """When a site goes offline; None while it is on hold."""
     if site.get("hold"):
         return None
-    for key, days in (("link_sent_at", LINK_DAYS), ("first_email_at", EMAIL_DAYS), ("built_at", UNUSED_DAYS)):
+    for key, days in (("replied_at", REPLY_DAYS), ("last_email_at", LAST_EMAIL_DAYS), ("link_sent_at", LINK_DAYS),
+                      ("first_email_at", EMAIL_DAYS), ("built_at", UNUSED_DAYS)):
         if site.get(key):
             return datetime.fromisoformat(site[key]) + timedelta(days=days)
     return None

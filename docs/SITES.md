@@ -47,12 +47,20 @@ A business that already has a website (the same Google place or email) keeps its
 
 ## 3. How long a website is online (`sites/deploy.py`)
 
+The latest of these decides:
+
 | Since | Online for | Why |
 | --- | --- | --- |
 | it was built (no email yet) | 30 days | |
-| the first email | 21 days | the last email (day 7) promises the preview "for another two weeks" |
-| its link was sent | 7 days | the countdown on the page |
+| a first email without the link | 21 days | older emails offered to send the link later |
+| the first email with the link (`{Website}`) | 14 days | room for follow-ups that go out late (weekends, the daily limit) |
+| the last email, when the emails link the site | 2 days | it says the preview "comes down tomorrow" |
+| the business replied | 30 days | it stays up while you talk |
 | on hold | until the hold is lifted | the business wants to keep it |
+
+The Roofer emails (a business type with a design starts with them, `SITE_STEPS` in
+`app/outreach/templates.py`) link the site in all three: day 0, day 3, and day 6 - *comes down
+tomorrow*.
 
 The Worker (`sites/worker/src/index.js`) reads each site's end date from `_status.json`, uploaded with
 the sites (never served): an ended site shows *This preview has ended* (`410`); a site on hold shows

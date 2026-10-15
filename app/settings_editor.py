@@ -111,9 +111,12 @@ OPTIONS = (
     Option("OUTREACH_MIN_REVIEWS", "sending", "{Rating} and {Reviews} – at least this many reviews",
            "Fewer: the email uses the sentence without them", minimum=0),
     Option("OUTREACH_MIN_RATING", "sending", "… and at least this rating", minimum=0, maximum=5),
+    Option("OUTREACH_UNSUBSCRIBE_HEADER", "sending", "Gmail's unsubscribe link",
+           "A List-Unsubscribe header on campaign emails. Off: they read as one-to-one emails – the footer "
+           "says to reply \"no\""),
     # --- sites ---
     Option("PREVIEW_SITES", "sites", "Build a website for each business",
-           "Off: campaigns email without one - the first email says it is built", restart=True),
+           "Off: campaigns email without one – use emails without {Website}", restart=True),
     Option("SITES_URL", "sites", "Where the websites are online",
            "Each business's website is this address / its name", "https://sites.leadspilot.co", restart=True),
     # --- drive ---

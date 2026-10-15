@@ -55,6 +55,7 @@ Plain text with placeholders in braces:
 | `{City}` | the place that was searched (`Houston`). For a search of several places, the one the business is in; for a lead file, the file's `City` column |
 | `{Trade}` | what the campaign calls these businesses (`roofers`) |
 | `{Rating}`, `{Reviews}` | Google rating and review count, **only** with at least `OUTREACH_MIN_REVIEWS` reviews and `OUTREACH_MIN_RATING` stars, else empty |
+| `{Website}` | the business's preview website, e.g. `https://sites.leadspilot.co/acme/` (empty without one - [SITES.md](SITES.md)) |
 | `{SenderName}`, `{SenderCompany}`, `{SenderAddress}` | `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS` |
 
 Optional parts:
@@ -148,7 +149,7 @@ or deleted.
 | Arrives | Recognised by | Result |
 | --- | --- | --- |
 | **Reply** | sent from the lead's address, or answering one of our emails (`In-Reply-To` / `References`) | `replied`, no more emails |
-| **Unsubscribe** | a reply whose subject is *unsubscribe / stop / remove*. Gmail's unsubscribe link sends exactly that, via the `List-Unsubscribe` header every email carries | `unsubscribed`, no more emails |
+| **Unsubscribe** | a reply whose subject is *unsubscribe / stop / remove*. Gmail's unsubscribe link sends exactly that, via the `List-Unsubscribe` header (with `OUTREACH_UNSUBSCRIBE_HEADER` on) | `unsubscribed`, no more emails |
 | **Bounce** | from `mailer-daemon` / `postmaster`, or a delivery-status report, naming the address (`X-Failed-Recipients`, or in its text) | `bounced`, no more emails |
 | **Automatic reply** | `Auto-Submitted`, `X-Autoreply`, or an *Out of office* / *Automatic reply* subject | noted, the follow-ups **continue** |
 | a *delivery delayed* notice | *Delay* / *will retry* in its subject | ignored |
@@ -168,9 +169,11 @@ tool never answers them.
 ## 6. What is sent
 
 Plain-text emails, UTF-8, from `SENDER_NAME <SENDER_EMAIL or MAIL_USERNAME>`, with a
-`Message-ID` on your own domain, `In-Reply-To` / `References` for follow-ups, and
-`List-Unsubscribe: <mailto:you?subject=unsubscribe>`. Gmail and Google Workspace keep a copy in
-*Sent* themselves. No tracking pixels, no links added.
+`Message-ID` on your own domain and `In-Reply-To` / `References` for follow-ups. With
+`OUTREACH_UNSUBSCRIBE_HEADER` on, also `List-Unsubscribe: <mailto:you?subject=unsubscribe>` (Gmail's
+unsubscribe link) - off by default: in tests, one-to-one emails with it went to Promotions or Spam,
+the same email without it to the inbox. The footer says to reply "no" either way. Gmail and Google
+Workspace keep a copy in *Sent* themselves. No tracking pixels, no links added (besides `{Website}`).
 
 **✉ Send me this** sends one email, filled in for the business you picked, to your own address,
 with *[Test]* in front of the subject. It changes nothing in the campaign.

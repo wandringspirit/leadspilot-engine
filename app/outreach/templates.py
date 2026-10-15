@@ -8,7 +8,9 @@ A template is plain text with placeholders in braces - ``{Business}``,
 
 ``{Rating}`` and ``{Reviews}`` only have a value for a business with at least
 ``OUTREACH_MIN_REVIEWS`` reviews and ``OUTREACH_MIN_RATING`` stars, so the
-default first email mentions the stars only when they help.
+default first email mentions the stars only when they help. ``{Website}`` is the
+business's preview website (docs/SITES.md); ``SITE_STEPS`` are the emails of a
+business type that has a website design - they send the link.
 
 Pure functions (tests/test_outreach.py).
 """
@@ -27,6 +29,7 @@ PLACEHOLDERS: dict[str, str] = {
     "Trade": "what the campaign calls these businesses, e.g. roofers",
     "Rating": "Google rating, e.g. 4.8 - empty with few reviews or a low rating",
     "Reviews": "number of Google reviews - empty with few reviews or a low rating",
+    "Website": "its preview website, e.g. https://sites.leadspilot.co/acme/ - empty without one",
     "SenderName": "your name (SENDER_NAME)",
     "SenderCompany": "your company (SENDER_COMPANY)",
     "SenderAddress": "your postal address (SENDER_ADDRESS)",
@@ -68,6 +71,44 @@ DEFAULT_STEPS: list[dict] = [
         ),
     },
 ]
+
+# For businesses that get a preview website: the link in the first email. The website comes down a
+# couple of days after the last email (sites/deploy.py: ends_at) - which says so.
+SITE_STEPS: list[dict] = [
+    {
+        "day": 0,
+        "subject": "{Business} website",
+        "body": (
+            "Hi,\n\n"
+            "I made a website for {Business}:\n"
+            "{Website}\n\n"
+            "It has your Google reviews and the towns you cover. If you like it, it's yours. "
+            "If not, no problem at all.\n\n"
+            "{SenderName}"
+        ),
+    },
+    {
+        "day": 3,
+        "subject": "",
+        "body": (
+            "Hi, just checking you saw the site I made for {Business}: {Website}\n\n"
+            "Happy to change anything: photos, services, phone number.\n\n"
+            "{SenderName}"
+        ),
+    },
+    {
+        "day": 6,
+        "subject": "",
+        "body": (
+            "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
+            "just reply \"yes\".\n\n"
+            "{Website}\n\n"
+            "{SenderName}"
+        ),
+    },
+]
+
+SITE_FOOTER = "[[{SenderCompany}, ]]{SenderAddress} · Reply \"no\" and I won't write again."
 
 DEFAULT_FOOTER = (
     "[[{SenderCompany}\n]]{SenderAddress}\n"
@@ -174,6 +215,7 @@ def lead_values(campaign: "Campaign", lead: "Lead", cfg: "Settings") -> dict[str
         "Trade": campaign.trade.strip(),
         "Rating": f"{lead.rating:.1f}" if stars else "",
         "Reviews": str(lead.reviews) if stars else "",
+        "Website": f"{cfg.SITES_URL.rstrip('/')}/{lead.site}/" if lead.site else "",
         "SenderName": cfg.SENDER_NAME.strip(),
         "SenderCompany": cfg.SENDER_COMPANY.strip(),
         "SenderAddress": cfg.SENDER_ADDRESS.strip(),
@@ -194,6 +236,12 @@ def compose(campaign: "Campaign", lead: "Lead", step: int, cfg: "Settings") -> t
     body = render(template.body, values)
     footer = render(campaign.footer, values)
     return subject, (f"{body}\n\n{footer}" if footer else body)
+
+
+def links_site(campaign: "Campaign", step: int) -> bool:
+    """Email ``step`` (1 = the first) or one before it had the ``{Website}`` link."""
+    texts = [campaign.footer] + [t for s in campaign.steps[:step] for t in (s.subject, s.body)]
+    return any("Website" in used_fields(t) for t in texts)
 
 
 def missing_fields(campaign: "Campaign", lead: "Lead", cfg: "Settings") -> list[str]:

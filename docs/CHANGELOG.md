@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.9.0 – 2026-10-15
+
+### Added
+- **`{Website}`** in emails: the business's own preview website. A business type with a website design
+  (Roofer) starts with emails that send it: *I made a website for {Business}* (day 0), a check-in
+  (day 3), and *the preview comes down tomorrow* (day 6).
+- `OUTREACH_UNSUBSCRIBE_HEADER` (off): the `List-Unsubscribe` header on campaign emails. In inbox
+  tests the same email went to Promotions or Spam with it and to the inbox without it; the footer says
+  to reply "no".
+
+### Changed
+- How long a preview website stays online follows the emails: 14 days after the first email with the
+  link, 2 days after the last email, 30 days after a reply ([SITES.md](SITES.md#3-how-long-a-website-is-online-sitesdeploypy)).
+
 ## 1.8.0 – 2026-10-15
 
 ### Added

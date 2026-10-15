@@ -79,6 +79,8 @@ class Settings(BaseSettings):
     OUTREACH_CHECK_MINUTES: int = 10      # how often the mailbox is checked for replies and bounces
     OUTREACH_MIN_REVIEWS: int = 10        # {Rating} / {Reviews} need at least this many reviews ...
     OUTREACH_MIN_RATING: float = 4.0      # ... and at least this rating
+    OUTREACH_UNSUBSCRIBE_HEADER: bool = False   # a List-Unsubscribe header (Gmail's unsubscribe link) on
+                                          # campaign emails - off: one-to-one emails got filed as mailings
 
     # --- Preview websites (docs/SITES.md) ------------------------------------
     PREVIEW_SITES: bool = True            # each business a campaign emails gets a preview website first

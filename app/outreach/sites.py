@@ -2,8 +2,7 @@
 
 With ``PREVIEW_SITES`` on, every business a campaign emails gets a preview website at
 ``SITES_URL/<slug>/`` - built with ``sites/build.py`` when the campaign is made, put online with
-``sites/deploy.py`` - and its first email waits until the website is online: the email says the website
-is built. A business whose website can't be built (it isn't in the searched area, it's a supply shop …)
+``sites/deploy.py`` - and its first email waits until the website is online: the email links it. A business whose website can't be built (it isn't in the searched area, it's a supply shop …)
 is left out of the campaign with the reason.
 
 Building runs in a thread (it renders pages and copies photos). Uploading runs Cloudflare's ``wrangler``
@@ -31,6 +30,9 @@ RETRY_S = 600                                # after a failed upload
 UPLOAD_TIMEOUT_S = 600
 
 Uploader = Callable[[], Awaitable[None]]     # uploads data/deploy/public; raises SiteError when it can't
+
+#: what ``record`` writes down: the first email, the first email with the link, the last email, a reply
+EVENTS = ("first_email_at", "link_sent_at", "last_email_at", "replied_at")
 
 
 class SiteError(Exception):
@@ -120,9 +122,12 @@ class SiteService:
         log.info("Built %d preview website(s) for %s, %d left out", built, business_type, len(results) - built)
         return results
 
-    def first_email(self, slug: str, at: datetime) -> None:
-        """A business got its first email: its website stays online 21 days from now on (uploaded soon)."""
-        if self._update(slug, "first_email_at", at):
+    def record(self, slug: str, event: str, at: datetime) -> None:
+        """Write down the first time ``event`` happened to a site - how long it stays online follows from it
+        (``sites/deploy.py``: ``ends_at``) - and upload soon, for the new end date."""
+        if event not in EVENTS:
+            raise ValueError(f"unknown site event {event!r}")
+        if self._update(slug, event, at):
             self.request_upload()
 
     def _update(self, slug: str, field: str, at: datetime) -> bool:
