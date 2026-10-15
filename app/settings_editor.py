@@ -60,6 +60,9 @@ GROUPS = (
           "The From line, and what {SenderName}, {SenderCompany} and {SenderAddress} fill in."),
     Group("sending", "When emails go out",
           "Campaigns only send inside this window, a few minutes apart, and never more than the daily limit."),
+    Group("sites", "Preview websites",
+          "Every business a campaign emails gets a preview website, and its first email waits until the website "
+          "is online. Needs Node.js and a Cloudflare login - docs/SITES.md."),
     Group("drive", "Google Drive",
           "An OAuth client of type Desktop app from the Google Cloud console – docs/PLAYBOOK.md step 2 shows how. "
           "After saving, press Connect Google Drive in the Outreach tab."),
@@ -108,6 +111,11 @@ OPTIONS = (
     Option("OUTREACH_MIN_REVIEWS", "sending", "{Rating} and {Reviews} – at least this many reviews",
            "Fewer: the email uses the sentence without them", minimum=0),
     Option("OUTREACH_MIN_RATING", "sending", "… and at least this rating", minimum=0, maximum=5),
+    # --- sites ---
+    Option("PREVIEW_SITES", "sites", "Build a website for each business",
+           "Off: campaigns email without one - the first email says it is built", restart=True),
+    Option("SITES_URL", "sites", "Where the websites are online",
+           "Each business's website is this address / its name", "https://sites.leadspilot.co", restart=True),
     # --- drive ---
     Option("GOOGLE_CLIENT_ID", "drive", "Client ID", "", "1234567890-abc.apps.googleusercontent.com", needed="drive"),
     Option("GOOGLE_CLIENT_SECRET", "drive", "Client secret", "", "GOCSPX-…", secret=True, needed="drive"),

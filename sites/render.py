@@ -83,19 +83,32 @@ class Images:
         return ", ".join(f"{self.img(src, w)} {w}w" for w in widths)
 
     def write(self, out: Path) -> None:
+        """Copy the photos into ``out``; each size is made once, in ``.image-cache`` next to ``out``,
+        since every site of a trade uses the same photos."""
         from PIL import Image
+        cache = out.parent / ".image-cache"
         for src, w in sorted(self.wanted):
             path, _, box = src.partition("#")
+            source = ROOT / path
+            stat = source.stat()
+            key = hashlib.md5(f"{src}|{w}|{stat.st_size}|{stat.st_mtime_ns}".encode()).hexdigest()[:16]
+            cached = cache / f"{key}.jpg"
+            if not cached.is_file():
+                cache.mkdir(parents=True, exist_ok=True)
+                with Image.open(source) as im:
+                    im = im.convert("RGB")
+                    if box:
+                        l, t, r, b = (float(v) / 100 for v in box.split(","))
+                        im = im.crop((round(im.width * l), round(im.height * t), round(im.width * r),
+                                      round(im.height * b)))
+                    if im.width > w:
+                        im = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
+                    partial = cached.with_suffix(".part")
+                    im.save(partial, "JPEG", quality=80, optimize=True, progressive=True)
+                partial.replace(cached)
             target = out / self.name(src, w)
             target.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(ROOT / path) as im:
-                im = im.convert("RGB")
-                if box:
-                    l, t, r, b = (float(v) / 100 for v in box.split(","))
-                    im = im.crop((round(im.width * l), round(im.height * t), round(im.width * r), round(im.height * b)))
-                if im.width > w:
-                    im = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
-                im.save(target, "JPEG", quality=80, optimize=True, progressive=True)
+            shutil.copyfile(cached, target)
 
 
 def area_map(area: list[dict], home_name: str) -> dict | None:
@@ -227,6 +240,11 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
 def render(pack_path: Path, lead_path: Path, out: Path, *, variant=None, preview=True, ends=None) -> Path:
     pack = json.loads(pack_path.read_text(encoding="utf-8"))
     lead = json.loads(lead_path.read_text(encoding="utf-8"))
+    return render_lead(pack, lead, out, variant=variant, preview=preview, ends=ends)
+
+
+def render_lead(pack: dict, lead: dict, out: Path, *, variant=None, preview=True, ends=None) -> Path:
+    """Write one business's site into ``out``: ``index.html``, ``site.css``, ``site.js`` and its photos."""
     design = ROOT / "designs" / pack["design"]
     env = Environment(loader=FileSystemLoader(design), autoescape=True, undefined=StrictUndefined,
                       trim_blocks=True, lstrip_blocks=True)

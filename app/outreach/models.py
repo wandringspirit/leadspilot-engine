@@ -63,6 +63,7 @@ class Lead(BaseModel):
     phone: str = ""
     category: str = ""
     maps_url: str = ""
+    site: str = ""                 # its preview website: SITES_URL/<site>/ ('' = none, docs/SITES.md)
     status: LeadStatus = LeadStatus.QUEUED
     next_due: datetime | None = None   # earliest time for the next follow-up
     sent: list[SentEmail] = Field(default_factory=list)
@@ -131,6 +132,7 @@ class Campaign(BaseModel):
     business_type_name: str = ""
     steps: list[Step] = Field(default_factory=default_steps)
     footer: str = DEFAULT_FOOTER   # added to every email: postal address and how to opt out
+    sites: bool = False            # each business has a preview website; its first email waits until it is online
     status: CampaignStatus = CampaignStatus.DRAFT
     error: str = ""                # why it was paused automatically
     leads: list[Lead] = Field(default_factory=list)

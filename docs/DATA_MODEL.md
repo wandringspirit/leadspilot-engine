@@ -369,7 +369,8 @@ classDiagram
 A campaign's **results CSV** (uploaded to Drive, [DRIVE.md](DRIVE.md)) has one row per lead:
 `Business`, `Email`, `Status`, `Emails Sent` (`2 of 3`), `First Email`, `Last Email`, `Next Email`
 (in the send window's time zone), `Answered`, `Answer` (the reply's subject), `City`, `Phone`,
-`Rating`, `Reviews`, `Name On Maps`, `Place ID`, `Note`.
+`Rating`, `Reviews`, `Name On Maps`, `Place ID`, `Note`, `Website` (the business's preview website,
+[SITES.md](SITES.md)).
 
 A **lead file** a campaign runs from is a CSV in the format of §1 / §2 – at least `Name` and
 `Email` ([DRIVE.md](DRIVE.md#lead-files)).

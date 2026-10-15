@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.8.0 – 2026-10-15
+
+### Added
+- **Preview websites for campaigns** ([SITES.md](SITES.md)): every business a new campaign emails gets
+  its own website at `sites.leadspilot.co/<business>/`, and **its first email waits until the website
+  is online** – the email says it is built. The panel builds them when the campaign is made and uploads
+  them to Cloudflare by itself (again every 10 minutes while an upload fails).
+  - A business without a city on Google gets the searched city; one more than 60 miles from it, or a
+    supply shop, is left out with the reason; a rating under 4.0 or from fewer than 5 reviews stays
+    off the page.
+  - A website stays online 30 days after it is built, 21 days after the first email, 7 days after its
+    link is sent; on hold, until you lift it.
+  - The Outreach tab shows each business's website and, in the setup list, how many are online and
+    any upload error. The results CSV has a **Website** column.
+  - A campaign for a business type without a website design can't start (today only Roofer has one).
+  - New settings `PREVIEW_SITES` and `SITES_URL`; new packages Jinja2 and Pillow.
+
 ## 1.7.0 – 2026-10-15
 
 ### Added

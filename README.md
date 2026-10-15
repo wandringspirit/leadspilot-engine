@@ -60,6 +60,9 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
   with a daily limit; any **reply, bounce or unsubscribe stops the follow-ups** (IMAP). Businesses
   with a website of their own, only a BBB / placeholder address, or emailed before are left out
   automatically. Nothing is sent before you press *Start*. See [docs/OUTREACH.md](docs/OUTREACH.md).
+- **Preview websites** – every business a campaign emails gets its own website at
+  `sites.leadspilot.co/<business>/`, and its first email waits until the website is online. See
+  [docs/SITES.md](docs/SITES.md).
 - **Google Drive** – each search's CSV lands in `<your folder>/<business type>/`, campaigns can
   run from a CSV / Google Sheet there, and each campaign's results are kept next to them. See
   [docs/DRIVE.md](docs/DRIVE.md).
@@ -286,6 +289,7 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/PLAYBOOK.md](docs/PLAYBOOK.md) | **setting everything up, in order**: mailbox, Google Drive, business types, search, campaign, every day |
 | [docs/README.md](docs/README.md) | documentation index |
 | [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
+| [docs/SITES.md](docs/SITES.md) | preview websites: how each business's site is made, who gets one, how long it stays online |
 | [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |

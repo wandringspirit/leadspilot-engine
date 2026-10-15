@@ -57,6 +57,7 @@ app/
     schedule.py        SendWindow - days, hours, time zone
     mailbox.py         SMTP / IMAP (worker thread), build_message(), parse_headers(), classify()
     manager.py         OutreachManager - persistence, the API's operations, the send loop, results_csv()
+    sites.py           SiteService - a campaign's preview websites: built, uploaded, first emails wait for them
   drive/               Google Drive (docs/DRIVE.md)
     client.py          DriveClient - OAuth sign-in (PKCE, loopback) and the REST calls, over httpx
     sync.py            DriveSync - folders per business type, uploads, lead files, campaign results
@@ -65,6 +66,13 @@ app/
     outreach.js                       the Outreach tab
     settings.js                       the Settings tab
     icon.ico                          the desktop shortcut's icon
+sites/                 preview websites (docs/SITES.md)
+  render.py            one business's website: design + trade pack + its details
+  build.py             a search's / campaign's websites, data/sites/sites.json
+  deploy.py            online at sites.leadspilot.co (wrangler), how long each stays up
+  designs/, trades/    page templates; words, photos and colours per trade
+  assets/, geo/        the trades' photos; the US town list
+  worker/              the Cloudflare Worker that serves them (wrangler.jsonc, src/index.js)
 cli.py                 CLI entry point
 run.py                 uvicorn launcher
 start.bat, start.py    one-click start: .venv, packages, Chromium, desktop shortcut, then run.py (restarts it)
@@ -187,6 +195,13 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |
 | `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |
 
+### Preview websites ([SITES.md](SITES.md))
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PREVIEW_SITES` | `true` | every business a campaign emails gets a preview website, and its first email waits until it is online (`false`: neither; the tests set it) |
+| `SITES_URL` | `https://sites.leadspilot.co` | where the websites are online: `<SITES_URL>/<slug>/` |
+
 ### Google Drive ([DRIVE.md](DRIVE.md))
 
 | Variable | Default | Description |
@@ -224,6 +239,7 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_logbuffer.py` | ring buffer semantics: cursor, limit/truncation, level filter, tracebacks, job-id tagging across asyncio tasks |
 | `test_outreach.py` | templates (placeholders, optional parts, business names), who becomes a lead, the send window (DST, weekends), building / reading emails (threading, replies, auto-replies, bounces, unsubscribes), the send loop on a fake mailbox and clock: pauses, daily limit, follow-ups, replies stopping them, auth errors pausing campaigns, nobody emailed twice, business types |
 | `test_outreach_api.py` | the outreach and Drive routes through `TestClient`: business types, campaigns from searches and from a Drive file, start / pause / delete, test emails, connecting Drive (Google's redirect), uploads |
+| `test_sites.py` | preview websites: who gets one (searched city and state, out-of-area businesses, supply shops, low ratings), how long each stays online, what gets uploaded, a campaign's first emails waiting for their websites, a trade without a design, upload errors |
 | `test_drive.py` | lead files (the crawler's CSV and hand-made ones), sign-in and token refresh, folders per business type, uploads that update in place, shared folders – against a fake Google (`httpx.MockTransport`) |
 | `test_settings.py` | the Settings tab: every setting listed, values written to `.env` and read back exactly (quotes, `#`, backslashes), the rest of the file kept, validation, environment variables winning, a broken `.env`; the settings / stop / restart routes and who may call them; `start.py` installing only when `requirements.txt` changed and finding a running panel |
 | `test_docs.py` | documentation consistency (see §7) |

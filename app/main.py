@@ -25,6 +25,7 @@ from app.jobs import ACTIVE_STATES, JobManager
 from app.logbuffer import LEVELS, install as install_log_buffer, log_buffer
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
 from app.outreach.manager import OutreachError, OutreachManager
+from app.outreach.sites import SiteService
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
                                  SendTestRequest)
@@ -43,11 +44,15 @@ async def lifespan(_: FastAPI):
     log.info("Leads Pilot Engine %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
     outreach.start_loop()
+    if sites is not None and sites.unpublished():
+        sites.request_upload()                  # an upload that hadn't happened when the server stopped
     if settings.DRIVE_AUTO_UPLOAD:
         drive.start_loop(outreach)
     yield
     await outreach.stop_loop()
     await drive.stop_loop()
+    if sites is not None:
+        await sites.stop()
     log.info("Shutting down")
 
 
@@ -58,7 +63,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 manager = JobManager(settings)
-outreach = OutreachManager(settings)
+sites = SiteService(settings) if settings.PREVIEW_SITES else None
+outreach = OutreachManager(settings, sites=sites)
 drive = DriveSync(settings)
 
 

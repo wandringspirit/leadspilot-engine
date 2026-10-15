@@ -14,6 +14,9 @@ checked for replies (at most ``FRESH_CHECK`` earlier); a reply, an unsubscribe
 or a bounce stops that business's follow-ups. When the mailbox refuses the
 login or the email, every running campaign is paused with the reason.
 
+With preview websites on (``sites``, docs/SITES.md) a new campaign builds every business's website, and
+a business's first email waits until its website is online.
+
 See docs/OUTREACH.md.
 """
 from __future__ import annotations
@@ -41,8 +44,9 @@ from app.outreach.mailbox import (MailAuthError, MailboxClient, Mailbox, MailErr
                                   sender_address, sender_header, smtp_problems)
 from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign,
                                  CampaignCreate, CampaignStatus, CampaignUpdate, DriveSource, InboundEmail, Lead,
-                                 LeadStatus, LeadUpdate, SendTestRequest, SentEmail, Step, default_steps)
+                                 LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
 from app.outreach.schedule import SendWindow, WindowError, day_label
+from app.outreach.sites import SiteService
 from app.outreach.templates import (DEFAULT_BUSINESS_TYPES, DEFAULT_FOOTER, PLACEHOLDERS, compose, lead_values,
                                     missing_fields, template_errors, used_fields)
 
@@ -90,9 +94,11 @@ def steps_problems(steps: list[Step], footer: str) -> list[str]:
 
 class OutreachManager:
     def __init__(self, cfg: Settings, *, mailbox: MailboxClient | None = None,
-                 clock: Callable[[], datetime] | None = None, rng: random.Random | None = None) -> None:
+                 clock: Callable[[], datetime] | None = None, rng: random.Random | None = None,
+                 sites: SiteService | None = None) -> None:
         self.cfg = cfg
         self.mailbox: MailboxClient = mailbox or Mailbox(cfg)
+        self.sites = sites                       # None: no preview websites, first emails don't wait
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.rng = rng or random.Random()
         self.campaigns: dict[str, Campaign] = {}
@@ -209,6 +215,7 @@ class OutreachManager:
             "placeholders": PLACEHOLDERS,
             "min_reviews": cfg.OUTREACH_MIN_REVIEWS,
             "min_rating": cfg.OUTREACH_MIN_RATING,
+            "sites": self.sites.status() if self.sites else None,
         }
 
     def sent_today(self, now: datetime) -> int:
@@ -308,6 +315,8 @@ class OutreachManager:
             file_jobs = [Job(id=f"file_{source.id}", query=source.name, limit=max(1, len(rows)), rows=rows,
                              status=JobStatus.COMPLETED) for source, rows in files]
             leads, left_out = leads_from_jobs([*jobs, *file_jobs], taken=self._taken())
+            if self.sites is not None and leads:
+                leads, left_out = await self._build_sites(business_type, [*jobs, *file_jobs], leads, left_out)
             campaign = Campaign(
                 name=" ".join(req.name.split()) or _default_name(jobs, [s for s, _ in files], business_type),
                 trade=req.trade.strip() or (business_type.trade if business_type else ""),
@@ -317,10 +326,12 @@ class OutreachManager:
                 business_type_name=business_type.name if business_type else "",
                 steps=[s.model_copy() for s in business_type.steps] if business_type else default_steps(),
                 footer=business_type.footer if business_type else DEFAULT_FOOTER,
-                leads=leads, left_out=left_out,
+                sites=self.sites is not None, leads=leads, left_out=left_out,
             )
             self.campaigns[campaign.id] = campaign
             self._save(campaign)
+            if self.sites is not None and any(lead.site for lead in leads):
+                self.sites.request_upload()
             log.info("Campaign %r created: %d business(es) to email, %d left out", campaign.name, len(leads),
                      len(left_out))
             return campaign
@@ -381,7 +392,7 @@ class OutreachManager:
     # -- Google Drive: app/drive/sync.py uploads, the campaign keeps where to -------
     def results(self, campaign: Campaign) -> bytes:
         """The campaign's results CSV (who was emailed when, who answered …)."""
-        return results_csv(campaign, self._window()[0])
+        return results_csv(campaign, self._window()[0], self.cfg.SITES_URL if self.sites else "")
 
     def record_drive(self, campaign: Campaign, file: dict, path: str, digest: str) -> None:
         campaign.drive_file_id, campaign.drive_link = file.get("id", ""), file.get("webViewLink", "")
@@ -391,6 +402,9 @@ class OutreachManager:
     def campaign_problems(self, campaign: Campaign) -> list[str]:
         """What keeps this campaign from starting (besides the mailbox settings)."""
         problems = steps_problems(campaign.steps, campaign.footer)
+        if campaign.sites and self.sites is not None and not self.sites.has_design(campaign.business_type_name):
+            problems.append(f"there's no website design for {campaign.business_type_name or 'these businesses'} "
+                            "yet, and the first email says their website is built")
         waiting = [lead for lead in campaign.leads if lead.status in OPEN_STATUSES]
         if not waiting:
             problems.append("there is no business left to email")
@@ -556,6 +570,33 @@ class OutreachManager:
                 if pick and self._fresh(now):
                     await self._send(*pick, now)
 
+    def site_ready(self, campaign: Campaign, lead: Lead) -> bool:
+        """The lead's first email may go out: its website is online (or the campaign has no websites)."""
+        return not campaign.sites or self.sites is None or self.sites.is_live(lead.site)
+
+    async def _build_sites(self, business_type: BusinessType | None, jobs: list[Job], leads: list[Lead],
+                           left_out: list[LeftOut]) -> tuple[list[Lead], list[LeftOut]]:
+        """Build each lead's website; a lead whose website can't be built is left out, with the reason."""
+        type_name = business_type.name if business_type else ""
+        if not self.sites.has_design(type_name):
+            return leads, left_out          # campaign_problems() says so, and the campaign can't start
+        by_id = {job.id: job for job in jobs}
+        items = []
+        for lead in leads:
+            job = by_id[lead.job_id]
+            row = _row_of(job, lead)
+            items.append((lead.id, job, row.model_copy(update={"email": lead.email}), lead.city))
+        results = await asyncio.to_thread(self.sites.build, type_name, items)
+        kept: list[Lead] = []
+        for lead in leads:
+            slug, why = results[lead.id]
+            if slug:
+                lead.site = slug
+                kept.append(lead)
+            else:
+                left_out.append(LeftOut(name=lead.name, email=lead.email, reason=why))
+        return kept, left_out
+
     def _fresh(self, now: datetime) -> bool:
         ok_at = self.last_check["ok_at"]
         return ok_at is not None and not self.last_check["error"] and now - ok_at <= FRESH_CHECK
@@ -575,6 +616,8 @@ class OutreachManager:
                         continue
                     key = (0, due, index)
                 elif lead.status == LeadStatus.QUEUED:
+                    if not self.site_ready(campaign, lead):
+                        continue
                     key = (1, campaign.started_at or campaign.created_at, index)
                 else:
                     continue
@@ -625,6 +668,8 @@ class OutreachManager:
         lead.sent.append(SentEmail(step=step, sent_at=now, message_id=message_id, subject=subject))
         if step == 1:
             self._mark_contacted(campaign, lead, "emailed", now)
+            if lead.site and self.sites is not None:
+                self.sites.first_email(lead.site, now)
         self._schedule(campaign, lead)
         log.info("Sent email %d of %d to %s <%s> (campaign %r)", step, len(campaign.steps), lead.business,
                  lead.email, campaign.name)
@@ -786,6 +831,12 @@ class OutreachManager:
 # --------------------------------------------------------------------------
 # helpers
 # --------------------------------------------------------------------------
+def _row_of(job: Job, lead: Lead) -> PlaceRow:
+    """The search row a lead was made from (the one with its email when the place has several)."""
+    rows = [r for r in job.rows if (lead.place_id and r.place_id == lead.place_id) or r.name == lead.name]
+    return next((r for r in rows if r.email.lower() == lead.email.lower()), rows[0])
+
+
 def _default_name(jobs: list[Job], files: list[DriveSource], business_type: BusinessType | None = None) -> str:
     """'Roofer · Houston', 'Roofer · my_list' (+ '+2 more' for more sources)."""
     more = len(jobs) + len(files) - 1
@@ -801,10 +852,11 @@ def _default_name(jobs: list[Job], files: list[DriveSource], business_type: Busi
 
 
 RESULT_COLUMNS = ["Business", "Email", "Status", "Emails Sent", "First Email", "Last Email", "Next Email",
-                  "Answered", "Answer", "City", "Phone", "Rating", "Reviews", "Name On Maps", "Place ID", "Note"]
+                  "Answered", "Answer", "City", "Phone", "Rating", "Reviews", "Name On Maps", "Place ID", "Note",
+                  "Website"]
 
 
-def results_csv(campaign: Campaign, window: SendWindow | None) -> bytes:
+def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = "") -> bytes:
     """The campaign's results as CSV (UTF-8 with BOM, like the lead lists): one row per business."""
     def when(moment: datetime | None) -> str:
         if moment is None:
@@ -823,6 +875,7 @@ def results_csv(campaign: Campaign, window: SendWindow | None) -> bytes:
             when(answer.received_at) if answer else "", answer.subject if answer else "",
             lead.city, lead.phone, "" if lead.rating is None else f"{lead.rating:g}",
             "" if lead.reviews is None else lead.reviews, lead.name, lead.place_id, lead.note,
+            f"{sites_url.rstrip('/')}/{lead.site}/" if lead.site and sites_url else "",
         ])
     return (chr(0xFEFF) + buffer.getvalue()).encode("utf-8")
 

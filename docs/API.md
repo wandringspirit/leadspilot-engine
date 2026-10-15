@@ -281,7 +281,12 @@ Google refused.
   "last_check": { "at": "2026-09-29T15:40:03+00:00", "error": "", "emails": 41, "replies": 1, "bounces": 0 },
   "contacted": 57,
   "placeholders": { "Business": "the business name, without LLC / Inc. (editable per lead)", "…": "…" },
-  "min_reviews": 10, "min_rating": 4.0
+  "min_reviews": 10, "min_rating": 4.0,
+  "sites": {                              // null with PREVIEW_SITES=false (docs/SITES.md)
+    "url": "https://sites.leadspilot.co", "uploading": false, "waiting": 0,
+    "online": ["texas-home-roofing", "…"],
+    "last_upload": { "at": "…", "ok_at": "…", "error": "", "online": 13 }
+  }
 }
 ```
 
@@ -345,6 +350,7 @@ At least one search or file is needed (`422`). Returns the full campaign (`201`)
   "job_ids": ["job_d38350fa59d5"], "drive_files": [],
   "business_type_id": "bt_…", "business_type_name": "Plumber",
   "steps": [ /* a copy of the type's */ ], "footer": "…",
+  "sites": true,                          // each business has a preview website; first emails wait for it
   "status": "draft",                      // draft | running | paused | finished
   "error": "",                            // why it was paused automatically
   "leads": [ {
@@ -352,6 +358,7 @@ At least one search or file is needed (`422`). Returns the full campaign (`201`)
       "name": "Acme Plumbing LLC", "business": "Acme Plumbing",
       "email": "office@acmeplumbing.example", "other_emails": [], "city": "Houston",
       "rating": 4.7, "reviews": 42, "phone": "(713) 555-0142", "category": "Plumber", "maps_url": "…",
+      "site": "acme-plumbing",            // its website: <SITES_URL>/acme-plumbing/ ('' = none)
       "status": "queued",                 // queued | sent | done | replied | unsubscribed | bounced | failed | skipped
       "next_due": null,                   // when the next follow-up may go out
       "sent": [ { "step": 1, "sent_at": "…", "message_id": "<…@getpatsweb.com>", "subject": "…" } ],

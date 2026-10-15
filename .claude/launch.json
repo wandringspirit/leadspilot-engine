@@ -12,6 +12,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "data/sites"],
       "port": 4173
+    },
+    {
+      "name": "sites-worker",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["sites/worker/node_modules/wrangler/bin/wrangler.js", "dev", "--config", "sites/worker/wrangler.jsonc", "--port", "8787", "--local"],
+      "port": 8787
     }
   ]
 }

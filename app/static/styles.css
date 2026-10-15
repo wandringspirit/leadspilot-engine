@@ -133,6 +133,7 @@ fieldset.filters legend { font-weight: 600; padding: 0 6px; margin-left: -6px; }
 .chip.small { font-size: 11px; padding: 0 7px; margin: 2px 0; }
 .chip.area { background: var(--primary-soft); color: var(--primary); }
 small.block { display: block; margin-top: 2px; }
+.site-link { display: block; margin-top: 2px; font-size: 12px; }
 kbd {
   font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--border);
   border-radius: 4px; background: var(--surface-2);

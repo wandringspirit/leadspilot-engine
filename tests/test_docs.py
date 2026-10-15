@@ -28,6 +28,7 @@ REQUIRED_DOCS = [
     "docs/PLAYBOOK.md",
     "docs/OUTREACH.md",
     "docs/DRIVE.md",
+    "docs/SITES.md",
 ]
 
 

@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     OUTREACH_MIN_REVIEWS: int = 10        # {Rating} / {Reviews} need at least this many reviews ...
     OUTREACH_MIN_RATING: float = 4.0      # ... and at least this rating
 
+    # --- Preview websites (docs/SITES.md) ------------------------------------
+    PREVIEW_SITES: bool = True            # each business a campaign emails gets a preview website first
+    SITES_URL: str = "https://sites.leadspilot.co"   # where they are online: <SITES_URL>/<slug>/
+
     # --- Google Drive (docs/DRIVE.md) ----------------------------------------
     GOOGLE_CLIENT_ID: str = ""            # OAuth client of type "Desktop app" from the Google Cloud console
     GOOGLE_CLIENT_SECRET: str = ""

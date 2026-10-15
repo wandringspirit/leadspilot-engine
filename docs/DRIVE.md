@@ -42,7 +42,7 @@ renamed folder keeps getting the files until the server restarts.
 | File | When | Content |
 | --- | --- | --- |
 | a search's CSV | when the search finishes, and again after an enrichment. Automatic with `DRIVE_AUTO_UPLOAD=true`; any time with **⇪ Save to Drive** in the results card | the **extended** export: the default 12 columns first, then Address, Category, Website Type, Rating, Place ID … ([DATA_MODEL.md](DATA_MODEL.md)). Same name as the download: `<search>_<filters>_DD_MM_YYYY.csv` |
-| a campaign's results | while it runs: when something changed, at most every 5 minutes. Also **⇪ Save results to Drive** | one row per business: Business, Email, Status, Emails Sent, First / Last / Next Email, Answered, Answer, City, Phone, Rating, Reviews, Name On Maps, Place ID, Note |
+| a campaign's results | while it runs: when something changed, at most every 5 minutes. Also **⇪ Save results to Drive** | one row per business: Business, Email, Status, Emails Sent, First / Last / Next Email, Answered, Answer, City, Phone, Rating, Reviews, Name On Maps, Place ID, Note, Website |
 
 A file is **updated in place**, the same Drive file with a new version, not a new copy each time.
 The first upload reuses a file of the same name in the folder, if there is one.

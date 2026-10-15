@@ -8,11 +8,12 @@ from pathlib import Path
 
 import pytest
 
-# The app's email loop and Drive uploads must never run in the tests: they would use the real
-# mailbox from .env and a Google Drive connected in data/. (Set before app.config is imported;
-# environment variables win over .env.)
+# The app's email loop, Drive uploads and website uploads must never run in the tests: they would use
+# the real mailbox from .env, a Google Drive connected in data/ and the Cloudflare login. (Set before
+# app.config is imported; environment variables win over .env.)
 os.environ["OUTREACH_AUTOSEND"] = "false"
 os.environ["DRIVE_AUTO_UPLOAD"] = "false"
+os.environ["PREVIEW_SITES"] = "false"      # no websites built or uploaded to Cloudflare (tests/test_sites.py)
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

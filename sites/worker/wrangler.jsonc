@@ -1,0 +1,22 @@
+// The Worker that serves the preview websites at sites.leadspilot.co - deploy with: python sites/deploy.py
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "leadspilot-sites",
+  // the Cloudflare account that owns leadspilot.co (leadpilot01@gmail.com): a login to another account fails
+  "account_id": "53053160af6109a9f82d179922a6c7b4",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    // made by sites/deploy.py: one folder per live site, plus _status.json
+    "directory": "../../data/deploy/public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "routes": [{ "pattern": "sites.leadspilot.co", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "send_metrics": false
+}

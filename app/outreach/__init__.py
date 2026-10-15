@@ -11,6 +11,7 @@ bounce or unsubscribe stops the follow-ups for that business.
 * ``schedule.py``  the send window: days, hours, time zone (pure)
 * ``mailbox.py``   SMTP to send, IMAP to notice replies; message building and parsing
 * ``manager.py``   OutreachManager: persistence, the API's operations, the send loop
+* ``sites.py``     SiteService: each lead's preview website, built, uploaded, first emails wait for it
 
 See docs/OUTREACH.md.
 """
