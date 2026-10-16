@@ -159,6 +159,9 @@ OPTIONS = (
            "Searches, campaigns and the Google Drive sign-in are kept here – move them yourself when you "
            "change it", restart=True),
     Option("LOG_BUFFER_SIZE", "server", "Log lines kept for Live logs", restart=True, minimum=100),
+    Option("KEEP_AWAKE", "server", "Keep the computer awake",
+           "Windows doesn't go to sleep while the panel runs, so emails and the autopilot keep going – the "
+           "screen still turns off", restart=True),
     # --- advanced ---
     Option("LOCALE", "advanced", "Google Maps language", "Keep en-US: the scraper reads the English page"),
     Option("USER_AGENT", "advanced", "Browser user agent"),

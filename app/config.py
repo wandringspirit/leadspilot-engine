@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # --- Server -----------------------------------------------------------
     HOST: str = "127.0.0.1"
     PORT: int = 8000
+    KEEP_AWAKE: bool = True               # Windows doesn't sleep while the panel runs (emails, autopilot)
 
     # --- Storage ----------------------------------------------------------
     DATA_DIR: Path = PROJECT_ROOT / "data"

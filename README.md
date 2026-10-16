@@ -96,6 +96,7 @@ installs what's new by itself.
 | `--no-browser` | don't open the panel in the browser |
 | `--reinstall` | install the packages and Chromium again |
 | `--shortcut` | make the desktop shortcut again (e.g. after moving the folder) |
+| `--autostart` | start the panel when you sign in to Windows (minimised, no browser); `--no-autostart` undoes it |
 
 ### Manual setup
 

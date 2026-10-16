@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.12.0 – 2026-10-16
+
+### Added
+- `start.bat --autostart` starts the panel when you sign in to Windows (minimised, no browser), so
+  the emails and the autopilot run every day; `--no-autostart` undoes it.
+- `KEEP_AWAKE` (on by default): Windows doesn't go to sleep while the panel runs.
+
+### Fixed
+- The preview websites couldn't be uploaded again (*PermissionError: [WinError 5] Access is
+  denied*): a site folder copied from the read-only design folder couldn't be removed. Emptying
+  `data/deploy/public` now clears the read-only flag first.
+
 ## 1.11.0 – 2026-10-15
 
 ### Changed

@@ -55,6 +55,18 @@ The autopilot switches itself off, says why, and writes it in the activity log w
 
 A search that didn't finish (the panel was closed during it) is searched again.
 
+### Every day, on its own
+
+The autopilot, the emails and the follow-ups run inside the panel, so they only happen while the
+panel runs on this computer:
+
+- `start.bat --autostart` starts the panel when you sign in to Windows, minimised and without
+  opening the browser (`--no-autostart` undoes it).
+- While the panel runs, Windows doesn't go to sleep (`KEEP_AWAKE`, on by default); the screen still
+  turns off. Closing a laptop's lid can still put it to sleep, depending on its power settings.
+- Missed while the computer was off? The emails go out once the panel runs again, in the send
+  window.
+
 ## 2. The activity log
 
 Every event is a line in `data/activity.jsonl`:

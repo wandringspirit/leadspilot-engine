@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__, settings_editor
 from app.config import settings
-from app.control import browse_url, control
+from app.control import browse_url, control, keep_awake
 from app.drive.client import DriveError
 from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
@@ -46,6 +46,8 @@ ENV_FILE = Path(settings.model_config["env_file"])    # the .env the Settings ta
 async def lifespan(_: FastAPI):
     log.info("Leads Pilot Engine %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
+    if settings.KEEP_AWAKE and keep_awake(True):
+        log.info("Keeping the computer awake while the panel runs (KEEP_AWAKE)")
     outreach.start_loop()
     autopilot.start_loop()
     if sites is not None and sites.unpublished():
@@ -58,6 +60,8 @@ async def lifespan(_: FastAPI):
     await drive.stop_loop()
     if sites is not None:
         await sites.stop()
+    if settings.KEEP_AWAKE:
+        keep_awake(False)
     log.info("Shutting down")
 
 

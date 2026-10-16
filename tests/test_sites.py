@@ -2,7 +2,9 @@
 first emails waiting for their websites (sites/, app/outreach/sites.py, docs/SITES.md)."""
 from __future__ import annotations
 
+import os
 import random
+import stat
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -65,6 +67,10 @@ def test_prepare_uploads_only_sites_still_up(tmp_path):
     assert (public / "fresh" / "index.html").is_file() and not (public / "ended").exists()
     status = (public / "_status.json").read_text(encoding="utf-8")
     assert '"hold": true' in status and "2026-11-14" in status
+    # read-only folders (copied from a read-only design folder) are still replaced next time
+    os.chmod(public / "fresh", stat.S_IREAD)
+    os.chmod(public / "fresh" / "index.html", stat.S_IREAD)
+    assert prepare(sites, public, now) == ["fresh", "kept"]
 
 
 # --------------------------------------------------------------------------

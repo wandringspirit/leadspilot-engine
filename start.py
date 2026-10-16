@@ -8,8 +8,10 @@ log lines show up there, Ctrl+C in it (or Stop in the panel) stops the panel, an
 button starts it again.
 
     python start.py [--host 127.0.0.1] [--port 8000] [--no-browser] [--reinstall] [--shortcut]
+                    [--autostart | --no-autostart]
 
---shortcut puts a shortcut to start.bat on the Windows desktop. Only the standard library is used until
+--shortcut puts a shortcut to start.bat on the Windows desktop. --autostart puts one in the Windows Startup
+folder, so the panel starts (minimised, no browser) when you sign in; --no-autostart removes it. Only the standard library is used until
 the packages are installed.
 """
 from __future__ import annotations
@@ -61,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
                     "https://www.python.org/downloads/ - tick \"Add python.exe to PATH\" - and start again.")
     if args.shortcut:
         return make_shortcut()
+    if args.autostart:
+        return make_shortcut(startup=True)
+    if args.no_autostart:
+        return remove_autostart()
     if not in_venv():
         return relaunch_in_venv(argv)
     first = not INSTALLED.is_file()
@@ -81,6 +87,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--no-browser", action="store_true", help="don't open the panel in the browser")
     parser.add_argument("--reinstall", action="store_true", help="install the packages and Chromium again")
     parser.add_argument("--shortcut", action="store_true", help="put a shortcut to start.bat on the desktop")
+    parser.add_argument("--autostart", action="store_true",
+                        help="start the panel when you sign in to Windows (a shortcut in the Startup folder)")
+    parser.add_argument("--no-autostart", action="store_true", help="stop starting the panel when you sign in")
     return parser.parse_args(argv)
 
 
@@ -369,40 +378,60 @@ def edit_env() -> None:
         print(f"The settings file: {env}")
 
 
-def make_shortcut() -> int:
+def _powershell(script: str) -> subprocess.CompletedProcess:
+    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+    return subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                           "-EncodedCommand", encoded], capture_output=True, text=True, timeout=60)
+
+
+def _ps(value: object) -> str:                       # a PowerShell '...' string
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def make_shortcut(*, startup: bool = False) -> int:
     """A desktop shortcut to start.bat, with the panel's icon. Through cmd.exe, so it can be pinned to the
-    taskbar too (right-click > Pin to taskbar)."""
+    taskbar too (right-click > Pin to taskbar). ``startup``: the same shortcut in the Windows Startup folder
+    instead, so the panel starts when you sign in to Windows - minimised and without opening the browser."""
+    where = "Startup" if startup else "Desktop"
     if not WINDOWS:
-        print("Desktop shortcuts are made on Windows. Elsewhere start the panel with: python3 start.py")
+        print("Shortcuts are made on Windows. Elsewhere start the panel with: python3 start.py")
         return 1
-
-    def ps(value: object) -> str:                    # a PowerShell '...' string
-        return "'" + str(value).replace("'", "''") + "'"
-
-    arguments = '/c ""' + str(ROOT / "start.bat") + '""'   # cmd.exe's quoting for a path with spaces
+    arguments = '/c ""' + str(ROOT / "start.bat") + '"' + (" --no-browser" if startup else "") + '"'
     script = "\n".join([
         "$shell = New-Object -ComObject WScript.Shell",
-        "$path = Join-Path ([Environment]::GetFolderPath('Desktop')) " + ps(NAME + ".lnk"),
+        f"$path = Join-Path ([Environment]::GetFolderPath('{where}')) " + _ps(NAME + ".lnk"),
         "$link = $shell.CreateShortcut($path)",
         "$link.TargetPath = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
-        "$link.Arguments = " + ps(arguments),
-        "$link.WorkingDirectory = " + ps(ROOT),
-        "$link.IconLocation = " + ps(f"{ICON},0"),
-        "$link.Description = " + ps(f"Start the {NAME} panel"),
+        "$link.Arguments = " + _ps(arguments),
+        "$link.WorkingDirectory = " + _ps(ROOT),
+        "$link.IconLocation = " + _ps(f"{ICON},0"),
+        "$link.Description = " + _ps(f"Start the {NAME} panel"),
+        "$link.WindowStyle = 7" if startup else "",     # minimised
         "$link.Save()",
         "Write-Output $path",
     ])
-    encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     try:
-        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-                                 "-EncodedCommand", encoded], capture_output=True, text=True, timeout=60)
+        result = _powershell(script)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        print(f"Could not make the desktop shortcut: {exc}", flush=True)
+        print(f"Could not make the {where.lower()} shortcut: {exc}", flush=True)
         return 1
     if result.returncode != 0 or not result.stdout.strip():
-        print(f"Could not make the desktop shortcut:\n{result.stderr.strip()}", flush=True)
+        print(f"Could not make the {where.lower()} shortcut:\n{result.stderr.strip()}", flush=True)
         return 1
-    print(f"Made the desktop shortcut {result.stdout.strip()} - double-click it to start the panel.", flush=True)
+    print(f"Made the shortcut {result.stdout.strip()} - " +
+          ("the panel starts when you sign in to Windows." if startup else "double-click it to start the panel."),
+          flush=True)
+    return 0
+
+
+def remove_autostart() -> int:
+    """Remove the Startup-folder shortcut: the panel no longer starts when you sign in."""
+    if not WINDOWS:
+        return 1
+    result = _powershell("$path = Join-Path ([Environment]::GetFolderPath('Startup')) " + _ps(NAME + ".lnk") +
+                         "\nif (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path; 'removed' }")
+    print("The panel no longer starts when you sign in to Windows." if "removed" in result.stdout
+          else "The panel wasn't set to start when you sign in.", flush=True)
     return 0
 
 

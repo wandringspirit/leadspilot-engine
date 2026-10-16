@@ -124,7 +124,7 @@ were skipped and why, how many searches / map sections ran, and why the scan sto
 
 Settings are read from environment variables, then from `.env` in the project root
 (`app/config.py`). The panel's Settings tab shows and changes all of them: it writes `.env` and
-applies new values at once, except `HOST`, `PORT`, `DATA_DIR` and `LOG_BUFFER_SIZE`, which are only
+applies new values at once, except `HOST`, `PORT`, `DATA_DIR`, `LOG_BUFFER_SIZE` and `KEEP_AWAKE`, which are only
 read when the server starts. A setting that is also an environment variable can't be changed there.
 `tests/test_docs.py` checks that every setting is listed here, `tests/test_settings.py` that every
 one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
@@ -137,6 +137,7 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `PORT` | `8000` | port for `run.py` |
 | `DATA_DIR` | `<project>/data` | where `jobs/` and `exports/` live |
 | `LOG_BUFFER_SIZE` | `2000` | log lines kept in memory for the panel's Live logs / `GET /api/logs` |
+| `KEEP_AWAKE` | `true` | Windows doesn't go to sleep while the panel runs, so scheduled emails and the autopilot keep going (the screen still turns off) |
 
 ### Google Maps scraping
 

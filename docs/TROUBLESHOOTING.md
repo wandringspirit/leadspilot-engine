@@ -7,6 +7,7 @@
 | Double-clicking `start.bat` says *Python 3.11 or newer is needed* | Install it from <https://www.python.org/downloads/>, tick *Add python.exe to PATH*, then double-click `start.bat` again. |
 | *Installing failed* in the start window | usually no internet connection, or a proxy; the lines above it say which package. Fix that, then start again; `start.bat --reinstall` installs everything once more. |
 | The desktop shortcut is missing, or does nothing after the folder moved | `start.bat --shortcut` (from a terminal in the project folder) makes it again. |
+| *The websites couldn't be uploaded: PermissionError: [WinError 5] Access is denied* | fixed in 1.12.0: a read-only folder in `data/deploy/public` couldn't be emptied. Restart the panel. |
 | `playwright: command not found` / `Executable doesn't exist at …chrome-win…` | Run `python -m playwright install chromium` inside the activated virtual environment (or `start.bat --reinstall`). |
 | Linux: Chromium fails to start with missing `libnss3` / `libatk` … | `python -m playwright install-deps chromium` (needs sudo) |
 | `ModuleNotFoundError: No module named 'app'` when running `cli.py` | Run from the project root (`cd leadspilot-engine`) with the venv activated. |

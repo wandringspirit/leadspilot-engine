@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -53,6 +55,21 @@ def ends_at(site: dict) -> datetime | None:
     return None
 
 
+def _writable(func, path, _exc) -> None:
+    """Windows won't delete a read-only file or folder (copytree copies the flag): clear it and retry."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def _remove(path: Path) -> None:
+    if not path.is_dir():
+        _writable(os.unlink, path, None)
+    elif sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_writable)
+    else:
+        shutil.rmtree(path, onerror=_writable)
+
+
 def prepare(sites_dir: Path = SITES, public: Path = PUBLIC, now: datetime | None = None) -> list[str]:
     """Fill ``public`` with the sites that are still up; returns their slugs."""
     path = sites_dir / "sites.json"
@@ -63,7 +80,7 @@ def prepare(sites_dir: Path = SITES, public: Path = PUBLIC, now: datetime | None
                   if (site.get("hold") or (ends[slug] and ends[slug] > now)) and (sites_dir / slug).is_dir())
     public.mkdir(parents=True, exist_ok=True)
     for old in public.iterdir():                    # emptied, not removed: wrangler dev may be watching it
-        shutil.rmtree(old) if old.is_dir() else old.unlink()
+        _remove(old)
     for slug in live:
         shutil.copytree(sites_dir / slug, public / slug)
     status = {slug: {"expires": ends[slug].isoformat(timespec="seconds") if ends[slug] else None,
