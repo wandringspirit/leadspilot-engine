@@ -19,6 +19,9 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | GET | `/api/logs` | live log lines (ring buffer with a sequence cursor) |
 | GET | `/api/outreach` | mailbox settings, send window, today's count, the last reply check |
 | POST | `/api/outreach/check` | check the mailbox for replies and bounces now |
+| GET / PATCH | `/api/autopilot` | the autopilot: status / switch it on or off, places, limits |
+| GET | `/api/activity` | what happened, newest first |
+| GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv` |
 | GET / POST | `/api/business-types` | list / add business types |
 | GET / PATCH / DELETE | `/api/business-types/{type_id}` | one business type: read, change, delete |
 | GET | `/api/business-types/{type_id}/preview` | its emails for two made-up businesses |
@@ -281,7 +284,12 @@ Google refused.
   "last_check": { "at": "2026-09-29T15:40:03+00:00", "error": "", "emails": 41, "replies": 1, "bounces": 0 },
   "contacted": 57,
   "placeholders": { "Business": "the business name, without LLC / Inc. (editable per lead)", "…": "…" },
-  "min_reviews": 10, "min_rating": 4.0
+  "min_reviews": 10, "min_rating": 4.0,
+  "sites": {                              // null with PREVIEW_SITES=false (docs/SITES.md)
+    "url": "https://sites.leadspilot.co", "uploading": false, "waiting": 0,
+    "online": ["texas-home-roofing", "…"],
+    "last_upload": { "at": "…", "ok_at": "…", "error": "", "online": 13 }
+  }
 }
 ```
 
@@ -345,6 +353,7 @@ At least one search or file is needed (`422`). Returns the full campaign (`201`)
   "job_ids": ["job_d38350fa59d5"], "drive_files": [],
   "business_type_id": "bt_…", "business_type_name": "Plumber",
   "steps": [ /* a copy of the type's */ ], "footer": "…",
+  "sites": true,                          // each business has a preview website; first emails wait for it
   "status": "draft",                      // draft | running | paused | finished
   "error": "",                            // why it was paused automatically
   "leads": [ {
@@ -352,6 +361,7 @@ At least one search or file is needed (`422`). Returns the full campaign (`201`)
       "name": "Acme Plumbing LLC", "business": "Acme Plumbing",
       "email": "office@acmeplumbing.example", "other_emails": [], "city": "Houston",
       "rating": 4.7, "reviews": 42, "phone": "(713) 555-0142", "category": "Plumber", "maps_url": "…",
+      "site": "acme-plumbing",            // its website: <SITES_URL>/acme-plumbing/ ('' = none)
       "status": "queued",                 // queued | sent | done | replied | unsubscribed | bounced | failed | skipped
       "next_due": null,                   // when the next follow-up may go out
       "sent": [ { "step": 1, "sent_at": "…", "message_id": "<…@getpatsweb.com>", "subject": "…" } ],
@@ -392,12 +402,31 @@ and `emails_sent`.
 - `POST /api/campaigns/{campaign_id}/drive` → `{"path": "Plumber/Outreach/plumber_houston_a1b2c3.csv",
   "link": "…"}` – uploads its results now ([DRIVE.md](DRIVE.md)).
 
+## Autopilot
+
+Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.md)).
+
+- `GET /api/autopilot` → `{"enabled", "business_type_id", "business_type_name", "places": ["Katy, TX", …],
+  "next_place", "next": "Sugar Land, TX", "min_waiting", "searches_per_day", "limit", "stopped": "",
+  "on_since", "waiting": 4, "searches_today": 1, "searching": "", "searching_job_id": "",
+  "holding": "why it isn't searching now", "runs": [{"place", "job_id", "started_at", "finished_at",
+  "found", "campaign_id", "emailing", "note"}]}` – `runs` newest first.
+- `PATCH /api/autopilot` `{enabled?, business_type_id?, places?, next_place?, min_waiting?,
+  searches_per_day?, limit?}` → the status. Switching it on clears `stopped` and starts the bounce
+  count afresh; `400` without a business type, `404` unknown business type.
+- `GET /api/activity?limit=100` → `[{"at", "what", "detail", "campaign", "business", "email"}]`,
+  newest first.
+- `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master sheet's files.
+
 ## Google Drive
 
 Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files: [DRIVE.md](DRIVE.md).
 
 - `GET /api/drive` → `{"configured": true, "connected": true, "email": "pat@gmail.com",
-  "folder": "Leads", "auto_upload": true, "problems": [], "last_error": ""}`.
+  "folder": "Leads", "auto_upload": true, "problems": [], "last_error": "", "master": {"campaigns":
+  {"name", "link", "at"}, "activity": {…}}, "sheets_off": "…"}` – `master`: where the master sheet
+  went: `{"sheet": {…}}` (the Google Sheet) or the two CSV files, with `sheets_off` saying why
+  (the Google Sheets API is off).
 - `POST /api/drive/connect` → `{"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?…"}` –
   open it in the browser; Google sends the browser back to `/` of this server, which stores the
   sign-in and redirects to `/?drive=connected#outreach` (or `/?drive=error&message=…`). `400` when

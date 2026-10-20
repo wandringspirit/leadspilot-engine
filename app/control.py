@@ -49,4 +49,15 @@ def browse_url(host: str, port: int) -> str:
     return f"http://{host}:{port}"
 
 
+def keep_awake(on: bool) -> bool:
+    """Ask Windows not to sleep while this process runs (the screen may still turn off); ``on=False`` lets it
+    sleep again, as does the process ending. Call it from the same thread both times. False elsewhere."""
+    if os.name != "nt":
+        return False
+    import ctypes
+    es_continuous, es_system_required = 0x80000000, 0x00000001
+    flags = es_continuous | (es_system_required if on else 0)
+    return bool(ctypes.windll.kernel32.SetThreadExecutionState(flags))
+
+
 control = ServerControl()

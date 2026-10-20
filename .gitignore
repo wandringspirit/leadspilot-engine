@@ -21,3 +21,8 @@ playwright-traces/
 Thumbs.db
 .vscode/
 .idea/
+
+# the preview-site Worker (sites/worker)
+node_modules/
+.wrangler/
+.dev.vars

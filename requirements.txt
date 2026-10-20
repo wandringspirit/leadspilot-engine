@@ -17,9 +17,9 @@ phonenumbers>=8.13
 # --- Email outreach ---
 tzdata>=2024.1          # time zones for the send window (Windows has no built-in tz database)
 
-# --- Website generator (sites/render.py) ---
-jinja2>=3.1,<4.0
-Pillow>=10.0         # resizes the trade pack's photos
+# --- Preview websites (sites/) ---
+jinja2>=3.1,<4.0        # the page templates
+pillow>=10.0            # the photos in the sizes a page uses
 
 # --- Tooling ---
 pytest>=8.2

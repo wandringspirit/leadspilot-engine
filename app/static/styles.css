@@ -133,6 +133,8 @@ fieldset.filters legend { font-weight: 600; padding: 0 6px; margin-left: -6px; }
 .chip.small { font-size: 11px; padding: 0 7px; margin: 2px 0; }
 .chip.area { background: var(--primary-soft); color: var(--primary); }
 small.block { display: block; margin-top: 2px; }
+.site-link { display: block; margin-top: 2px; font-size: 12px; }
+.site-opened { margin-top: 3px; color: var(--primary); font-size: 12px; font-weight: 600; }
 kbd {
   font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--border);
   border-radius: 4px; background: var(--surface-2);
@@ -463,3 +465,15 @@ label.switch input { width: 18px; height: 18px; margin: 0; accent-color: var(--p
   max-width: 460px; background: var(--surface); color: var(--text); border-radius: 12px; padding: 24px 26px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, .3); display: flex; flex-direction: column; gap: 10px;
 }
+
+/* ---------- autopilot + activity (autopilot.js) ---------- */
+#ap-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+.ap-runs { margin-top: 12px; }
+.ap-runs summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+ul.activity { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; font-size: 13px; max-height: 420px; overflow: auto; }
+ul.activity li { padding: 6px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+ul.activity li:last-child { border-bottom: 0; }
+.activity-when { display: inline-block; min-width: 150px; color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+ul.activity li.what-reply strong { color: var(--primary); }
+ul.activity li.what-bounce strong, ul.activity li.what-autopilot-stopped strong, ul.activity li.what-search-blocked strong { color: var(--danger); }
+@media (max-width: 640px) { .activity-when { display: block; min-width: 0; } }

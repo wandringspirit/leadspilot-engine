@@ -60,6 +60,12 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
   with a daily limit; any **reply, bounce or unsubscribe stops the follow-ups** (IMAP). Businesses
   with a website of their own, only a BBB / placeholder address, or emailed before are left out
   automatically. Nothing is sent before you press *Start*. See [docs/OUTREACH.md](docs/OUTREACH.md).
+- **Preview websites** – every business a campaign emails gets its own website at
+  `sites.leadspilot.co/<business>/`, and its first email waits until the website is online. See
+  [docs/SITES.md](docs/SITES.md).
+- **Autopilot** – searches the next place on a list and starts its campaign whenever the
+  businesses to email run low; it stops itself on bounces or a Google block. A **master sheet** in
+  Google Drive shows every campaign and everything that happened. See [docs/AUTOPILOT.md](docs/AUTOPILOT.md).
 - **Google Drive** – each search's CSV lands in `<your folder>/<business type>/`, campaigns can
   run from a CSV / Google Sheet there, and each campaign's results are kept next to them. See
   [docs/DRIVE.md](docs/DRIVE.md).
@@ -90,6 +96,7 @@ installs what's new by itself.
 | `--no-browser` | don't open the panel in the browser |
 | `--reinstall` | install the packages and Chromium again |
 | `--shortcut` | make the desktop shortcut again (e.g. after moving the folder) |
+| `--autostart` | start the panel when you sign in to Windows (minimised, no browser); `--no-autostart` undoes it |
 
 ### Manual setup
 
@@ -286,6 +293,8 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/PLAYBOOK.md](docs/PLAYBOOK.md) | **setting everything up, in order**: mailbox, Google Drive, business types, search, campaign, every day |
 | [docs/README.md](docs/README.md) | documentation index |
 | [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
+| [docs/AUTOPILOT.md](docs/AUTOPILOT.md) | the autopilot (searches and campaigns by themselves) and the master sheet |
+| [docs/SITES.md](docs/SITES.md) | preview websites: how each business's site is made, who gets one, how long it stays online |
 | [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |

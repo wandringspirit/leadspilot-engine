@@ -35,7 +35,8 @@ def test_every_setting_is_on_the_settings_tab():
     assert sorted(names) == sorted(Settings.model_fields) and len(names) == len(set(names))
     assert {option.group for option in editor.OPTIONS} == {group.key for group in editor.GROUPS}
     assert {option.name for option in editor.OPTIONS if option.restart} == {"HOST", "PORT", "DATA_DIR",
-                                                                            "LOG_BUFFER_SIZE"}
+                                                                            "LOG_BUFFER_SIZE", "KEEP_AWAKE", "PREVIEW_SITES", "SITES_VISITS_KEY",
+                                                                            "SITES_URL"}
 
 
 @pytest.mark.parametrize("value", ["plain", "abcd efgh ijkl mnop", "1 Main St, Houston, TX 77002", "pa#ss", "a #b",

@@ -63,11 +63,18 @@ class Lead(BaseModel):
     phone: str = ""
     category: str = ""
     maps_url: str = ""
+    site: str = ""                 # its preview website: SITES_URL/<site>/ ('' = none, docs/SITES.md)
     status: LeadStatus = LeadStatus.QUEUED
     next_due: datetime | None = None   # earliest time for the next follow-up
     sent: list[SentEmail] = Field(default_factory=list)
     inbound: list[InboundEmail] = Field(default_factory=list)
     note: str = ""                 # why it stopped: the reply's subject, the server's answer ...
+    # its website's visits by someone else than you or a link checker (app/outreach/visits.py)
+    site_opened_at: datetime | None = None    # the first one
+    site_last_visit_at: datetime | None = None
+    site_visits: int = 0           # pages opened
+    site_taps: list[str] = Field(default_factory=list)   # tapped: call / email / keep (each once)
+    site_from: str = ""            # where the last visit came from, e.g. "Comcast Cable · Houston, US"
 
 
 class LeftOut(BaseModel):
@@ -131,6 +138,7 @@ class Campaign(BaseModel):
     business_type_name: str = ""
     steps: list[Step] = Field(default_factory=default_steps)
     footer: str = DEFAULT_FOOTER   # added to every email: postal address and how to opt out
+    sites: bool = False            # each business has a preview website; its first email waits until it is online
     status: CampaignStatus = CampaignStatus.DRAFT
     error: str = ""                # why it was paused automatically
     leads: list[Lead] = Field(default_factory=list)

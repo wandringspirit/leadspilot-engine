@@ -57,6 +57,7 @@ app/
     schedule.py        SendWindow - days, hours, time zone
     mailbox.py         SMTP / IMAP (worker thread), build_message(), parse_headers(), classify()
     manager.py         OutreachManager - persistence, the API's operations, the send loop, results_csv()
+    sites.py           SiteService - a campaign's preview websites: built, uploaded, first emails wait for them
   drive/               Google Drive (docs/DRIVE.md)
     client.py          DriveClient - OAuth sign-in (PKCE, loopback) and the REST calls, over httpx
     sync.py            DriveSync - folders per business type, uploads, lead files, campaign results
@@ -65,6 +66,13 @@ app/
     outreach.js                       the Outreach tab
     settings.js                       the Settings tab
     icon.ico                          the desktop shortcut's icon
+sites/                 preview websites (docs/SITES.md)
+  render.py            one business's website: design + trade pack + its details
+  build.py             a search's / campaign's websites, data/sites/sites.json
+  deploy.py            online at sites.leadspilot.co (wrangler), how long each stays up
+  designs/, trades/    page templates; words, photos and colours per trade
+  assets/, geo/        the trades' photos; the US town list
+  worker/              the Cloudflare Worker that serves them (wrangler.jsonc, src/index.js)
 cli.py                 CLI entry point
 run.py                 uvicorn launcher
 start.bat, start.py    one-click start: .venv, packages, Chromium, desktop shortcut, then run.py (restarts it)
@@ -116,7 +124,7 @@ were skipped and why, how many searches / map sections ran, and why the scan sto
 
 Settings are read from environment variables, then from `.env` in the project root
 (`app/config.py`). The panel's Settings tab shows and changes all of them: it writes `.env` and
-applies new values at once, except `HOST`, `PORT`, `DATA_DIR` and `LOG_BUFFER_SIZE`, which are only
+applies new values at once, except `HOST`, `PORT`, `DATA_DIR`, `LOG_BUFFER_SIZE` and `KEEP_AWAKE`, which are only
 read when the server starts. A setting that is also an environment variable can't be changed there.
 `tests/test_docs.py` checks that every setting is listed here, `tests/test_settings.py` that every
 one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
@@ -129,6 +137,7 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `PORT` | `8000` | port for `run.py` |
 | `DATA_DIR` | `<project>/data` | where `jobs/` and `exports/` live |
 | `LOG_BUFFER_SIZE` | `2000` | log lines kept in memory for the panel's Live logs / `GET /api/logs` |
+| `KEEP_AWAKE` | `true` | Windows doesn't go to sleep while the panel runs, so scheduled emails and the autopilot keep going (the screen still turns off) |
 
 ### Google Maps scraping
 
@@ -186,6 +195,16 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `OUTREACH_MIN_GAP_S` / `OUTREACH_MAX_GAP_S` | `90` / `240` | random pause between two emails |
 | `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |
 | `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |
+| `OUTREACH_TEST_COPY_TO` | *(empty)* | your own addresses, comma-separated: each day's first email also goes to them, word for word, so you can see which tab it lands in ([OUTREACH.md](OUTREACH.md#6-what-is-sent)) |
+| `OUTREACH_UNSUBSCRIBE_HEADER` | `false` | `true`: campaign emails carry a `List-Unsubscribe` header (Gmail's unsubscribe link); off, they read as one-to-one emails and the footer says to reply "no" |
+
+### Preview websites ([SITES.md](SITES.md))
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PREVIEW_SITES` | `true` | every business a campaign emails gets a preview website, and its first email waits until it is online (`false`: neither; the tests set it) |
+| `SITES_URL` | `https://sites.leadspilot.co` | where the websites are online: `<SITES_URL>/<slug>/` |
+| `SITES_VISITS_KEY` | *(empty)* | the Worker's `VISITS_KEY` secret: with it the panel fetches who opened which website (`python sites/deploy.py --visits-key` sets both, [SITES.md](SITES.md#5-who-opened-their-website)) |
 
 ### Google Drive ([DRIVE.md](DRIVE.md))
 
@@ -224,6 +243,7 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_logbuffer.py` | ring buffer semantics: cursor, limit/truncation, level filter, tracebacks, job-id tagging across asyncio tasks |
 | `test_outreach.py` | templates (placeholders, optional parts, business names), who becomes a lead, the send window (DST, weekends), building / reading emails (threading, replies, auto-replies, bounces, unsubscribes), the send loop on a fake mailbox and clock: pauses, daily limit, follow-ups, replies stopping them, auth errors pausing campaigns, nobody emailed twice, business types |
 | `test_outreach_api.py` | the outreach and Drive routes through `TestClient`: business types, campaigns from searches and from a Drive file, start / pause / delete, test emails, connecting Drive (Google's redirect), uploads |
+| `test_sites.py` | preview websites: who gets one (searched city and state, out-of-area businesses, supply shops, low ratings), how long each stays online, what gets uploaded, a campaign's first emails waiting for their websites, a trade without a design, upload errors |
 | `test_drive.py` | lead files (the crawler's CSV and hand-made ones), sign-in and token refresh, folders per business type, uploads that update in place, shared folders – against a fake Google (`httpx.MockTransport`) |
 | `test_settings.py` | the Settings tab: every setting listed, values written to `.env` and read back exactly (quotes, `#`, backslashes), the rest of the file kept, validation, environment variables winning, a broken `.env`; the settings / stop / restart routes and who may call them; `start.py` installing only when `requirements.txt` changed and finding a running panel |
 | `test_docs.py` | documentation consistency (see §7) |

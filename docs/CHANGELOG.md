@@ -3,6 +3,91 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.13.0 – 2026-10-20
+
+### Added
+- **Who opened their website.** The website Worker records each visit in a Cloudflare D1 database:
+  page loads, a page that stayed open, taps on the phone number, email or *keep my website*. It
+  keeps the visitor's network, city and country, and a hash of the IP address, never the address.
+  The panel fetches them every 5 minutes and leaves out your own visits (your connection or your
+  country), test copies and mail servers checking the link. *Website opened* and taps go into the
+  activity log; the results file and the master sheet count them. Needs `SITES_VISITS_KEY`
+  (`python sites/deploy.py --visits-key`).
+- **Test copy** (`OUTREACH_TEST_COPY_TO`): each day's first email also goes to your own addresses,
+  word for word, so you can see which tab it lands in.
+- The settings say so when the Gmail login (`MAIL_USERNAME`) isn't an email address.
+- The project keeps its own Cloudflare login in `data/wrangler` (`python sites/deploy.py --login`):
+  logging in to another Cloudflare account for another project no longer stops the website uploads.
+
+### Fixed
+- The tests could start real Google Maps searches: app.main's autopilot read the real `data/`. The
+  tests now run with a temporary `DATA_DIR`.
+
+## 1.12.0 – 2026-10-16
+
+### Added
+- `start.bat --autostart` starts the panel when you sign in to Windows (minimised, no browser), so
+  the emails and the autopilot run every day; `--no-autostart` undoes it.
+- `KEEP_AWAKE` (on by default): Windows doesn't go to sleep while the panel runs.
+
+### Fixed
+- The preview websites couldn't be uploaded again (*PermissionError: [WinError 5] Access is
+  denied*): a site folder copied from the read-only design folder couldn't be removed. Emptying
+  `data/deploy/public` now clears the read-only flag first.
+
+## 1.11.0 – 2026-10-15
+
+### Changed
+- The master sheet is a **Google Sheet** with a Campaigns tab and an Activity tab. It has a purple
+  header that stays at the top, filter buttons, and rows coloured by status or by what happened. It
+  needs the Google Sheets API switched on in the Google Cloud project. Until then it is the two CSV
+  files, and the panel switches over by itself.
+
+## 1.10.0 – 2026-10-15
+
+### Added
+- **Autopilot** ([AUTOPILOT.md](AUTOPILOT.md)) finds businesses and starts their campaigns by itself.
+  It works through a list of places (20 in Texas to start) for one business type. When fewer than 10
+  businesses are waiting for a first email, it searches the next place and makes and starts that
+  place's campaign. It searches at most twice a day. It stops itself, pausing the campaigns, when 2 of
+  the last 20 businesses emailed bounced, and it also stops when Google blocks a search. Off until you
+  switch it on in the Outreach tab.
+- **Activity log**: every search, campaign, email, reply and bounce, in the Outreach tab and
+  `GET /api/activity`.
+- **Master sheet** in Google Drive: `Leads Pilot - campaigns.csv` has a row per campaign (emailed,
+  waiting, replied, bounced, emails sent …), and `Leads Pilot - activity.csv` holds the activity log.
+
+## 1.9.0 – 2026-10-15
+
+### Added
+- **`{Website}`** in emails: the business's own preview website. A business type with a website design
+  (Roofer) starts with emails that send it: *I made a website for {Business}* (day 0), a check-in
+  (day 3), and *the preview comes down tomorrow* (day 6).
+- `OUTREACH_UNSUBSCRIBE_HEADER` (off): the `List-Unsubscribe` header on campaign emails. In inbox
+  tests the same email went to Promotions or Spam with it and to the inbox without it; the footer says
+  to reply "no".
+
+### Changed
+- How long a preview website stays online follows the emails: 14 days after the first email with the
+  link, 2 days after the last email, 30 days after a reply ([SITES.md](SITES.md#3-how-long-a-website-is-online-sitesdeploypy)).
+
+## 1.8.0 – 2026-10-15
+
+### Added
+- **Preview websites for campaigns** ([SITES.md](SITES.md)): every business a new campaign emails gets
+  its own website at `sites.leadspilot.co/<business>/`, and **its first email waits until the website
+  is online** – the email says it is built. The panel builds them when the campaign is made and uploads
+  them to Cloudflare by itself (again every 10 minutes while an upload fails).
+  - A business without a city on Google gets the searched city; one more than 60 miles from it, or a
+    supply shop, is left out with the reason; a rating under 4.0 or from fewer than 5 reviews stays
+    off the page.
+  - A website stays online 30 days after it is built, 21 days after the first email, 7 days after its
+    link is sent; on hold, until you lift it.
+  - The Outreach tab shows each business's website and, in the setup list, how many are online and
+    any upload error. The results CSV has a **Website** column.
+  - A campaign for a business type without a website design can't start (today only Roofer has one).
+  - New settings `PREVIEW_SITES` and `SITES_URL`; new packages Jinja2 and Pillow.
+
 ## 1.7.1 – 2026-10-20
 
 ### Fixed

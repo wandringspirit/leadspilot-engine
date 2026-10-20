@@ -133,6 +133,7 @@
       { done: started, title: "Your first campaign",
         text: "+ New campaign, check the preview, send yourself a test, then Start." },
     ];
+    if (s.sites) items.splice(3, 0, { done: !s.sites.last_upload.error, title: "Preview websites", build: buildSitesStep });
     els.setupList.innerHTML = "";
     for (const item of items) {
       const li = el("li", item.done ? "done" : "");
@@ -166,6 +167,33 @@
     line.appendChild(el("small", "muted", "Gmail: use an app password – Settings shows how."));
     line.appendChild(settingsButton("Fill in ›", "mailbox"));
     li.appendChild(line);
+  }
+
+  function buildSitesStep(li, done) {
+    const w = state.status.sites;
+    if (!done) {
+      const list = el("ul", "problems");
+      list.appendChild(el("li", "", `The websites couldn't be uploaded: ${w.last_upload.error}`));
+      li.appendChild(list);
+      li.appendChild(el("small", "muted block", "First emails wait until their business's website is online. "
+        + "It tries again every 10 minutes."));
+      return;
+    }
+    const parts = [`${w.online.length} online at ${w.url.replace(/^https?:\/\//, "")}`];
+    if (w.uploading) parts.push("uploading…");
+    else if (w.waiting) parts.push(`${w.waiting} waiting to go online`);
+    li.appendChild(el("small", "muted block", parts.join(" · ")));
+  }
+
+  // the business's website (SITES_URL/<slug>/), or "" when it has none
+  function siteUrl(lead) {
+    const w = state.status && state.status.sites;
+    return lead.site && w ? `${w.url}/${lead.site}/` : "";
+  }
+
+  function siteOnline(lead) {
+    const w = state.status && state.status.sites;
+    return !w || !lead.site || w.online.includes(lead.site);
   }
 
   function buildDriveStep(li, done) {
@@ -294,6 +322,7 @@
 
   function show(kind) {
     els.intro.hidden = kind !== "intro";
+    for (const id of ["autopilot-card", "activity-card"]) $(id).hidden = kind !== "intro";
     els.newCard.hidden = kind !== "new";
     els.campCard.hidden = kind !== "campaign";
     els.leadsCard.hidden = kind !== "campaign";
@@ -603,6 +632,13 @@
     name.appendChild(el("span", "", lead.business));
     name.title = lead.name !== lead.business ? `On Google Maps: ${lead.name}` : lead.name;
     if (lead.category) name.appendChild(el("small", "muted block", lead.category));
+    if (siteUrl(lead)) {
+      const link = el("a", "site-link", siteOnline(lead) ? "Website ↗" : "Website (not online yet)");
+      link.href = siteUrl(lead);
+      link.target = "_blank";
+      link.rel = "noopener";
+      name.appendChild(link);
+    }
     tr.appendChild(name);
     const email = el("td", "", lead.email);
     email.title = lead.other_emails.length ? `Also: ${lead.other_emails.join(", ")}` : lead.email;
@@ -617,12 +653,21 @@
     const notes = [lead.note, ...lead.inbound.map((i) => `${i.kind.replace("_", " ")} ${when(i.received_at)}: ${i.subject}`)];
     tag.title = notes.filter(Boolean).join("\n");
     status.appendChild(tag);
+    if (lead.site_opened_at) {           // who opened their website: app/outreach/visits.py
+      const taps = lead.site_taps.length ? ` · tapped ${lead.site_taps.join(", ")}` : "";
+      const opened = el("small", "block site-opened",
+        `Opened website${lead.site_visits > 1 ? ` ×${lead.site_visits}` : ""}${taps}`);
+      opened.title = [`First: ${when(lead.site_opened_at)}`, `Last: ${when(lead.site_last_visit_at)}`,
+        lead.site_from ? `From: ${lead.site_from}` : ""].filter(Boolean).join("\n");
+      status.appendChild(opened);
+    }
     tr.appendChild(status);
     const sent = el("td", "", `${lead.sent.length} of ${c.steps.length}`);
     sent.title = lead.sent.map((s) => `Email ${s.step}: ${when(s.sent_at)}`).join("\n") || "Nothing sent yet";
     tr.appendChild(sent);
     let next = "—";
     if (lead.status === "sent" && lead.next_due) next = when(lead.next_due);
+    else if (lead.status === "queued" && c.sites && !siteOnline(lead)) next = "once its website is online";
     else if (lead.status === "queued") next = c.status === "running" ? "in the send window" : "after Start";
     tr.appendChild(el("td", "", next));
 
@@ -1139,7 +1184,7 @@
   // polling while the tab is open
   // ------------------------------------------------------------------
   async function poll() {
-    await Promise.all([loadStatus(), loadCampaigns()]);
+    await Promise.all([loadStatus(), loadCampaigns(), window.autopilotPanel ? window.autopilotPanel.refresh() : null]);
     if (state.view.kind === "campaign" && state.campaign) {
       try {
         state.campaign = await api(`/api/campaigns/${state.campaign.id}`);

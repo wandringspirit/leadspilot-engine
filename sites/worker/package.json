@@ -1,0 +1,12 @@
+{
+  "name": "leadspilot-sites",
+  "private": true,
+  "description": "Serves the preview websites at sites.leadspilot.co - see sites/deploy.py",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.0"
+  }
+}

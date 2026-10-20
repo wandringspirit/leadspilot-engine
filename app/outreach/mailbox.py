@@ -89,6 +89,10 @@ def smtp_problems(cfg: Settings) -> list[str]:
         problems.append("SMTP_HOST is not set (e.g. smtp.gmail.com)")
     if not cfg.MAIL_USERNAME.strip() or not cfg.MAIL_PASSWORD:
         problems.append("MAIL_USERNAME / MAIL_PASSWORD are not set (Gmail: your address and an app password)")
+    user = cfg.MAIL_USERNAME.strip()
+    if user and "@" not in user and "google" in f"{cfg.SMTP_HOST} {cfg.IMAP_HOST}".replace("gmail", "google"):
+        problems.append(f"MAIL_USERNAME {user!r} is not an email address - Gmail logs in with the account's own "
+                        "address (not a send-as alias, not an app password's name)")
     address = sender_address(cfg)
     if address and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
         problems.append(f"SENDER_EMAIL {address!r} is not an email address")

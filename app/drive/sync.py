@@ -2,6 +2,9 @@
 
 ```
 DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL, or My Drive itself)
+  Leads Pilot - Master sheet       a Google Sheet: a Campaigns tab (every campaign on one page) and an
+                                   Activity tab (everything that happened) - app/drive/sheets.py
+  (Leads Pilot - campaigns.csv / activity.csv instead, while the Sheets API is off)
   Roofer/                          one folder per business type (its name)
     roofing_in_houston_no_website_email_29_09_2026.csv    each search, when it finishes
     my_cleaned_list.csv            a lead file you put there - a campaign can run from it
@@ -13,22 +16,25 @@ DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL,
 
 A search's CSV is the extended export (the default columns first, then the
 extra ones); it is written again after an enrichment. Campaign results are
-uploaded when they changed, at most every ``RESULTS_EVERY``. Folders are made
+and the master sheet are uploaded when they changed, at most every ``RESULTS_EVERY``. Folders are made
 when missing and remembered for the session.
 """
 from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from app.config import Settings
 from app.drive.client import SHEET_TYPE, DriveClient, DriveError, folder_id_from
+from app.drive.sheets import NAME as SHEET_NAME, MasterSheet, SheetsOff
 from app.export.csv_export import job_filename, rows_to_csv_bytes, safe_filename
 from app.export.csv_import import CsvFormatError, rows_from_csv
+from app.outreach.master import to_csv
 from app.models import Job, PlaceRow
 
 if TYPE_CHECKING:
@@ -40,6 +46,8 @@ log = logging.getLogger(__name__)
 OUTREACH_FOLDER = "Outreach"
 RESULTS_EVERY = timedelta(minutes=5)     # campaign results are uploaded at most this often
 LOOP_S = 60
+MASTER_FILES = {"campaigns": "Leads Pilot - campaigns.csv", "activity": "Leads Pilot - activity.csv"}
+SHEETS_RETRY = timedelta(minutes=10)     # the Sheets API was off: try it again after this
 LEAD_FILE_TYPES = ("text/csv", "text/comma-separated-values", "application/vnd.ms-excel", SHEET_TYPE)
 
 
@@ -56,6 +64,13 @@ class DriveSync:
         self.last_error = ""
         self._folders: dict[tuple[str, ...], dict] = {}
         self._task: asyncio.Task | None = None
+        # where the master sheet went: "sheet" -> {link, at}, or (CSV) part -> {id, link, hash, at}
+        self.master: dict[str, dict] = {}
+        self.sheet = MasterSheet(self.client, cfg.DATA_DIR / "master_sheet.json")
+        self.sheets_off = ""                 # why the master sheet is CSV files ('' = it isn't)
+        self._sheets_off_at: datetime | None = None
+        self._master_hash = ""
+        self._master_at: datetime | None = None
 
     @property
     def connected(self) -> bool:
@@ -74,6 +89,10 @@ class DriveSync:
             "auto_upload": self.cfg.DRIVE_AUTO_UPLOAD,
             "problems": problems,
             "last_error": self.last_error,
+            "master": {part: {"name": SHEET_NAME if part == "sheet" else MASTER_FILES[part],
+                              "link": file.get("link", ""), "at": file.get("at")}
+                       for part, file in self.master.items()},
+            "sheets_off": self.sheets_off,
         }
 
     # ------------------------------------------------------------------
@@ -172,9 +191,51 @@ class DriveSync:
             log.info("Google Drive: saved the results of %r to %s", campaign.name, path)
         return uploaded
 
-    def start_loop(self, outreach: "OutreachManager") -> None:
+    async def sync_master(self, tables: dict[str, tuple[list[str], list[list]]], *, force: bool = False) -> bool:
+        """Write the master sheet (``tables``: campaigns / activity -> (header, rows)) when it changed, at most
+        every RESULTS_EVERY: the Google Sheet, or CSV files while the Sheets API is off."""
+        now = datetime.now(timezone.utc)
+        digest = hashlib.sha1(json.dumps(tables, default=str).encode("utf-8")).hexdigest()
+        try_sheet = self.sheets_off == "" or self._sheets_off_at is None or now - self._sheets_off_at >= SHEETS_RETRY
+        retry = bool(self.sheets_off) and try_sheet
+        if not force and not retry and (digest == self._master_hash
+                                        or (self._master_at and now - self._master_at < RESULTS_EVERY)):
+            return False
+        if try_sheet:
+            try:
+                folder = await self.folder()
+                result = await self._call(self.sheet.write, folder["id"], tables)
+                self.master = {"sheet": {"link": result["link"], "at": now.isoformat()}}
+                if self.sheets_off:
+                    log.info("Google Drive: the Sheets API is on - the master sheet is a Google Sheet now")
+                self.sheets_off, self._master_hash, self._master_at = "", digest, now
+                log.info("Google Drive: master sheet saved (%s)", SHEET_NAME)
+                return True
+            except SheetsOff:
+                if not self.sheets_off:
+                    log.warning("Google Drive: the Google Sheets API is off - the master sheet is saved as CSV "
+                                "files until it is switched on (docs/AUTOPILOT.md)")
+                self.sheets_off = ("the Google Sheets API is off in your Google Cloud project - switch it on and "
+                                   "the master sheet becomes a coloured Google Sheet")
+                self._sheets_off_at = now
+                self.last_error = ""
+        if digest == self._master_hash and not force:
+            return False
+        for part, table in tables.items():
+            known = self.master.get(part, {})
+            file = await self._upload((), MASTER_FILES[part], to_csv(table), known.get("id", ""))
+            self.master[part] = {"id": file.get("id", ""), "link": file.get("webViewLink", ""), "at": now.isoformat()}
+        self.master.pop("sheet", None)
+        self._master_hash, self._master_at = digest, now
+        log.info("Google Drive: master sheet saved (%s)", ", ".join(MASTER_FILES.values()))
+        return True
+
+    def start_loop(self, outreach: "OutreachManager",
+                   master: "Callable[[], dict[str, tuple[list[str], list[list]]]] | None" = None) -> None:
+        """Keep campaign results (and, with ``master`` - it makes the master sheet's files - the master
+        sheet) up to date in Drive."""
         if self._task is None or self._task.done():
-            self._task = asyncio.create_task(self._loop(outreach), name="drive")
+            self._task = asyncio.create_task(self._loop(outreach, master), name="drive")
 
     async def stop_loop(self) -> None:
         if self._task is not None:
@@ -183,13 +244,16 @@ class DriveSync:
                 await self._task
             self._task = None
 
-    async def _loop(self, outreach: "OutreachManager") -> None:
+    async def _loop(self, outreach: "OutreachManager",
+                    master: "Callable[[], dict[str, tuple[list[str], list[list]]]] | None") -> None:
         while True:
             await asyncio.sleep(LOOP_S)
             if not self.connected:
                 continue
             try:
                 await self.sync_campaigns(outreach)
+                if master is not None:
+                    await self.sync_master(master())
                 self.last_error = ""
             except DriveError as exc:
                 self.last_error = str(exc)

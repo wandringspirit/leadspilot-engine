@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # --- Server -----------------------------------------------------------
     HOST: str = "127.0.0.1"
     PORT: int = 8000
+    KEEP_AWAKE: bool = True               # Windows doesn't sleep while the panel runs (emails, autopilot)
 
     # --- Storage ----------------------------------------------------------
     DATA_DIR: Path = PROJECT_ROOT / "data"
@@ -79,6 +80,14 @@ class Settings(BaseSettings):
     OUTREACH_CHECK_MINUTES: int = 10      # how often the mailbox is checked for replies and bounces
     OUTREACH_MIN_REVIEWS: int = 10        # {Rating} / {Reviews} need at least this many reviews ...
     OUTREACH_MIN_RATING: float = 4.0      # ... and at least this rating
+    OUTREACH_TEST_COPY_TO: str = ""       # your own addresses: a copy of each day's first email (which tab?)
+    OUTREACH_UNSUBSCRIBE_HEADER: bool = False   # a List-Unsubscribe header (Gmail's unsubscribe link) on
+                                          # campaign emails - off: one-to-one emails got filed as mailings
+
+    # --- Preview websites (docs/SITES.md) ------------------------------------
+    PREVIEW_SITES: bool = True            # each business a campaign emails gets a preview website first
+    SITES_URL: str = "https://sites.leadspilot.co"   # where they are online: <SITES_URL>/<slug>/
+    SITES_VISITS_KEY: str = ""            # the Worker's VISITS_KEY secret: who opened which website (docs/SITES.md)
 
     # --- Google Drive (docs/DRIVE.md) ----------------------------------------
     GOOGLE_CLIENT_ID: str = ""            # OAuth client of type "Desktop app" from the Google Cloud console

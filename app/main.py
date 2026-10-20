@@ -17,14 +17,19 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__, settings_editor
 from app.config import settings
-from app.control import browse_url, control
+from app.control import browse_url, control, keep_awake
 from app.drive.client import DriveError
 from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
 from app.jobs import ACTIVE_STATES, JobManager
 from app.logbuffer import LEVELS, install as install_log_buffer, log_buffer
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
+from app.outreach.activity import ActivityLog
+from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.manager import OutreachError, OutreachManager
+from app.outreach.master import activity_table, campaigns_table, to_csv
+from app.outreach.sites import SiteService
+from app.outreach.visits import Visits
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
                                  SendTestRequest)
@@ -42,12 +47,26 @@ ENV_FILE = Path(settings.model_config["env_file"])    # the .env the Settings ta
 async def lifespan(_: FastAPI):
     log.info("Leads Pilot Engine %s ready - %d job(s) loaded, headless=%s, detail concurrency=%d",
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
+    if settings.KEEP_AWAKE and keep_awake(True):
+        log.info("Keeping the computer awake while the panel runs (KEEP_AWAKE)")
     outreach.start_loop()
+    autopilot.start_loop()
+    if sites is not None and sites.unpublished():
+        sites.request_upload()                  # an upload that hadn't happened when the server stopped
     if settings.DRIVE_AUTO_UPLOAD:
-        drive.start_loop(outreach)
+        drive.start_loop(outreach, master=_master_tables)
+    if visits is not None:
+        visits.start_loop(outreach.record_visits)
     yield
+    if visits is not None:
+        await visits.stop_loop()
+    await autopilot.stop_loop()
     await outreach.stop_loop()
     await drive.stop_loop()
+    if sites is not None:
+        await sites.stop()
+    if settings.KEEP_AWAKE:
+        keep_awake(False)
     log.info("Shutting down")
 
 
@@ -58,12 +77,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 manager = JobManager(settings)
-outreach = OutreachManager(settings)
+sites = SiteService(settings) if settings.PREVIEW_SITES else None
+activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
+visits = Visits(settings) if sites is not None else None
+outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits)
+autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 
 
+def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
+    """The master sheet's two tables (app/outreach/master.py)."""
+    return {"campaigns": campaigns_table(outreach.list_campaigns()), "activity": activity_table(activity.entries())}
+
+
 async def _job_finished(job: Job) -> None:
-    """A search (or an enrichment) finished: put its CSV in Google Drive (DRIVE_AUTO_UPLOAD)."""
+    """A search (or an enrichment) finished: the autopilot makes its campaign, and its CSV goes to Google
+    Drive (DRIVE_AUTO_UPLOAD)."""
+    try:
+        await autopilot.job_finished(job)
+    except Exception:  # noqa: BLE001 - the Drive upload below still happens
+        log.exception("Autopilot: could not act on the finished search %s", job.id)
     if settings.DRIVE_AUTO_UPLOAD and drive.connected and job.rows:
         try:
             await _save_job_to_drive(job)
@@ -247,6 +280,34 @@ async def outreach_status() -> dict:
 async def outreach_check() -> dict:
     """Check the mailbox for replies and bounces now."""
     return await _outreach(outreach.check_now())
+
+
+@app.get("/api/autopilot")
+async def autopilot_status() -> dict:
+    """The autopilot: on or off, its places, what it's waiting for, its recent searches."""
+    return autopilot.status()
+
+
+@app.patch("/api/autopilot")
+async def update_autopilot(req: AutopilotUpdate) -> dict:
+    """Switch the autopilot on or off, change its business type, places or limits."""
+    return _outreach_call(autopilot.update, req)
+
+
+@app.get("/api/activity")
+async def get_activity(limit: int = Query(100, ge=1, le=5000)) -> list[dict]:
+    """What happened, newest first: searches, campaigns, emails, replies, bounces."""
+    return activity.entries(limit)
+
+
+@app.get("/api/master/{part}.csv")
+async def master_csv(part: str) -> Response:
+    """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log)."""
+    tables = _master_tables()
+    if part not in tables:
+        raise HTTPException(404, "the master sheet has campaigns.csv and activity.csv")
+    return Response(content=to_csv(tables[part]), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="leads-pilot-{part}.csv"'})
 
 
 @app.get("/api/business-types", response_model=list[BusinessType])
@@ -491,7 +552,7 @@ async def _apply_settings(names: set[str]) -> None:
             await outreach.stop_loop()
     if "DRIVE_AUTO_UPLOAD" in names:
         if settings.DRIVE_AUTO_UPLOAD:
-            drive.start_loop(outreach)
+            drive.start_loop(outreach, master=_master_tables)
         else:
             await drive.stop_loop()
     if names & {"DRIVE_FOLDER", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"}:
