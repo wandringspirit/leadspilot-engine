@@ -195,6 +195,7 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `OUTREACH_MIN_GAP_S` / `OUTREACH_MAX_GAP_S` | `90` / `240` | random pause between two emails |
 | `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |
 | `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |
+| `OUTREACH_TEST_COPY_TO` | *(empty)* | your own addresses, comma-separated: each day's first email also goes to them, word for word, so you can see which tab it lands in ([OUTREACH.md](OUTREACH.md#6-what-is-sent)) |
 | `OUTREACH_UNSUBSCRIBE_HEADER` | `false` | `true`: campaign emails carry a `List-Unsubscribe` header (Gmail's unsubscribe link); off, they read as one-to-one emails and the footer says to reply "no" |
 
 ### Preview websites ([SITES.md](SITES.md))
@@ -203,6 +204,7 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | --- | --- | --- |
 | `PREVIEW_SITES` | `true` | every business a campaign emails gets a preview website, and its first email waits until it is online (`false`: neither; the tests set it) |
 | `SITES_URL` | `https://sites.leadspilot.co` | where the websites are online: `<SITES_URL>/<slug>/` |
+| `SITES_VISITS_KEY` | *(empty)* | the Worker's `VISITS_KEY` secret: with it the panel fetches who opened which website (`python sites/deploy.py --visits-key` sets both, [SITES.md](SITES.md#5-who-opened-their-website)) |
 
 ### Google Drive ([DRIVE.md](DRIVE.md))
 

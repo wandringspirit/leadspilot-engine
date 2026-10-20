@@ -76,8 +76,9 @@ Set up once, on the computer the panel runs on:
 
 1. install [Node.js](https://nodejs.org);
 2. in `sites/worker`: `npm install`;
-3. in `sites/worker`: `npx wrangler login` – log in with the Cloudflare account that owns
-   `leadspilot.co`. `wrangler.jsonc` names that account (`account_id`), so an upload under another
+3. `python sites/deploy.py --login` – log in with the Cloudflare account that owns
+   `leadspilot.co`. This project keeps its own login in `data/wrangler`, so logging in to another
+   Cloudflare account elsewhere doesn't affect it. `wrangler.jsonc` names that account (`account_id`), so an upload under another
    login fails instead of going to the wrong account.
 
 | Setting | Default | |
@@ -85,7 +86,47 @@ Set up once, on the computer the panel runs on:
 | `PREVIEW_SITES` | `true` | `false`: campaigns get no websites and first emails don't wait (the tests set it) |
 | `SITES_URL` | `https://sites.leadspilot.co` | where the websites are online |
 
-## 5. By hand
+## 5. Who opened their website
+
+The Worker writes every visit into a small Cloudflare D1 database, `leadspilot-visits`
+(`sites/worker/migrations/0001_visits.sql`):
+
+| Kind | When |
+| --- | --- |
+| `view` | a page of the site was loaded |
+| `seen` | it stayed open 3 seconds (a small script the Worker adds to every page) |
+| `call` / `email` / `keep` | the phone number, the business's email or *keep my website* was tapped |
+| `ended` | the site had ended and *This preview has ended* was shown |
+
+Of the visitor it keeps their network (e.g. *Comcast Cable*), city and country, the browser's
+User-Agent and a hash of the IP address made with the `VISITS_KEY` secret. The address itself is never
+stored. The panel fetches the new visits every 5 minutes (`GET /_visits`, with `VISITS_KEY` as the
+bearer token; `app/outreach/visits.py`), keeps them in `data/sites/visits.jsonl`, and sorts them:
+
+- **you**: from the panel's own internet connection, or from your own country (the Worker tells the
+  panel both). Your test visits, from this computer or your phone, aren't the business's;
+- **copy**: opened from a test copy of an email (`?copy` on the link, `OUTREACH_TEST_COPY_TO`);
+- **check**: a mail server or security scanner checking the link: a program's User-Agent, a network
+  like Microsoft's or Google's, or a page load within 2 minutes of the email that didn't stay open;
+- **visitor**: everyone else. Counted on the business: *Website opened* in the activity log (the first
+  of each day, with where it came from) and *Tapped call* / *Tapped email* / *Asked to keep website*,
+  and the columns *Website Opened*, *Last Visit*, *Website Visits*, *Tapped*, *Visited From* in the
+  campaign's results file. The master sheet counts *Opened website* and *Tapped* per campaign.
+
+Set up once (done for sites.leadspilot.co):
+
+```bash
+cd sites/worker
+npx wrangler d1 create leadspilot-visits                       # its id goes into wrangler.jsonc
+npx wrangler d1 migrations apply leadspilot-visits --remote
+cd ../..
+python sites/deploy.py --visits-key        # makes VISITS_KEY: the Worker's secret and .env's SITES_VISITS_KEY
+python sites/deploy.py                     # uploads the Worker
+```
+
+Restart the panel after `--visits-key`. Without `SITES_VISITS_KEY` the panel doesn't fetch visits.
+
+## 6. By hand
 
 ```bash
 python sites/render.py sites/trades/roofer.json sites/samples/roofer-dallas.json   # one sample site
@@ -97,11 +138,12 @@ python sites/deploy.py                                                          
 `.claude/launch.json` has two preview servers: `sites` (the built sites, port 4173) and
 `sites-worker` (the Worker with `wrangler dev`, port 8787, after `python sites/deploy.py --prepare`).
 
-## 6. When something goes wrong
+## 7. When something goes wrong
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| *not logged in to Cloudflare* | wrangler has no login on this computer | `npx wrangler login` in `sites/worker` |
+| *not logged in to Cloudflare* | this project has no Cloudflare login | `python sites/deploy.py --login` |
 | *Node.js isn't installed* | `node` isn't on the PATH | install Node.js, restart the panel |
 | first emails never go out, *once its website is online* | uploads fail | the setup list shows why |
 | a new website address doesn't open on your PC | the router remembers it didn't exist yet | wait up to an hour, or try on mobile data |
+| *the websites don't know this key* | `SITES_VISITS_KEY` isn't the Worker's `VISITS_KEY` | `python sites/deploy.py --visits-key`, restart the panel |

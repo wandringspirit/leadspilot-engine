@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,9 @@ import pytest
 os.environ["OUTREACH_AUTOSEND"] = "false"
 os.environ["DRIVE_AUTO_UPLOAD"] = "false"
 os.environ["PREVIEW_SITES"] = "false"      # no websites built or uploaded to Cloudflare (tests/test_sites.py)
+# ... and app.main's objects never see the real data/: the autopilot there (switched on) would start real
+# Google Maps searches, and its campaigns, activity log and Drive sign-in are the real ones
+os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="leadspilot-tests-")
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

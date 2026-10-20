@@ -25,3 +25,4 @@ Thumbs.db
 # the preview-site Worker (sites/worker)
 node_modules/
 .wrangler/
+.dev.vars

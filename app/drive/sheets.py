@@ -12,10 +12,11 @@ import json
 from pathlib import Path
 
 from app.drive.client import API, SHEET_TYPE, DriveClient, DriveError
+from app.outreach.master import COUNT_COLUMNS
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 NAME = "Leads Pilot - Master sheet"
-FORMAT_VERSION = 1                     # raise it to format existing sheets again
+FORMAT_VERSION = 2                     # raise it to format existing sheets again
 CAMPAIGNS, ACTIVITY = 0, 1             # sheet ids
 
 HEADER = {"red": 0.29, "green": 0.11, "blue": 0.43}         # deep purple
@@ -27,19 +28,22 @@ RED = {"red": 0.98, "green": 0.84, "blue": 0.84}
 BLUE = {"red": 0.87, "green": 0.92, "blue": 0.98}
 LILAC = {"red": 0.93, "green": 0.9, "blue": 0.98}
 GREY = {"red": 0.94, "green": 0.94, "blue": 0.94}
+TEAL = {"red": 0.8, "green": 0.94, "blue": 0.92}
 
 #: rows coloured by the Status column (C) - paused carries its reason, so it is matched at the start
 CAMPAIGN_COLOURS = [("^running", GREEN), ("^paused", YELLOW), ("^finished", BLUE)]
 #: rows coloured by What (B)
 ACTIVITY_COLOURS = [
     ("^(Reply)$", GREEN),
-    ("^(Bounce|Email refused|Autopilot stopped|Search blocked|Campaign paused|Campaign not started)$", RED),
+    ("^(Website opened|Tapped call|Tapped email|Asked to keep website|Ended website opened)$", TEAL),
+    ("^(Bounce|Email refused|Autopilot stopped|Search blocked|Campaign paused|Campaign not started|"
+     "Test copy not sent)$", RED),
     ("^(Email sent)$", BLUE),
     ("^(Campaign created|Campaign started|Campaign finished|Autopilot on)$", YELLOW),
     ("^(Search started|Search finished|Search stopped)$", LILAC),
-    ("^(Automatic reply|Unsubscribe|Autopilot off|Campaign not made)$", GREY),
+    ("^(Automatic reply|Unsubscribe|Autopilot off|Campaign not made|Test copy sent)$", GREY),
 ]
-CAMPAIGN_WIDTHS = [240, 105, 170, 125, 125] + [88] * 12 + [125, 300]
+CAMPAIGN_WIDTHS = [240, 105, 170, 125, 125] + [88] * len(COUNT_COLUMNS) + [125, 300]
 ACTIVITY_WIDTHS = [125, 140, 210, 230, 240, 460]
 
 
@@ -128,7 +132,7 @@ class MasterSheet:
                                                "textFormat": {"fontSize": 10}}},
                 "fields": "userEnteredFormat(verticalAlignment,wrapStrategy,textFormat.fontSize)"}})
         requests.append({"repeatCell": {                      # the counts, centred
-            "range": {"sheetId": CAMPAIGNS, "startRowIndex": 1, "startColumnIndex": 5, "endColumnIndex": 17},
+            "range": {"sheetId": CAMPAIGNS, "startRowIndex": 1, "startColumnIndex": 5, "endColumnIndex": 5 + len(COUNT_COLUMNS)},
             "cell": {"userEnteredFormat": {"horizontalAlignment": "CENTER"}},
             "fields": "userEnteredFormat.horizontalAlignment"}})
         requests.append({"repeatCell": {                      # the All campaigns row

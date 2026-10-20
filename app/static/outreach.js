@@ -653,6 +653,14 @@
     const notes = [lead.note, ...lead.inbound.map((i) => `${i.kind.replace("_", " ")} ${when(i.received_at)}: ${i.subject}`)];
     tag.title = notes.filter(Boolean).join("\n");
     status.appendChild(tag);
+    if (lead.site_opened_at) {           // who opened their website: app/outreach/visits.py
+      const taps = lead.site_taps.length ? ` · tapped ${lead.site_taps.join(", ")}` : "";
+      const opened = el("small", "block site-opened",
+        `Opened website${lead.site_visits > 1 ? ` ×${lead.site_visits}` : ""}${taps}`);
+      opened.title = [`First: ${when(lead.site_opened_at)}`, `Last: ${when(lead.site_last_visit_at)}`,
+        lead.site_from ? `From: ${lead.site_from}` : ""].filter(Boolean).join("\n");
+      status.appendChild(opened);
+    }
     tr.appendChild(status);
     const sent = el("td", "", `${lead.sent.length} of ${c.steps.length}`);
     sent.title = lead.sent.map((s) => `Email ${s.step}: ${when(s.sent_at)}`).join("\n") || "Nothing sent yet";

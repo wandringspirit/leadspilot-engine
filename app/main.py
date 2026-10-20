@@ -29,6 +29,7 @@ from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.manager import OutreachError, OutreachManager
 from app.outreach.master import activity_table, campaigns_table, to_csv
 from app.outreach.sites import SiteService
+from app.outreach.visits import Visits
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
                                  SendTestRequest)
@@ -54,7 +55,11 @@ async def lifespan(_: FastAPI):
         sites.request_upload()                  # an upload that hadn't happened when the server stopped
     if settings.DRIVE_AUTO_UPLOAD:
         drive.start_loop(outreach, master=_master_tables)
+    if visits is not None:
+        visits.start_loop(outreach.record_visits)
     yield
+    if visits is not None:
+        await visits.stop_loop()
     await autopilot.stop_loop()
     await outreach.stop_loop()
     await drive.stop_loop()
@@ -74,7 +79,8 @@ app = FastAPI(
 manager = JobManager(settings)
 sites = SiteService(settings) if settings.PREVIEW_SITES else None
 activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
-outreach = OutreachManager(settings, sites=sites, activity=activity)
+visits = Visits(settings) if sites is not None else None
+outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits)
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 

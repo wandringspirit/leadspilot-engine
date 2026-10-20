@@ -3,6 +3,8 @@
     python sites/deploy.py              # upload every site that is still up
     python sites/deploy.py --dry-run    # check everything, upload nothing
     python sites/deploy.py --prepare    # only make data/deploy/public (for: wrangler dev)
+    python sites/deploy.py --login      # log in to Cloudflare for this project (opens the browser)
+    python sites/deploy.py --visits-key # a new VISITS_KEY: the Worker's secret and .env's SITES_VISITS_KEY
 
 The panel does this by itself after it builds a campaign's sites and after first emails go out
 (app/outreach/sites.py). The sites come from ``sites/build.py`` (``data/sites/sites.json``). This copies
@@ -16,9 +18,13 @@ business replied; 2 days after the last email, which links the site and says it 
 email without it; else 30 days after it was built. A site on hold - the business wants to keep it - stays
 until the hold is lifted.
 
-Once, before the first upload, log in to Cloudflare (it opens the browser), in sites/worker:
+Once, before the first upload, log in to Cloudflare with the account that owns leadspilot.co (it opens
+the browser):
 
-    npx wrangler login
+    python sites/deploy.py --login
+
+This project keeps its own Cloudflare login, in data/wrangler (``WRANGLER_HOME``), so logging in to
+another Cloudflare account for another project doesn't stop the uploads here.
 """
 from __future__ import annotations
 
@@ -37,6 +43,7 @@ SITES = ROOT.parent / "data" / "sites"
 PUBLIC = ROOT.parent / "data" / "deploy" / "public"    # wrangler.jsonc's assets directory
 WORKER = ROOT / "worker"
 WRANGLER = WORKER / "node_modules" / "wrangler" / "bin" / "wrangler.js"
+WRANGLER_HOME = ROOT.parent / "data" / "wrangler"       # this project's own Cloudflare login
 REPLY_DAYS = 30
 LAST_EMAIL_DAYS = 2
 LINK_DAYS = 14
@@ -110,12 +117,62 @@ def mark_published(slugs: list[str], sites_dir: Path = SITES, now: datetime | No
     partial.replace(path)
 
 
+def wrangler_env() -> dict[str, str]:
+    """The environment wrangler runs in: with this project's own login (``WRANGLER_HOME``)."""
+    WRANGLER_HOME.mkdir(parents=True, exist_ok=True)
+    return {**os.environ, "XDG_CONFIG_HOME": str(WRANGLER_HOME)}
+
+
+def login() -> int:
+    """Log in to Cloudflare for this project (opens the browser) - with the account that owns leadspilot.co."""
+    if not WRANGLER.is_file():
+        print("Cloudflare's wrangler isn't installed - run  npm install  in sites/worker", file=sys.stderr)
+        return 1
+    print("Log in with the Cloudflare account that owns leadspilot.co (leadpilot01@gmail.com).")
+    result = subprocess.run(["node", str(WRANGLER), "login"], cwd=WORKER, env=wrangler_env())
+    if result.returncode == 0:
+        subprocess.run(["node", str(WRANGLER), "whoami"], cwd=WORKER, env=wrangler_env())
+    return result.returncode
+
+
+def visits_key() -> int:
+    """A new random VISITS_KEY: the Worker hashes visitors' IP addresses with it and only shows the visits
+    to whoever has it - set as the Worker's secret, and as SITES_VISITS_KEY in .env for the panel. It is
+    never printed."""
+    import secrets
+    sys.path.insert(0, str(ROOT.parent))
+    from app import settings_editor
+    from app.config import PROJECT_ROOT, Settings
+    if not WRANGLER.is_file():
+        print("Cloudflare's wrangler isn't installed - run  npm install  in sites/worker", file=sys.stderr)
+        return 1
+    key = secrets.token_urlsafe(32)
+    result = subprocess.run(["node", str(WRANGLER), "secret", "put", "VISITS_KEY", "--config",
+                             str(WORKER / "wrangler.jsonc")], cwd=WORKER, env=wrangler_env(), input=key, text=True,
+                            capture_output=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        print("The Worker's secret couldn't be set:\n" + (result.stdout + result.stderr).strip()[-800:],
+              file=sys.stderr)
+        return result.returncode
+    settings_editor.save(Settings(), {"SITES_VISITS_KEY": key}, PROJECT_ROOT / ".env")
+    print("VISITS_KEY is set on the Worker and in .env (SITES_VISITS_KEY) - restart the panel.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="check everything, upload nothing")
     mode.add_argument("--prepare", action="store_true", help="only make data/deploy/public")
+    mode.add_argument("--login", action="store_true", help="log in to Cloudflare for this project")
+    mode.add_argument("--visits-key", action="store_true",
+                      help="make a new VISITS_KEY (who opened which website): the Worker's secret and .env's "
+                           "SITES_VISITS_KEY")
     args = ap.parse_args()
+    if args.login:
+        return login()
+    if args.visits_key:
+        return visits_key()
     slugs = prepare()
     print(f"{len(slugs)} site(s) ready in {PUBLIC}")
     if args.prepare:
@@ -125,7 +182,7 @@ def main() -> int:
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
         return 1
-    result = subprocess.run(command, cwd=WORKER)
+    result = subprocess.run(command, cwd=WORKER, env=wrangler_env())
     if result.returncode == 0 and not args.dry_run:
         mark_published(slugs)
         print("Online: " + ", ".join(f"https://sites.leadspilot.co/{slug}/" for slug in slugs[:3])

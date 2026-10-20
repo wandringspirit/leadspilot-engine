@@ -134,7 +134,7 @@ def test_a_low_rating_stays_off_the_site(sites_dir):
 
 
 def test_wrangler_problems_in_plain_words():
-    assert "npx wrangler login" in _wrangler_problem("✘ [ERROR] You are not authenticated. Please run `wrangler login`.")
+    assert "deploy.py --login" in _wrangler_problem("✘ [ERROR] You are not authenticated. Please run `wrangler login`.")
     assert _wrangler_problem("building...\n✘ [ERROR] A request to the Cloudflare API failed.\n") == \
         "A request to the Cloudflare API failed."
 

@@ -36,6 +36,7 @@ import json
 import logging
 import os
 import random
+import re
 import tempfile
 from contextlib import suppress
 from datetime import datetime, time, timedelta, timezone
@@ -56,6 +57,7 @@ from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate
                                  LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
 from app.outreach.schedule import SendWindow, WindowError, day_label
 from app.outreach.sites import SiteService
+from app.outreach.visits import Visits, place
 from app.outreach.templates import (DEFAULT_BUSINESS_TYPES, DEFAULT_FOOTER, PLACEHOLDERS, SITE_FOOTER, SITE_STEPS,
                                     compose, lead_values, links_site, missing_fields, template_errors, used_fields)
 
@@ -67,6 +69,9 @@ WATCH_DAYS = 45                          # replies are looked for this long afte
 RETRY_AFTER = timedelta(minutes=5)       # pause after a failed send
 MAX_FAILURES = 3                         # failed sends in a row before the campaigns are paused
 STOP_WAIT_S = 90                         # stopping waits this long at most for the email being sent
+LINK_CHECK = timedelta(minutes=2)        # a website opened this soon after its email: a mail server checking it
+PERSON_KINDS = frozenset({"seen", "call", "email", "keep"})   # visits only a person makes
+TAPS = {"call": "Tapped call", "email": "Tapped email", "keep": "Asked to keep website"}
 
 _STOPPED_BY = {"reply": LeadStatus.REPLIED, "unsubscribe": LeadStatus.UNSUBSCRIBED, "bounce": LeadStatus.BOUNCED}
 _BusinessTypes = TypeAdapter(list[BusinessType])
@@ -104,11 +109,13 @@ def steps_problems(steps: list[Step], footer: str) -> list[str]:
 class OutreachManager:
     def __init__(self, cfg: Settings, *, mailbox: MailboxClient | None = None,
                  clock: Callable[[], datetime] | None = None, rng: random.Random | None = None,
-                 sites: SiteService | None = None, activity: ActivityLog | None = None) -> None:
+                 sites: SiteService | None = None, activity: ActivityLog | None = None,
+                 visits: Visits | None = None) -> None:
         self.cfg = cfg
         self.activity = activity                 # None: nothing is written down (tests)
         self.mailbox: MailboxClient = mailbox or Mailbox(cfg)
         self.sites = sites                       # None: no preview websites, first emails don't wait
+        self.visits = visits                     # who opened their website - only for the status here
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.rng = rng or random.Random()
         self.campaigns: dict[str, Campaign] = {}
@@ -237,6 +244,8 @@ class OutreachManager:
             "min_reviews": cfg.OUTREACH_MIN_REVIEWS,
             "min_rating": cfg.OUTREACH_MIN_RATING,
             "sites": self.sites.status() if self.sites else None,
+            "visits": self.visits.status() if self.visits else None,
+            "test_copy_to": test_copy_addresses(cfg),
         }
 
     def sent_today(self, now: datetime) -> int:
@@ -704,6 +713,69 @@ class OutreachManager:
         self._finish_if_done(campaign, now)
         self._save(campaign)
         self._after_send(now)
+        if test_copy_addresses(self.cfg) and self.sent_today(now) == 1:
+            await self._test_copy(campaign, lead, step, subject, body)
+
+    async def _test_copy(self, campaign: Campaign, lead: Lead, step: int, subject: str, body: str) -> None:
+        """The day's first email, word for word, to your own addresses (``OUTREACH_TEST_COPY_TO``): which tab
+        does it land in? Its website link carries ``?copy``, so opening it isn't counted as the business's."""
+        if lead.site and self.sites is not None:
+            url = self.sites.url(lead.site)
+            body = body.replace(url, url + "?copy")
+        me = sender_address(self.cfg)
+        for address in test_copy_addresses(self.cfg):
+            message = build_message(sender=sender_header(self.cfg), to=address, subject=subject, body=body,
+                                    message_id=new_message_id(me),
+                                    unsubscribe=me if self.cfg.OUTREACH_UNSUBSCRIBE_HEADER else "")
+            try:
+                await self.mailbox.send(message)
+            except MailError as exc:
+                log.warning("The test copy to %s wasn't sent: %s", address, exc)
+                self._note("Test copy not sent", f"to {address}: {exc}", campaign)
+                continue
+            log.info("Sent a test copy of %s's email %d to %s", lead.business, step, address)
+            self._note("Test copy sent", f"to {address}: {lead.business}'s email {step} – which tab is it in?", campaign)
+
+    # ------------------------------------------------------------------
+    # Website visits (app/outreach/visits.py)
+    # ------------------------------------------------------------------
+    def record_visits(self, visits: list[dict]) -> None:
+        """New visits to the businesses' websites. Those of the business - not yours, not a test copy's, not
+        a link check - are counted on its lead; the first of each day and every tap go into the activity log."""
+        owners = {lead.site: (c, lead) for c in self.campaigns.values() for lead in c.leads if lead.site}
+        # the page stayed open or something was tapped: a person, even right after the email
+        people = {(v.get("slug"), v.get("who")) for v in visits if v.get("kind") in PERSON_KINDS}
+        window, _ = self._window()
+        day = (lambda moment: window.local_date(moment)) if window else (lambda moment: moment.date())
+        changed: dict[str, Campaign] = {}
+        for visit in sorted(visits, key=lambda v: v.get("id", 0)):
+            found = owners.get(visit.get("slug"))
+            if not found or visit.get("as") != "visitor":
+                continue
+            campaign, lead = found
+            at = datetime.fromisoformat(visit["at"].replace("Z", "+00:00"))
+            kind = visit.get("kind", "")
+            if (kind in ("view", "ended") and (visit.get("slug"), visit.get("who")) not in people
+                    and any(timedelta(0) <= at - s.sent_at <= LINK_CHECK for s in lead.sent)):
+                continue                        # a mail server opening the link to check it
+            first_today = lead.site_last_visit_at is None or day(lead.site_last_visit_at) != day(at)
+            lead.site_opened_at = lead.site_opened_at or at
+            lead.site_last_visit_at = max(at, lead.site_last_visit_at or at)
+            lead.site_from = place(visit) or lead.site_from
+            if kind in ("view", "ended"):
+                lead.site_visits += 1
+            if first_today and kind in ("view", "ended", "seen"):
+                what = "Ended website opened" if kind == "ended" else "Website opened"
+                self._note(what, " · ".join(filter(None, [place(visit), _visit_count(lead)])), campaign, lead)
+            if kind in TAPS and kind not in lead.site_taps:
+                lead.site_taps.append(kind)
+                self._note(TAPS[kind], place(visit), campaign, lead)
+            changed[campaign.id] = campaign
+        for campaign in changed.values():
+            self._save(campaign)
+        if changed:
+            log.info("Website visits: %d business(es) opened their website",
+                     len({(c.id, lead.id) for c in changed.values() for lead in c.leads if lead.site_opened_at}))
 
     def _site_dates(self, campaign: Campaign, lead: Lead, step: int, now: datetime) -> None:
         """Email ``step`` went out: write down what it means for the lead's website (``sites/deploy.py``)."""
@@ -905,7 +977,7 @@ def _default_name(jobs: list[Job], files: list[DriveSource], business_type: Busi
 
 RESULT_COLUMNS = ["Business", "Email", "Status", "Emails Sent", "First Email", "Last Email", "Next Email",
                   "Answered", "Answer", "City", "Phone", "Rating", "Reviews", "Name On Maps", "Place ID", "Note",
-                  "Website"]
+                  "Website", "Website Opened", "Last Visit", "Website Visits", "Tapped", "Visited From"]
 
 
 def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = "") -> bytes:
@@ -928,8 +1000,19 @@ def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = 
             lead.city, lead.phone, "" if lead.rating is None else f"{lead.rating:g}",
             "" if lead.reviews is None else lead.reviews, lead.name, lead.place_id, lead.note,
             f"{sites_url.rstrip('/')}/{lead.site}/" if lead.site and sites_url else "",
+            when(lead.site_opened_at), when(lead.site_last_visit_at), lead.site_visits or "",
+            ", ".join(lead.site_taps), lead.site_from,
         ])
     return (chr(0xFEFF) + buffer.getvalue()).encode("utf-8")
+
+
+def test_copy_addresses(cfg: Settings) -> list[str]:
+    """``OUTREACH_TEST_COPY_TO`` as a list of addresses (anything that isn't one is ignored)."""
+    return [a for a in re.split(r"[,;\s]+", cfg.OUTREACH_TEST_COPY_TO) if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", a)]
+
+
+def _visit_count(lead: Lead) -> str:
+    return f"{lead.site_visits} visit(s) so far" if lead.site_visits > 1 else ""
 
 
 def _sample_leads() -> list[tuple[str, Lead]]:

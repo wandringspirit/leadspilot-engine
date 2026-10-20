@@ -201,7 +201,7 @@ class SiteService:
             return func(*args)
 
     async def _wrangler(self) -> None:
-        from sites.deploy import PUBLIC, WORKER, wrangler_command
+        from sites.deploy import PUBLIC, WORKER, wrangler_command, wrangler_env
         if self.public.resolve() != PUBLIC.resolve():
             raise SiteError(f"wrangler uploads {PUBLIC} - DATA_DIR points somewhere else ({self.cfg.DATA_DIR})")
         try:
@@ -210,7 +210,8 @@ class SiteService:
             raise SiteError(str(exc)) from exc
         try:
             # in a thread: asyncio's own subprocesses need the Proactor loop on Windows
-            result = await asyncio.to_thread(subprocess.run, command, cwd=WORKER, capture_output=True, text=True,
+            result = await asyncio.to_thread(subprocess.run, command, cwd=WORKER, env=wrangler_env(),
+                                             capture_output=True, text=True,
                                              encoding="utf-8", errors="replace", timeout=UPLOAD_TIMEOUT_S)
         except FileNotFoundError as exc:
             raise SiteError("Node.js isn't installed - get it from https://nodejs.org") from exc
@@ -233,7 +234,7 @@ def _wrangler_problem(output: str) -> str:
     """What went wrong, from wrangler's output, in a line."""
     text = output.lower()
     if "wrangler login" in text or "not authenticated" in text or "authentication error" in text:
-        return "not logged in to Cloudflare - in sites\\worker run: npx wrangler login"
+        return "not logged in to Cloudflare - run: python sites/deploy.py --login"
     lines = [(raw, re.sub(r"^[\s✘▲]*(\[(ERROR|WARNING)\]\s*)?", "", raw).strip())
              for raw in output.splitlines() if raw.strip()]
     errors = [clean for raw, clean in lines if "error" in raw.lower()]

@@ -69,6 +69,12 @@ class Lead(BaseModel):
     sent: list[SentEmail] = Field(default_factory=list)
     inbound: list[InboundEmail] = Field(default_factory=list)
     note: str = ""                 # why it stopped: the reply's subject, the server's answer ...
+    # its website's visits by someone else than you or a link checker (app/outreach/visits.py)
+    site_opened_at: datetime | None = None    # the first one
+    site_last_visit_at: datetime | None = None
+    site_visits: int = 0           # pages opened
+    site_taps: list[str] = Field(default_factory=list)   # tapped: call / email / keep (each once)
+    site_from: str = ""            # where the last visit came from, e.g. "Comcast Cable · Houston, US"
 
 
 class LeftOut(BaseModel):

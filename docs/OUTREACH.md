@@ -174,6 +174,14 @@ Plain-text emails, UTF-8, from `SENDER_NAME <SENDER_EMAIL or MAIL_USERNAME>`, wi
 unsubscribe link) - off by default: in tests, one-to-one emails with it went to Promotions or Spam,
 the same email without it to the inbox. The footer says to reply "no" either way. Gmail and Google
 Workspace keep a copy in *Sent* themselves. No tracking pixels, no links added (besides `{Website}`).
+Who opened their website is known from the website itself ([SITES.md](SITES.md#5-who-opened-their-website)).
+
+**Test copy.** With `OUTREACH_TEST_COPY_TO` set to your own addresses (a Gmail, a Yahoo …), each
+day's first email also goes to them, word for word, right after it went to the business, so you can
+see which tab it lands in: Primary, Promotions or Spam. Its website link ends in `?copy`, so opening
+it isn't counted as the business's visit. It doesn't count towards the daily limit; the activity log
+says *Test copy sent*. A fresh address that has never written to you shows the placement best: Gmail
+puts mail from people you've written to in Primary more readily.
 
 **✉ Send me this** sends one email, filled in for the business you picked, to your own address,
 with *[Test]* in front of the subject. It changes nothing in the campaign.
@@ -196,7 +204,7 @@ separate warmed-up domain, and let people say no. This is not legal advice.
 `MAIL_PASSWORD`, `SENDER_EMAIL`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`,
 `OUTREACH_AUTOSEND`, `OUTREACH_TIMEZONE`, `OUTREACH_DAYS`, `OUTREACH_HOURS`,
 `OUTREACH_DAILY_LIMIT`, `OUTREACH_MIN_GAP_S`, `OUTREACH_MAX_GAP_S`, `OUTREACH_CHECK_MINUTES`,
-`OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`. What each one does and its default:
+`OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`. What each one does and its default:
 [DEVELOPMENT.md §4](DEVELOPMENT.md#4-configuration-reference).
 
 The routes (`/api/outreach`, `/api/campaigns…`, `/api/business-types…`) are in

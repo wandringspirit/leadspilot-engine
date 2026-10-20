@@ -5,7 +5,7 @@ Two tables, kept in Google Drive by ``app/drive/sync.py``: a Google Sheet with a
 offers them as CSV downloads:
 
 * **Campaigns** - a row per campaign (an *All campaigns* row first): its status, how many businesses
-  were emailed, are waiting, replied, bounced …, and how many emails went out;
+  were emailed, are waiting, replied, bounced, opened their website …, and how many emails went out;
 * **Activity** - the activity log, newest first: searches, campaigns, emails, replies, bounces.
 
 Times are the computer's own. Pure functions (tests/test_autopilot.py).
@@ -20,8 +20,9 @@ from app.outreach.models import Campaign, LeadStatus
 
 CAMPAIGN_COLUMNS = ["Campaign", "Business type", "Status", "Created", "Started", "Businesses", "Emailed",
                     "Waiting", "In sequence", "Replied", "No reply", "Bounced", "Unsubscribed", "Refused",
-                    "Skipped", "Left out", "Emails sent", "Last email", "Results file"]
-COUNT_COLUMNS = CAMPAIGN_COLUMNS[5:17]
+                    "Skipped", "Left out", "Opened website", "Tapped", "Emails sent", "Last email",
+                    "Results file"]
+COUNT_COLUMNS = CAMPAIGN_COLUMNS[5:19]
 ACTIVITY_COLUMNS = ["When", "What", "Campaign", "Business", "Email", "Detail"]
 
 Table = tuple[list[str], list[list]]          # (header, rows)
@@ -80,6 +81,8 @@ def _campaign_row(campaign: Campaign) -> dict:
         "Refused": counts[LeadStatus.FAILED.value],
         "Skipped": counts[LeadStatus.SKIPPED.value],
         "Left out": len(campaign.left_out),
+        "Opened website": sum(lead.site_opened_at is not None for lead in campaign.leads),
+        "Tapped": sum(bool(lead.site_taps) for lead in campaign.leads),
         "Emails sent": len(sent),
         "Last email": _local(max(sent)) if sent else "",
         "Results file": campaign.drive_link,

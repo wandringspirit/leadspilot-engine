@@ -111,6 +111,9 @@ OPTIONS = (
     Option("OUTREACH_MIN_REVIEWS", "sending", "{Rating} and {Reviews} – at least this many reviews",
            "Fewer: the email uses the sentence without them", minimum=0),
     Option("OUTREACH_MIN_RATING", "sending", "… and at least this rating", minimum=0, maximum=5),
+    Option("OUTREACH_TEST_COPY_TO", "sending", "Test copy to",
+           "Your own addresses, comma-separated: each day's first email also goes to them, word for word, so "
+           "you can see which tab it lands in (Primary, Promotions, Spam)", "you@gmail.com, you@yahoo.com"),
     Option("OUTREACH_UNSUBSCRIBE_HEADER", "sending", "Gmail's unsubscribe link",
            "A List-Unsubscribe header on campaign emails. Off: they read as one-to-one emails – the footer "
            "says to reply \"no\""),
@@ -119,6 +122,9 @@ OPTIONS = (
            "Off: campaigns email without one – use emails without {Website}", restart=True),
     Option("SITES_URL", "sites", "Where the websites are online",
            "Each business's website is this address / its name", "https://sites.leadspilot.co", restart=True),
+    Option("SITES_VISITS_KEY", "sites", "Website visits key",
+           "The websites' VISITS_KEY secret – with it the panel shows who opened their website "
+           "(python sites/deploy.py --visits-key sets both)", secret=True, restart=True),
     # --- drive ---
     Option("GOOGLE_CLIENT_ID", "drive", "Client ID", "", "1234567890-abc.apps.googleusercontent.com", needed="drive"),
     Option("GOOGLE_CLIENT_SECRET", "drive", "Client secret", "", "GOCSPX-…", secret=True, needed="drive"),

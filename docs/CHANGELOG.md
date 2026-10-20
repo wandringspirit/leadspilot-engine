@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.13.0 – 2026-10-20
+
+### Added
+- **Who opened their website.** The website Worker records each visit in a Cloudflare D1 database:
+  page loads, a page that stayed open, taps on the phone number, email or *keep my website*. It
+  keeps the visitor's network, city and country, and a hash of the IP address, never the address.
+  The panel fetches them every 5 minutes and leaves out your own visits (your connection or your
+  country), test copies and mail servers checking the link. *Website opened* and taps go into the
+  activity log; the results file and the master sheet count them. Needs `SITES_VISITS_KEY`
+  (`python sites/deploy.py --visits-key`).
+- **Test copy** (`OUTREACH_TEST_COPY_TO`): each day's first email also goes to your own addresses,
+  word for word, so you can see which tab it lands in.
+- The settings say so when the Gmail login (`MAIL_USERNAME`) isn't an email address.
+- The project keeps its own Cloudflare login in `data/wrangler` (`python sites/deploy.py --login`):
+  logging in to another Cloudflare account for another project no longer stops the website uploads.
+
+### Fixed
+- The tests could start real Google Maps searches: app.main's autopilot read the real `data/`. The
+  tests now run with a temporary `DATA_DIR`.
+
 ## 1.12.0 – 2026-10-16
 
 ### Added

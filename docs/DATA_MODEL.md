@@ -370,7 +370,9 @@ A campaign's **results CSV** (uploaded to Drive, [DRIVE.md](DRIVE.md)) has one r
 `Business`, `Email`, `Status`, `Emails Sent` (`2 of 3`), `First Email`, `Last Email`, `Next Email`
 (in the send window's time zone), `Answered`, `Answer` (the reply's subject), `City`, `Phone`,
 `Rating`, `Reviews`, `Name On Maps`, `Place ID`, `Note`, `Website` (the business's preview website,
-[SITES.md](SITES.md)).
+[SITES.md](SITES.md)), `Website Opened`, `Last Visit`, `Website Visits`, `Tapped`, `Visited From` (who
+opened it, [SITES.md](SITES.md#5-who-opened-their-website)). A lead keeps them as `site_opened_at`,
+`site_last_visit_at`, `site_visits`, `site_taps` and `site_from`.
 
 A **lead file** a campaign runs from is a CSV in the format of §1 / §2 – at least `Name` and
 `Email` ([DRIVE.md](DRIVE.md#lead-files)).
