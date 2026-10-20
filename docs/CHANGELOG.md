@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.7.1 – 2026-10-20
+
+### Fixed
+- `jinja2` and `Pillow` are now in `requirements.txt`. The website generator (`sites/render.py`)
+  needs both, so on a fresh install it stopped with *No module named 'jinja2'* (then *'PIL'*).
+  `start.bat` installs them on its next run, since `requirements.txt` changed.
+
 ## 1.7.0 – 2026-10-15
 
 ### Added
