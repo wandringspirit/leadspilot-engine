@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.13.1 – 2026-10-23
+
+### Changed
+- The website emails' first email says the website is free to keep: *If you like it, it's yours to
+  keep at no cost.* (without the word *free*, which spam filters look for).
+
 ## 1.13.0 – 2026-10-20
 
 ### Added

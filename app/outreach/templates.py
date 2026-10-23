@@ -82,7 +82,7 @@ SITE_STEPS: list[dict] = [
             "Hi,\n\n"
             "I made a website for {Business}:\n"
             "{Website}\n\n"
-            "It has your Google reviews and the towns you cover. If you like it, it's yours. "
+            "It has your Google reviews and the towns you cover. If you like it, it's yours to keep at no cost. "
             "If not, no problem at all.\n\n"
             "{SenderName}"
         ),
