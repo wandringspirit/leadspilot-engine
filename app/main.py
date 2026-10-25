@@ -22,7 +22,7 @@ from app.drive.client import DriveError
 from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
 from app.jobs import ACTIVE_STATES, JobManager
-from app.logbuffer import LEVELS, install as install_log_buffer, log_buffer
+from app.logbuffer import LEVELS, LOG_FORMAT, install as install_log_buffer, install_file as install_log_file, log_buffer
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
 from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
@@ -35,9 +35,10 @@ from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeU
                                  SendTestRequest)
 from app.settings_editor import SettingsError, SettingsUpdate
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per request is too chatty
 install_log_buffer(settings.LOG_BUFFER_SIZE)              # feeds the panel's "Live logs"
+install_log_file(settings.DATA_DIR / "logs" / "panel.log")  # kept after the panel stops: when and why it did
 log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"

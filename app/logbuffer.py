@@ -18,6 +18,8 @@ import traceback
 from collections import deque
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Any
 
 current_job_id: ContextVar[str | None] = ContextVar("current_job_id", default=None)
@@ -118,6 +120,29 @@ class LogBuffer(logging.Handler):
 
 
 log_buffer = LogBuffer()
+
+LOG_FILE_BYTES = 2_000_000     # data/logs/panel.log is rotated at this size
+LOG_FILE_KEEP = 3              # ... keeping panel.log.1 .. .3
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+
+def install_file(path: Path, root: logging.Logger | None = None) -> logging.Handler | None:
+    """Also write the log to ``path`` (data/logs/panel.log), so it is still there after the panel has stopped -
+    to see when and why it stopped (idempotent). None when the file can't be opened."""
+    root = root or logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, RotatingFileHandler) and Path(handler.baseFilename) == path.resolve():
+            return handler
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handler = RotatingFileHandler(path, maxBytes=LOG_FILE_BYTES, backupCount=LOG_FILE_KEEP, encoding="utf-8",
+                                      delay=True)
+    except OSError:
+        return None
+    handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    handler.setLevel(logging.INFO)
+    root.addHandler(handler)
+    return handler
 
 
 def install(capacity: int | None = None, root: logging.Logger | None = None) -> LogBuffer:

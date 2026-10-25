@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from app.logbuffer import LogBuffer, current_job_id
+from app.logbuffer import LogBuffer, current_job_id, install_file
 
 
 @pytest.fixture
@@ -121,3 +121,26 @@ def test_job_id_tag_follows_asyncio_tasks(buf):
     assert tags["in job_b"] == "job_b" and tags["child of job_b"] == "job_b"
     only_a = buffer.entries(job_id="job_a")["entries"]
     assert {e["message"] for e in only_a} == {"in job_a", "child of job_a"}
+
+
+def test_install_file_writes_the_log_to_a_file_once(tmp_path):
+    root = logging.getLogger("test.logfile")
+    root.setLevel(logging.INFO)
+    root.propagate = False
+    path = tmp_path / "logs" / "panel.log"
+    first = install_file(path, root)
+    try:
+        assert install_file(path, root) is first and len(root.handlers) == 1
+        root.info("the panel is ready")
+        first.flush()
+        assert "INFO test.logfile: the panel is ready" in path.read_text(encoding="utf-8")
+    finally:
+        root.removeHandler(first)
+        first.close()
+
+
+def test_start_notes_how_the_panel_stopped(tmp_path):
+    import start
+    path = tmp_path / "logs" / "panel.log"
+    start.note(path, "the window was closed - the panel stops with it")
+    assert path.read_text(encoding="utf-8").endswith("INFO start.py: the window was closed - the panel stops with it\n")

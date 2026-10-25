@@ -8,11 +8,17 @@ log lines show up there, Ctrl+C in it (or Stop in the panel) stops the panel, an
 button starts it again.
 
     python start.py [--host 127.0.0.1] [--port 8000] [--no-browser] [--reinstall] [--shortcut]
-                    [--autostart | --no-autostart]
+                    [--autostart | --no-autostart] [--weekday-start | --no-weekday-start]
 
 --shortcut puts a shortcut to start.bat on the Windows desktop. --autostart puts one in the Windows Startup
-folder, so the panel starts (minimised, no browser) when you sign in; --no-autostart removes it. Only the standard library is used until
-the packages are installed.
+folder, so the panel starts (minimised, no browser) when you sign in; --no-autostart removes it.
+--weekday-start adds a Windows Task Scheduler task that starts the panel at 18:00 (local time) Monday to
+Friday unless it is already running - or as soon as the computer is awake after that - so a closed window
+doesn't cost a day of emails; --no-weekday-start removes it. Only the standard library is used until the
+packages are installed.
+
+How the panel's window ended is written to data/logs/panel.log (with the panel's own log): the exit code,
+or that the window was closed.
 """
 from __future__ import annotations
 
@@ -47,6 +53,8 @@ ICON = ROOT / "app" / "static" / "icon.ico"
 MIN_PYTHON = (3, 11)
 WINDOWS = os.name == "nt"
 STARTUP_S = 180                 # the browser opens once the panel answers - if it does within this
+TASK = f"{NAME} - weekday start"  # the Task Scheduler task --weekday-start adds
+TASK_AT = "18:00"               # ... its time (local): before the send window (08:00 Chicago = 18:30 India)
 
 # never a proxy for the panel on this computer
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -67,6 +75,10 @@ def main(argv: list[str] | None = None) -> int:
         return make_shortcut(startup=True)
     if args.no_autostart:
         return remove_autostart()
+    if args.weekday_start:
+        return add_weekday_start()
+    if args.no_weekday_start:
+        return remove_weekday_start()
     if not in_venv():
         return relaunch_in_venv(argv)
     first = not INSTALLED.is_file()
@@ -90,6 +102,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--autostart", action="store_true",
                         help="start the panel when you sign in to Windows (a shortcut in the Startup folder)")
     parser.add_argument("--no-autostart", action="store_true", help="stop starting the panel when you sign in")
+    parser.add_argument("--weekday-start", action="store_true",
+                        help=f"start the panel at {TASK_AT} Monday-Friday if it isn't running (Task Scheduler)")
+    parser.add_argument("--no-weekday-start", action="store_true", help="remove that Task Scheduler task")
     return parser.parse_args(argv)
 
 
@@ -153,6 +168,7 @@ def serve(args: argparse.Namespace) -> int:
                         f"Fix it in {ROOT / '.env'} (Notepad opens it) and start again.", edit=True)
         host, port = args.host or cfg.HOST, args.port or cfg.PORT
         url = browse_url(host, port)
+        log_file = cfg.DATA_DIR / "logs" / "panel.log"
         set_title(f"{NAME} - {url}")
         if panel_version(url):
             if "server" not in (panel_config(url) or {}):
@@ -166,7 +182,11 @@ def serve(args: argparse.Namespace) -> int:
         if port_taken(url):
             return fail(f"Another program uses port {port}. Close it, or give the panel another port: "
                         f"PORT=8001 in {ROOT / '.env'}, or start it with: start.bat --port 8001", edit=True)
+        watch_window(log_file)
         code = run_panel(host, port, url, open_browser=browser)
+        note(log_file, "the panel exited " + ("for a restart" if code == RESTART_CODE else
+                                               "normally (Stop button or Ctrl+C)" if code == 0 else
+                                               f"unexpectedly with exit code {code}"))
         browser = False                                 # an open page reconnects by itself
         if code == RESTART_CODE:
             print("\nRestarting the panel ...\n", flush=True)
@@ -224,6 +244,41 @@ def run_panel(host: str, port: int, url: str, *, open_browser: bool) -> int:
         if not WINDOWS:
             signal.signal(signal.SIGINT, signal.default_int_handler)
     return child.wait()
+
+
+def note(log_file: Path, message: str) -> None:
+    """One line in data/logs/panel.log (the panel's log file) from this script."""
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with log_file.open("a", encoding="utf-8") as out:
+            out.write(f"{stamp},000 INFO start.py: {message}\n")
+    except OSError:
+        pass
+
+
+_window_handler = None                                  # kept: Windows calls it until the process ends
+
+_WINDOW_EVENTS = {2: "the window was closed", 5: "Windows is signing out", 6: "Windows is shutting down"}
+
+
+def watch_window(log_file: Path) -> None:
+    """Windows: write to the log when the window is closed (or Windows signs out / shuts down) - the panel
+    stops with it, and nothing else would say so."""
+    global _window_handler
+    if not WINDOWS or _window_handler is not None:
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+    def handler(event: int) -> bool:
+        if event in _WINDOW_EVENTS:
+            note(log_file, _WINDOW_EVENTS[event] + " - the panel stops with it")
+        return False                                    # then what Windows does anyway
+
+    if _kernel32().SetConsoleCtrlHandler(handler, True):
+        _window_handler = handler
 
 
 def announce(url: str, opened: bool) -> None:
@@ -421,6 +476,52 @@ def make_shortcut(*, startup: bool = False) -> int:
     print(f"Made the shortcut {result.stdout.strip()} - " +
           ("the panel starts when you sign in to Windows." if startup else "double-click it to start the panel."),
           flush=True)
+    return 0
+
+
+def add_weekday_start() -> int:
+    """A Task Scheduler task: start.bat --no-browser at TASK_AT, Monday to Friday. When the panel is already
+    running start.bat just says so and closes; when the computer was asleep or off at TASK_AT it runs as soon
+    as it can. No time limit - the task is the panel while it runs."""
+    if not WINDOWS:
+        print("The weekday start uses the Windows Task Scheduler.")
+        return 1
+    arguments = '/c ""' + str(ROOT / "start.bat") + '" --no-browser"'
+    script = "\n".join([
+        "$action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\\cmd.exe') -Argument "
+        + _ps(arguments) + " -WorkingDirectory " + _ps(ROOT),
+        "$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At "
+        + _ps(TASK_AT),
+        "$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries "
+        "-DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew",
+        "$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name",
+        "$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited",
+        "Register-ScheduledTask -TaskName " + _ps(TASK) + " -Action $action -Trigger $trigger -Settings $settings "
+        "-Principal $principal -Description " + _ps(f"Start the {NAME} panel on weekdays if it isn't running")
+        + " -Force | Out-Null",
+        "Write-Output 'ok'",
+    ])
+    try:
+        result = _powershell(script)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"Could not add the Task Scheduler task: {exc}", flush=True)
+        return 1
+    if result.returncode != 0 or "ok" not in result.stdout:
+        print(f"Could not add the Task Scheduler task:\n{result.stderr.strip()}", flush=True)
+        return 1
+    print(f"Added the Task Scheduler task \"{TASK}\": the panel starts at {TASK_AT} Monday to Friday if it "
+          "isn't running.", flush=True)
+    return 0
+
+
+def remove_weekday_start() -> int:
+    """Remove the Task Scheduler task --weekday-start added."""
+    if not WINDOWS:
+        return 1
+    result = _powershell("if (Get-ScheduledTask -TaskName " + _ps(TASK) + " -ErrorAction SilentlyContinue) { "
+                         "Unregister-ScheduledTask -TaskName " + _ps(TASK) + " -Confirm:$false; 'removed' }")
+    print("The panel no longer starts on weekdays by itself." if "removed" in result.stdout
+          else "There was no weekday start to remove.", flush=True)
     return 0
 
 

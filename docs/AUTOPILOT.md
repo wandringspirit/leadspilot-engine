@@ -62,6 +62,12 @@ panel runs on this computer:
 
 - `start.bat --autostart` starts the panel when you sign in to Windows, minimised and without
   opening the browser (`--no-autostart` undoes it).
+- `start.bat --weekday-start` adds a Windows Task Scheduler task that starts the panel at 18:00
+  (the computer's time) Monday to Friday unless it is already running, or as soon as the computer is
+  awake after that. A closed window then costs at most a few hours, not a day of emails
+  (`--no-weekday-start` removes it). In India 18:00 is half an hour before the send window opens.
+- How the panel stopped is in `data/logs/panel.log`: *the window was closed*, *exited normally* (Stop
+  button or Ctrl+C) or *unexpectedly with exit code …*, after the panel's own log lines.
 - While the panel runs, Windows doesn't go to sleep (`KEEP_AWAKE`, on by default); the screen still
   turns off. Closing a laptop's lid can still put it to sleep, depending on its power settings.
 - Missed while the computer was off? The emails go out once the panel runs again, in the send

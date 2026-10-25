@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.14.0 – 2026-10-25
+
+### Added
+- `start.bat --weekday-start`: a Windows Task Scheduler task starts the panel at 18:00 Monday to Friday
+  unless it is already running (or as soon as the computer is awake after that), so a closed window
+  doesn't cost a day of emails; `--no-weekday-start` removes it.
+- The panel's log is also written to `data/logs/panel.log` (rotated at 2 MB), with how the panel
+  stopped: the window closed, a normal stop, or an exit code.
+
 ## 1.13.1 – 2026-10-23
 
 ### Changed
