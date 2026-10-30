@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.15.0 – 2026-10-30
+
+### Added
+- **Testing two versions of the emails.** A campaign or business type can have a second version
+  (`steps_b`): the businesses take turns at their first email between A and B and keep theirs for
+  the follow-ups. The activity log says which version went out, and the results file has a
+  **Version** column. `SITE_STEPS_ASK_FIRST` is a version of the website emails without the link
+  in the first email (it asks first; the second email sends it).
+
 ## 1.14.0 – 2026-10-25
 
 ### Added

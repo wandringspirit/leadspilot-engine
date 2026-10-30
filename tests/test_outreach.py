@@ -595,3 +595,30 @@ def test_business_types(tmp_path):
     with_stars, few = preview["samples"]
     assert "4.8 stars from 57 reviews" in with_stars["emails"][0]["body"]
     assert "There's no website on your Google listing" in few["emails"][0]["body"]
+
+
+def test_two_versions_take_turns_and_each_keeps_its_own_emails(tmp_path):
+    from app.outreach.manager import results_csv
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock)
+    run(manager.update(campaign, CampaignUpdate(steps_b=[
+        Step(day=0, subject="hello {Business}", body="Version B, no link yet"),
+        Step(day=2, body="B follow-up")])))
+    for _ in range(3):                                              # the three first emails
+        run(manager.tick())
+        clock.advance(seconds=61)
+    assert [lead.variant for lead in campaign.leads] == ["A", "B", "A"]
+    assert mailbox.sent[0]["Subject"] == "website for Palm Breeze Plumbing"
+    assert mailbox.sent[1]["Subject"].startswith("hello ") and "Version B, no link yet" in mailbox.sent[1].get_content()
+    a, b = campaign.leads[0], campaign.leads[1]
+    assert a.next_due == a.sent[0].sent_at + timedelta(days=3)     # A's follow-up on day 3
+    assert b.next_due == b.sent[0].sent_at + timedelta(days=2)     # B's on day 2
+    clock.now = b.next_due + timedelta(minutes=5)
+    run(manager.tick())
+    assert mailbox.sent[3]["Subject"].startswith("Re: hello ") and "B follow-up" in mailbox.sent[3].get_content()
+    assert b.status == LeadStatus.DONE                              # B has two emails, not three
+    rows = results_csv(campaign, None).decode("utf-8-sig").splitlines()
+    assert rows[0].endswith(",Version") and rows[2].endswith(",B") and "2 of 2" in rows[2]
+    # a version B that can't be sent stops the change
+    with pytest.raises(OutreachError, match="version B"):
+        run(manager.update(campaign, CampaignUpdate(steps_b=[Step(day=2, subject="x", body="y")])))

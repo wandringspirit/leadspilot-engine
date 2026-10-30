@@ -85,6 +85,15 @@ class OutreachError(Exception):
         self.status = status
 
 
+def versions_problems(steps: list[Step], steps_b: list[Step], footer: str) -> list[str]:
+    """steps_problems for both versions of the emails (``steps_b`` may be [] - no second version)."""
+    problems = steps_problems(steps, footer)
+    if steps_b:
+        problems += [f"version B: {p}" for p in steps_problems(steps_b, footer) if not p.startswith("footer")
+                     and "{SenderAddress}" not in p]
+    return problems
+
+
 def steps_problems(steps: list[Step], footer: str) -> list[str]:
     """What is wrong with a set of emails ([] when they can be sent)."""
     problems: list[str] = []
@@ -286,8 +295,9 @@ class OutreachManager:
     async def update_business_type(self, business_type: BusinessType, req: BusinessTypeUpdate) -> BusinessType:
         async with self._guard():
             steps = req.steps if req.steps is not None else business_type.steps
+            steps_b = req.steps_b if req.steps_b is not None else business_type.steps_b
             footer = req.footer if req.footer is not None else business_type.footer
-            problems = steps_problems(steps, footer)
+            problems = versions_problems(steps, steps_b, footer)
             if problems:
                 raise OutreachError("; ".join(problems))
             if req.name is not None and req.name.strip().lower() != business_type.name.lower():
@@ -298,7 +308,7 @@ class OutreachManager:
                 business_type.search = req.search.strip()
             if req.trade is not None:
                 business_type.trade = req.trade.strip()
-            business_type.steps, business_type.footer = steps, footer
+            business_type.steps, business_type.steps_b, business_type.footer = steps, steps_b, footer
             business_type.updated_at = self.clock()
             self._save_types()
             return business_type
@@ -356,6 +366,7 @@ class OutreachManager:
                 business_type_id=business_type.id if business_type else "",
                 business_type_name=business_type.name if business_type else "",
                 steps=[s.model_copy() for s in business_type.steps] if business_type else default_steps(),
+                steps_b=[s.model_copy() for s in business_type.steps_b] if business_type else [],
                 footer=business_type.footer if business_type else DEFAULT_FOOTER,
                 sites=self.sites is not None, leads=leads, left_out=left_out,
             )
@@ -371,16 +382,17 @@ class OutreachManager:
     async def update(self, campaign: Campaign, req: CampaignUpdate) -> Campaign:
         async with self._guard():
             steps = req.steps if req.steps is not None else campaign.steps
+            steps_b = req.steps_b if req.steps_b is not None else campaign.steps_b
             footer = req.footer if req.footer is not None else campaign.footer
-            problems = steps_problems(steps, footer)
+            problems = versions_problems(steps, steps_b, footer)
             if problems:
                 raise OutreachError("; ".join(problems))
             if req.name is not None:
                 campaign.name = " ".join(req.name.split())
             if req.trade is not None:
                 campaign.trade = req.trade.strip()
-            if req.steps is not None:
-                campaign.steps = steps
+            if req.steps is not None or req.steps_b is not None:
+                campaign.steps, campaign.steps_b = steps, steps_b
                 self._reschedule(campaign)
             campaign.footer = footer
             self._finish_if_done(campaign, self.clock())
@@ -435,14 +447,14 @@ class OutreachManager:
 
     def campaign_problems(self, campaign: Campaign) -> list[str]:
         """What keeps this campaign from starting (besides the mailbox settings)."""
-        problems = steps_problems(campaign.steps, campaign.footer)
+        problems = versions_problems(campaign.steps, campaign.steps_b, campaign.footer)
         if campaign.sites and self.sites is not None and not self.sites.has_design(campaign.business_type_name):
             problems.append(f"there's no website design for {campaign.business_type_name or 'these businesses'} "
                             "yet, and the emails send their website")
         waiting = [lead for lead in campaign.leads if lead.status in OPEN_STATUSES]
         if not waiting:
             problems.append("there is no business left to email")
-        texts = [campaign.footer] + [t for s in campaign.steps for t in (s.subject, s.body)]
+        texts = [campaign.footer] + [t for s in campaign.all_steps() for t in (s.subject, s.body)]
         if "Trade" in set().union(*(used_fields(t) for t in texts)) and not campaign.trade.strip():
             problems.append("fill in what the emails call these businesses ({Trade}), e.g. roofers")
         missing: dict[str, list[str]] = {}
@@ -535,7 +547,7 @@ class OutreachManager:
     def _emails(self, source: Campaign | BusinessType, lead: Lead) -> list[dict]:
         sent = {s.step: s for s in lead.sent}
         emails = []
-        for number, step in enumerate(source.steps, 1):
+        for number, step in enumerate(source.steps_of(lead), 1):
             subject, body = compose(source, lead, number, self.cfg)
             emails.append({"step": number, "day": step.day, "subject": subject, "body": body,
                            "sent_at": _iso(sent[number].sent_at) if number in sent else None})
@@ -644,7 +656,7 @@ class OutreachManager:
         running = [c for c in self.campaigns.values() if c.status == CampaignStatus.RUNNING]
         for campaign in sorted(running, key=lambda c: c.started_at or c.created_at):
             for index, lead in enumerate(campaign.leads):
-                if lead.status == LeadStatus.SENT and len(lead.sent) < len(campaign.steps):
+                if lead.status == LeadStatus.SENT and len(lead.sent) < len(campaign.steps_of(lead)):
                     due = lead.next_due or now
                     if due > now and not any_time:
                         continue
@@ -669,6 +681,8 @@ class OutreachManager:
 
     async def _deliver(self, campaign: Campaign, lead: Lead, now: datetime) -> None:
         step = len(lead.sent) + 1
+        if step == 1 and campaign.steps_b and not lead.variant:
+            lead.variant = self._next_variant()
         subject, body = compose(campaign, lead, step, self.cfg)
         me = sender_address(self.cfg)
         message_id = new_message_id(me)
@@ -707,14 +721,22 @@ class OutreachManager:
         if lead.site and self.sites is not None:
             self._site_dates(campaign, lead, step, now)
         self._schedule(campaign, lead)
-        log.info("Sent email %d of %d to %s <%s> (campaign %r)", step, len(campaign.steps), lead.business,
-                 lead.email, campaign.name)
-        self._note("Email sent", f"email {step} of {len(campaign.steps)}: {subject}", campaign, lead)
+        version = f" (version {lead.variant})" if lead.variant else ""
+        log.info("Sent email %d of %d%s to %s <%s> (campaign %r)", step, len(campaign.steps_of(lead)), version,
+                 lead.business, lead.email, campaign.name)
+        self._note("Email sent", f"email {step} of {len(campaign.steps_of(lead))}{version}: {subject}", campaign,
+                   lead)
         self._finish_if_done(campaign, now)
         self._save(campaign)
         self._after_send(now)
         if test_copy_addresses(self.cfg) and self.sent_today(now) == 1:
             await self._test_copy(campaign, lead, step, subject, body)
+
+    def _next_variant(self) -> str:
+        """A or B for a business about to get its first email: whichever fewer businesses have had so far
+        (across all campaigns), A on a tie - so the two versions stay even."""
+        given = [lead.variant for c in self.campaigns.values() for lead in c.leads if lead.variant]
+        return "B" if given.count("A") > given.count("B") else "A"
 
     async def _test_copy(self, campaign: Campaign, lead: Lead, step: int, subject: str, body: str) -> None:
         """The day's first email, word for word, to your own addresses (``OUTREACH_TEST_COPY_TO``): which tab
@@ -781,9 +803,9 @@ class OutreachManager:
         """Email ``step`` went out: write down what it means for the lead's website (``sites/deploy.py``)."""
         if step == 1:
             self.sites.record(lead.site, "first_email_at", now)
-        if links_site(campaign, step):
+        if links_site(campaign, lead, step):
             self.sites.record(lead.site, "link_sent_at", now)
-            if step == len(campaign.steps):          # it says the website comes down tomorrow
+            if step == len(campaign.steps_of(lead)):          # it says the website comes down tomorrow
                 self.sites.record(lead.site, "last_email_at", now)
 
     def _after_send(self, now: datetime) -> None:
@@ -794,13 +816,13 @@ class OutreachManager:
         """Set a lead's status and next follow-up from the emails it has had."""
         if lead.status not in OPEN_STATUSES:
             return
-        count = len(lead.sent)
+        count, steps = len(lead.sent), campaign.steps_of(lead)
         if count == 0:
             lead.status, lead.next_due = LeadStatus.QUEUED, None
-        elif count >= len(campaign.steps):
+        elif count >= len(steps):
             lead.status, lead.next_due = LeadStatus.DONE, None
         else:
-            gap = campaign.steps[count].day - campaign.steps[count - 1].day
+            gap = steps[count].day - steps[count - 1].day
             lead.status = LeadStatus.SENT
             lead.next_due = lead.sent[-1].sent_at + timedelta(days=max(1, gap))
 
@@ -977,7 +999,7 @@ def _default_name(jobs: list[Job], files: list[DriveSource], business_type: Busi
 
 RESULT_COLUMNS = ["Business", "Email", "Status", "Emails Sent", "First Email", "Last Email", "Next Email",
                   "Answered", "Answer", "City", "Phone", "Rating", "Reviews", "Name On Maps", "Place ID", "Note",
-                  "Website", "Website Opened", "Last Visit", "Website Visits", "Tapped", "Visited From"]
+                  "Website", "Website Opened", "Last Visit", "Website Visits", "Tapped", "Visited From", "Version"]
 
 
 def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = "") -> bytes:
@@ -993,7 +1015,7 @@ def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = 
     for lead in campaign.leads:
         answer = next((i for i in reversed(lead.inbound) if i.kind != "auto_reply"), None)
         writer.writerow([
-            lead.business, lead.email, lead.status.value, f"{len(lead.sent)} of {len(campaign.steps)}",
+            lead.business, lead.email, lead.status.value, f"{len(lead.sent)} of {len(campaign.steps_of(lead))}",
             when(lead.sent[0].sent_at) if lead.sent else "", when(lead.sent[-1].sent_at) if lead.sent else "",
             when(lead.next_due) if lead.status == LeadStatus.SENT else "",
             when(answer.received_at) if answer else "", answer.subject if answer else "",
@@ -1001,7 +1023,7 @@ def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = 
             "" if lead.reviews is None else lead.reviews, lead.name, lead.place_id, lead.note,
             f"{sites_url.rstrip('/')}/{lead.site}/" if lead.site and sites_url else "",
             when(lead.site_opened_at), when(lead.site_last_visit_at), lead.site_visits or "",
-            ", ".join(lead.site_taps), lead.site_from,
+            ", ".join(lead.site_taps), lead.site_from, lead.variant,
         ])
     return (chr(0xFEFF) + buffer.getvalue()).encode("utf-8")
 

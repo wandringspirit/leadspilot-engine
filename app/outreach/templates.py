@@ -108,6 +108,42 @@ SITE_STEPS: list[dict] = [
     },
 ]
 
+# version B of SITE_STEPS, to test against it: no link in the first email - it asks first; the second
+# email sends the link (docs/OUTREACH.md, "Testing two versions")
+SITE_STEPS_ASK_FIRST: list[dict] = [
+    {
+        "day": 0,
+        "subject": "{Business} website",
+        "body": (
+            "Hi,\n\n"
+            "I came across {Business} on Google Maps. [[{Rating} stars from {Reviews} reviews, but there's no "
+            "website on your listing||There's no website on your Google listing]], so I made one for you. It has "
+            "your Google reviews and the towns you cover, and it's yours to keep at no cost.\n\n"
+            "Can I send you the link?\n\n"
+            "{SenderName}"
+        ),
+    },
+    {
+        "day": 3,
+        "subject": "",
+        "body": (
+            "Hi, in case it's easier to just look, here's the website I made for {Business}: {Website}\n\n"
+            "Happy to change anything: photos, services, phone number.\n\n"
+            "{SenderName}"
+        ),
+    },
+    {
+        "day": 6,
+        "subject": "",
+        "body": (
+            "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
+            "just reply \"yes\".\n\n"
+            "{Website}\n\n"
+            "{SenderName}"
+        ),
+    },
+]
+
 SITE_FOOTER = "[[{SenderCompany}, ]]{SenderAddress} · Reply \"no\" and I won't write again."
 
 DEFAULT_FOOTER = (
@@ -228,8 +264,9 @@ def compose(campaign: "Campaign", lead: "Lead", step: int, cfg: "Settings") -> t
     A follow-up without a subject of its own answers the first email: 'Re: <first subject>'.
     """
     values = lead_values(campaign, lead, cfg)
-    template = campaign.steps[step - 1]
-    first_subject = _one_line(render(campaign.steps[0].subject, values))
+    steps = campaign.steps_of(lead)
+    template = steps[step - 1]
+    first_subject = _one_line(render(steps[0].subject, values))
     subject = _one_line(render(template.subject, values)) if template.subject.strip() else ""
     if not subject:
         subject = first_subject if step == 1 else f"Re: {first_subject}"
@@ -238,16 +275,17 @@ def compose(campaign: "Campaign", lead: "Lead", step: int, cfg: "Settings") -> t
     return subject, (f"{body}\n\n{footer}" if footer else body)
 
 
-def links_site(campaign: "Campaign", step: int) -> bool:
-    """Email ``step`` (1 = the first) or one before it had the ``{Website}`` link."""
-    texts = [campaign.footer] + [t for s in campaign.steps[:step] for t in (s.subject, s.body)]
+def links_site(campaign: "Campaign", lead: "Lead", step: int) -> bool:
+    """Email ``step`` (1 = the first) to ``lead`` or one before it had the ``{Website}`` link."""
+    texts = [campaign.footer] + [t for s in campaign.steps_of(lead)[:step] for t in (s.subject, s.body)]
     return any("Website" in used_fields(t) for t in texts)
 
 
 def missing_fields(campaign: "Campaign", lead: "Lead", cfg: "Settings") -> list[str]:
     """Placeholders the lead's emails need (used outside optional parts) that have no value."""
     values = lead_values(campaign, lead, cfg)
-    texts = [campaign.footer] + [t for s in campaign.steps for t in (s.subject, s.body)]
+    steps = campaign.steps_of(lead) if lead.variant else campaign.all_steps()
+    texts = [campaign.footer] + [t for s in steps for t in (s.subject, s.body)]
     needed = set().union(*(required_fields(t) for t in texts))
     return sorted(n for n in needed if not values.get(n))
 

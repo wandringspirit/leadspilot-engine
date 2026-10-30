@@ -322,7 +322,7 @@ settings are missing, `502` when the mailbox refused (the message says why).
   `steps` / `footer` are the default emails. `409` when the name exists (case-insensitive).
 - `GET /api/business-types/{type_id}` → the type, `404` if unknown.
 - `PATCH /api/business-types/{type_id}` – any of `name`, `search`, `trade`, `steps` (1–5),
-  `footer`. `400` lists what is wrong with the emails (unknown placeholders, days not going up,
+  `steps_b` (a second version to test, `[]` = none), `footer`. `400` lists what is wrong with the emails (unknown placeholders, days not going up,
   no `{SenderAddress}` in the footer …).
 - `DELETE /api/business-types/{type_id}` → `204`. Searches, campaigns and Drive files stay.
 - `GET /api/business-types/{type_id}/preview` → `{"from", "samples": [{"label", "to", "emails":
@@ -381,7 +381,8 @@ and `emails_sent`.
 ### The other campaign routes
 
 - `GET /api/campaigns/{campaign_id}` – the full campaign (`404` if unknown).
-- `PATCH /api/campaigns/{campaign_id}` – any of `name`, `trade`, `steps`, `footer`; allowed while
+- `PATCH /api/campaigns/{campaign_id}` – any of `name`, `trade`, `steps`, `steps_b` (a second version
+  of the emails: the businesses take turns at their first email; `[]` ends the test), `footer`; allowed while
   it runs (changes apply to the emails not sent yet; the next follow-ups are rescheduled when the
   days change). `400` lists what is wrong with the emails.
 - `DELETE /api/campaigns/{campaign_id}` → `204`; `409` while it is running (pause first). The

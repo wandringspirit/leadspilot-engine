@@ -87,6 +87,15 @@ right the email as it goes out, filled in while you type for a business you pick
 header means it is filled in; **!** means something is wrong. The panel fills the templates the
 same way the server does, and the server checks them again on *Save*.
 
+**Testing two versions.** A business type or campaign can have a second version of its emails,
+`steps_b` (API only for now: `PATCH /api/campaigns/{id}` / `/api/business-types/{id}` with
+`{"steps_b": [...]}`; `[]` ends the test). The businesses then take turns at their first email: each
+gets **A** (`steps`) or **B** (`steps_b`), whichever fewer businesses have had so far across all
+campaigns, and keeps it for its follow-ups (`variant` on the lead). The activity log says
+*email 1 of 3 (version B)*, and the results file has a **Version** column. Businesses emailed before
+the test started stay on A. `SITE_STEPS_ASK_FIRST` in `templates.py` is the website emails' B: no
+link in the first email - it asks *Can I send you the link?* - and the link in the second.
+
 ## 4. When emails go out (`app/outreach/manager.py`, `schedule.py`)
 
 The server's send loop wakes every 20 s (only with `OUTREACH_AUTOSEND=true`) and sends **at most

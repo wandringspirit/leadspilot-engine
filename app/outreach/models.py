@@ -75,6 +75,7 @@ class Lead(BaseModel):
     site_visits: int = 0           # pages opened
     site_taps: list[str] = Field(default_factory=list)   # tapped: call / email / keep (each once)
     site_from: str = ""            # where the last visit came from, e.g. "Comcast Cable · Houston, US"
+    variant: str = ""              # "A" / "B": which version of the emails it gets, when its campaign tests two
 
 
 class LeftOut(BaseModel):
@@ -116,9 +117,13 @@ class BusinessType(BaseModel):
     search: str = ""               # typed into Google Maps, e.g. "roofing"
     trade: str = ""                # {Trade} in the emails, e.g. "roofers"
     steps: list[Step] = Field(default_factory=default_steps)
+    steps_b: list[Step] = Field(default_factory=list)   # a second version to test against steps ([] = none)
     footer: str = DEFAULT_FOOTER
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+    def steps_of(self, lead: "Lead") -> list[Step]:
+        return self.steps_b if lead.variant == "B" and self.steps_b else self.steps
 
 
 class DriveSource(BaseModel):
@@ -137,6 +142,9 @@ class Campaign(BaseModel):
     business_type_id: str = ""     # the business type the emails were copied from ('' = the default emails)
     business_type_name: str = ""
     steps: list[Step] = Field(default_factory=default_steps)
+    # a second version of the emails, tested against ``steps``: the businesses take turns at their first
+    # email (Lead.variant A / B) - [] = no test, everyone gets ``steps``
+    steps_b: list[Step] = Field(default_factory=list)
     footer: str = DEFAULT_FOOTER   # added to every email: postal address and how to opt out
     sites: bool = False            # each business has a preview website; its first email waits until it is online
     status: CampaignStatus = CampaignStatus.DRAFT
@@ -155,6 +163,14 @@ class Campaign(BaseModel):
 
     def lead(self, lead_id: str) -> Lead | None:
         return next((lead for lead in self.leads if lead.id == lead_id), None)
+
+    def steps_of(self, lead: Lead) -> list[Step]:
+        """The emails ``lead`` gets: version B when it was given B and the campaign has one."""
+        return self.steps_b if lead.variant == "B" and self.steps_b else self.steps
+
+    def all_steps(self) -> list[Step]:
+        """Every email of both versions (for checks that cover whatever a business may get)."""
+        return [*self.steps, *self.steps_b]
 
     def counts(self) -> dict[str, int]:
         counts = {status.value: 0 for status in LeadStatus}
@@ -222,6 +238,7 @@ class BusinessTypeUpdate(BaseModel):
     search: str | None = Field(None, max_length=120)
     trade: str | None = Field(None, max_length=60)
     steps: list[Step] | None = Field(None, min_length=1, max_length=5)
+    steps_b: list[Step] | None = Field(None, max_length=5, description="A second version to test; [] = none")
     footer: str | None = Field(None, max_length=1000)
 
 
@@ -230,6 +247,9 @@ class CampaignUpdate(BaseModel):
     trade: str | None = Field(None, max_length=60)
     steps: list[Step] | None = Field(None, min_length=1, max_length=5,
                                      description="The first email and up to 4 follow-ups")
+    steps_b: list[Step] | None = Field(None, max_length=5,
+                                       description="A second version, tested against steps: the businesses take "
+                                                   "turns at their first email; [] = no test")
     footer: str | None = Field(None, max_length=1000)
 
 
