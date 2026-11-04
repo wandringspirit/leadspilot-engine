@@ -16,7 +16,7 @@ from app.outreach.master import COUNT_COLUMNS
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 NAME = "Leads Pilot - Master sheet"
-FORMAT_VERSION = 2                     # raise it to format existing sheets again
+FORMAT_VERSION = 3                     # raise it to format existing sheets again
 CAMPAIGNS, ACTIVITY = 0, 1             # sheet ids
 
 HEADER = {"red": 0.29, "green": 0.11, "blue": 0.43}         # deep purple
@@ -41,7 +41,8 @@ ACTIVITY_COLOURS = [
     ("^(Email sent)$", BLUE),
     ("^(Campaign created|Campaign started|Campaign finished|Autopilot on)$", YELLOW),
     ("^(Search started|Search finished|Search stopped)$", LILAC),
-    ("^(Automatic reply|Unsubscribe|Autopilot off|Campaign not made|Test copy sent)$", GREY),
+    ("^(Automatic reply|Delivery delayed|Address skipped|Unsubscribe|Autopilot off|Campaign not made|"
+     "Test copy sent)$", GREY),
 ]
 CAMPAIGN_WIDTHS = [240, 105, 170, 125, 125] + [88] * len(COUNT_COLUMNS) + [125, 300]
 ACTIVITY_WIDTHS = [125, 140, 210, 230, 240, 460]

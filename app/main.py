@@ -26,6 +26,7 @@ from app.logbuffer import LEVELS, LOG_FORMAT, install as install_log_buffer, ins
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
 from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
+from app.outreach.domains import domain_problem
 from app.outreach.manager import OutreachError, OutreachManager
 from app.outreach.master import activity_table, campaigns_table, to_csv
 from app.outreach.sites import SiteService
@@ -81,7 +82,7 @@ manager = JobManager(settings)
 sites = SiteService(settings) if settings.PREVIEW_SITES else None
 activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
 visits = Visits(settings) if sites is not None else None
-outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits)
+outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=domain_problem)
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 

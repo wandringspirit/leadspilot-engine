@@ -162,6 +162,7 @@ class MailboxMessage:
     refs: set[str] = field(default_factory=set)       # In-Reply-To + References
     auto: bool = False             # an automatic reply (out of office …)
     bounce: bool = False           # a delivery failure report
+    delay: bool = False            # a report that delivery is taking long: it may still arrive
     failed: list[str] = field(default_factory=list)   # addresses a bounce names (X-Failed-Recipients)
     text: str = ""                 # start of the body - only fetched for bounces
 
@@ -185,12 +186,13 @@ def parse_headers(raw: bytes, text: str = "") -> MailboxMessage:
     content_type = _header(msg, "Content-Type").lower().replace(" ", "").replace('"', "")
     bounce = (local.startswith(_BOUNCE_SENDERS) or "report-type=delivery-status" in content_type
               or (not sender and lowered.startswith(_BOUNCE_SUBJECTS)))
-    if any(word in lowered for word in _DELAY_WORDS):
-        bounce = False             # "still trying to deliver" - not a failure (yet)
+    delay = bounce and any(word in lowered for word in _DELAY_WORDS)
+    bounce = bounce and not delay  # "still trying to deliver" - not a failure (yet)
     failed = [a.strip().lower() for a in _header(msg, "X-Failed-Recipients").split(",") if "@" in a]
     return MailboxMessage(sender=sender, subject=subject, received_at=received,
                           message_id=_first_id(_header(msg, "Message-ID")), refs=refs,
-                          auto=auto and not bounce, bounce=bounce, failed=failed, text=text)
+                          auto=auto and not bounce and not delay, bounce=bounce, delay=delay, failed=failed,
+                          text=text)
 
 
 def classify(message: MailboxMessage, *, addresses: Mapping[str, str], message_ids: Mapping[str, str],
@@ -198,8 +200,8 @@ def classify(message: MailboxMessage, *, addresses: Mapping[str, str], message_i
     """(lead key, kind) for an email that concerns a lead, else None.
 
     ``addresses`` / ``message_ids`` map the leads' addresses (lower case) and the Message-IDs of
-    the emails sent to them to a lead key. kind: ``bounce``, ``unsubscribe``, ``auto_reply`` or
-    ``reply``. A reply is recognised by its sender's address, or - sent from another address - by
+    the emails sent to them to a lead key. kind: ``bounce``, ``delay``, ``unsubscribe``, ``auto_reply``
+    or ``reply``. A reply is recognised by its sender's address, or - sent from another address - by
     answering one of our emails.
     """
     if message.bounce:
@@ -219,6 +221,8 @@ def classify(message: MailboxMessage, *, addresses: Mapping[str, str], message_i
     key = addresses.get(message.sender) or next((message_ids[i] for i in message.refs if i in message_ids), None)
     if key is None:
         return None
+    if message.delay:
+        return key, "delay"
     subject = re.sub(r"^(re|aw|fwd?)\s*:\s*", "", message.subject.strip().lower()).strip(" .!")
     if subject in _UNSUBSCRIBE_SUBJECTS:
         return key, "unsubscribe"

@@ -42,7 +42,7 @@ class SentEmail(BaseModel):
 
 class InboundEmail(BaseModel):
     """Something that arrived in the mailbox for a lead."""
-    kind: str                      # reply | auto_reply | unsubscribe | bounce
+    kind: str                      # reply | auto_reply | delay | unsubscribe | bounce
     received_at: datetime | None = None
     sender: str = ""
     subject: str = ""

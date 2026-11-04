@@ -622,3 +622,50 @@ def test_two_versions_take_turns_and_each_keeps_its_own_emails(tmp_path):
     # a version B that can't be sent stops the change
     with pytest.raises(OutreachError, match="version B"):
         run(manager.update(campaign, CampaignUpdate(steps_b=[Step(day=2, subject="x", body="y")])))
+
+
+def test_a_delay_report_is_not_a_reply(tmp_path):
+    raw = (b"From: Mail Delivery Subsystem <mailer-daemon@googlemail.com>\r\n"
+           b"Subject: Delivery Status Notification (Delay)\r\nIn-Reply-To: <m1@mysender.com>\r\n\r\n")
+    delay = parse_headers(raw)
+    assert delay.delay and not delay.bounce and not delay.auto
+    person = parse_headers(b"From: a@b.com\r\nSubject: sorry I delayed answering\r\n\r\n")
+    assert not person.delay
+    addresses, ids = {"lia@gmail.com": "L2"}, {"<m1@mysender.com>": "L1"}
+    assert classify(delay, addresses=addresses, message_ids=ids) == ("L1", "delay")
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock)
+    run(manager.tick())
+    lead = campaign.leads[0]
+    report = MailboxMessage(sender="mailer-daemon@googlemail.com", subject="Delivery Status Notification (Delay)",
+                            delay=True, message_id="<d1@mail.test>", refs={lead.sent[0].message_id})
+    mailbox.inbox = [report]
+    clock.advance(minutes=11)
+    run(manager.tick())
+    assert lead.status == LeadStatus.SENT and lead.next_due is not None      # the follow-ups continue
+    assert lead.inbound[0].kind == "delay"
+
+
+def test_an_address_that_cant_receive_email_is_skipped(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock)
+    asked = []
+
+    async def check(address):
+        asked.append(address)
+        return "the domain x.co doesn't exist" if address == "palmbreeze@gmail.com" else ""
+
+    manager.check_domain = check
+    run(manager.tick())
+    skipped = campaign.leads[0]
+    assert skipped.status == LeadStatus.FAILED and "doesn't exist" in skipped.note and not skipped.sent
+    assert mailbox.sent == []
+    assert json.loads((tmp_path / "contacted.json").read_text(encoding="utf-8"))["palmbreeze@gmail.com"][
+        "status"] == "failed"
+    run(manager.tick())                                                      # the next business goes straight on
+    assert [m["To"] for m in mailbox.sent] == ["hampshire@gmail.com"]
+    clock.now = TUESDAY_9AM + timedelta(days=3, minutes=5)
+    count = len(asked)
+    run(manager.tick())                                                      # no new check for a follow-up
+    assert mailbox.sent[-1]["To"] == "hampshire@gmail.com" and mailbox.sent[-1]["Subject"].startswith("Re: ")
+    assert asked[count:] == []

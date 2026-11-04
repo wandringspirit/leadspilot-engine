@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.16.0 – 2026-11-04
+
+### Added
+- **Address check**: just before a business's first email, an address whose domain doesn't exist or
+  has no mail server is skipped (*Address skipped* in the activity log), so it can't bounce. When the
+  lookup fails, the email goes out as usual.
+
+### Fixed
+- A delivery report saying an email is delayed was logged as an *Automatic reply*, or could count as
+  a reply and stop the follow-ups when it had no automatic-reply header. It is now *Delivery delayed*
+  and the follow-ups continue.
+
 ## 1.15.0 – 2026-10-30
 
 ### Added

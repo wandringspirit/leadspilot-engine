@@ -41,7 +41,7 @@ import tempfile
 from contextlib import suppress
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Awaitable, Callable
 
 from pydantic import TypeAdapter
 
@@ -119,8 +119,10 @@ class OutreachManager:
     def __init__(self, cfg: Settings, *, mailbox: MailboxClient | None = None,
                  clock: Callable[[], datetime] | None = None, rng: random.Random | None = None,
                  sites: SiteService | None = None, activity: ActivityLog | None = None,
-                 visits: Visits | None = None) -> None:
+                 visits: Visits | None = None,
+                 check_domain: Callable[[str], Awaitable[str]] | None = None) -> None:
         self.cfg = cfg
+        self.check_domain = check_domain
         self.activity = activity                 # None: nothing is written down (tests)
         self.mailbox: MailboxClient = mailbox or Mailbox(cfg)
         self.sites = sites                       # None: no preview websites, first emails don't wait
@@ -681,6 +683,16 @@ class OutreachManager:
 
     async def _deliver(self, campaign: Campaign, lead: Lead, now: datetime) -> None:
         step = len(lead.sent) + 1
+        if step == 1 and self.check_domain is not None:
+            problem = await self.check_domain(lead.email)
+            if problem:
+                lead.status, lead.next_due, lead.note = LeadStatus.FAILED, None, problem
+                log.warning("Not emailing %s <%s>: %s", lead.business, lead.email, problem)
+                self._note("Address skipped", problem, campaign, lead)
+                self._mark_contacted(campaign, lead, "failed", now)   # never try this address again
+                self._finish_if_done(campaign, now)
+                self._save(campaign)
+                return
         if step == 1 and campaign.steps_b and not lead.variant:
             lead.variant = self._next_variant()
         subject, body = compose(campaign, lead, step, self.cfg)
@@ -904,6 +916,11 @@ class OutreachManager:
             lead.inbound.append(InboundEmail(kind=kind, received_at=message.received_at, sender=message.sender,
                                              subject=message.subject, message_id=message.message_id))
             changed[campaign.id] = campaign
+            if kind == "delay":
+                log.info("Delivery to %s <%s> is taking long (%s) - the follow-ups continue", lead.business,
+                         lead.email, message.subject)
+                self._note("Delivery delayed", message.subject, campaign, lead)
+                continue
             if kind == "auto_reply":
                 log.info("Automatic reply from %s <%s> (%s) - the follow-ups continue", lead.business,
                          message.sender, message.subject)
@@ -1013,7 +1030,7 @@ def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = 
     writer = csv.writer(buffer, lineterminator="\r\n")
     writer.writerow(RESULT_COLUMNS)
     for lead in campaign.leads:
-        answer = next((i for i in reversed(lead.inbound) if i.kind != "auto_reply"), None)
+        answer = next((i for i in reversed(lead.inbound) if i.kind not in ("auto_reply", "delay")), None)
         writer.writerow([
             lead.business, lead.email, lead.status.value, f"{len(lead.sent)} of {len(campaign.steps_of(lead))}",
             when(lead.sent[0].sent_at) if lead.sent else "", when(lead.sent[-1].sent_at) if lead.sent else "",

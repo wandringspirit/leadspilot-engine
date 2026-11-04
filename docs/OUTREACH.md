@@ -96,6 +96,13 @@ campaigns, and keeps it for its follow-ups (`variant` on the lead). The activity
 the test started stay on A. `SITE_STEPS_ASK_FIRST` in `templates.py` is the website emails' B: no
 link in the first email - it asks *Can I send you the link?* - and the link in the second.
 
+**The address check** (`app/outreach/domains.py`). Just before a business's first email, the panel
+asks whether its address's domain can receive email at all. If the domain doesn't exist or has no mail
+server, the business is skipped (*Address skipped* in the activity log, status *refused*, never tried
+again), so it can't bounce. It uses Cloudflare's DNS over HTTPS, not the computer's DNS, which a home
+router can answer wrongly. When the lookup fails, the email goes out as usual. It can't see whether the
+mailbox itself exists, so an address like `admin@` on a working domain can still bounce.
+
 ## 4. When emails go out (`app/outreach/manager.py`, `schedule.py`)
 
 The server's send loop wakes every 20 s (only with `OUTREACH_AUTOSEND=true`) and sends **at most
@@ -161,6 +168,7 @@ or deleted.
 | **Unsubscribe** | a reply whose subject is *unsubscribe / stop / remove*. Gmail's unsubscribe link sends exactly that, via the `List-Unsubscribe` header (with `OUTREACH_UNSUBSCRIBE_HEADER` on) | `unsubscribed`, no more emails |
 | **Bounce** | from `mailer-daemon` / `postmaster`, or a delivery-status report, naming the address (`X-Failed-Recipients`, or in its text) | `bounced`, no more emails |
 | **Automatic reply** | `Auto-Submitted`, `X-Autoreply`, or an *Out of office* / *Automatic reply* subject | noted, the follow-ups **continue** |
+| **Delivery delayed** | a delivery report saying it is still trying (*Delivery Status Notification (Delay)*) | noted as *Delivery delayed*, the follow-ups **continue**; it becomes a bounce if the mail server gives up |
 | a *delivery delayed* notice | *Delay* / *will retry* in its subject | ignored |
 
 A reply saying *"no"* is a reply: it stops the follow-ups, and because the address is on the
