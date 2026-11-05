@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.17.1 – 2026-11-06
+
+### Changed
+- The roofer websites' insurance answer: it now says the insurance company can tell the visitor what's covered,
+  and that the roofer documents what they find for the visitor to send on. Rebuilt and deployed to the online sites.
+
 ## 1.17.0 – 2026-11-05
 
 ### Added
