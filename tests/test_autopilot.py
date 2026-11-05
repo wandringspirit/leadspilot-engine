@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import random
+from datetime import timedelta
 
 import pytest
 
@@ -107,11 +108,18 @@ async def test_it_stops_when_emails_bounce_and_pauses_the_campaigns(tmp_path):
     await pilot.tick()
     assert "bounced" in pilot.state.stopped and campaign.status == CampaignStatus.PAUSED
     assert activity.entries()[0]["what"] == "Autopilot stopped"
-    # switched on again: the old bounces don't count
+    # saving its settings doesn't clear the stop
+    pilot.update(AutopilotUpdate(min_waiting=5))
+    assert "bounced" in pilot.state.stopped
+    # switched on again (the panel's button sends just this): the old bounces don't count
     clock.advance(minutes=1)
-    pilot.update(AutopilotUpdate(enabled=False))
     pilot.update(AutopilotUpdate(enabled=True))
-    assert pilot.state.stopped == "" and pilot._recent_bounces() == 0
+    assert pilot.state.stopped == "" and pilot.state.enabled and pilot._recent_bounces() == 0
+    assert pilot.state.on_since == clock() and activity.entries()[0]["what"] == "Autopilot on"
+    # asked again while it is on: nothing changes, so the bounce count doesn't start afresh
+    clock.advance(minutes=1)
+    pilot.update(AutopilotUpdate(enabled=True))
+    assert pilot.state.on_since == clock() - timedelta(minutes=1)
 
 
 async def test_a_blocked_search_stops_it_and_a_lost_one_is_searched_again(tmp_path):

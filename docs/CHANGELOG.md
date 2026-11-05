@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.16.1 – 2026-11-05
+
+### Fixed
+- Switching the autopilot on after it stopped itself did nothing: the button said *on*, but it stayed
+  stopped until it was switched off and on. Switching it on now clears the stop and starts the bounce
+  count afresh.
+
 ## 1.16.0 – 2026-11-04
 
 ### Added

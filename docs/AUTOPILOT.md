@@ -49,7 +49,8 @@ The autopilot switches itself off, says why, and writes it in the activity log w
 
 - **2 of the last 20 businesses emailed bounced.** It also pauses the running campaigns, because
   bounces hurt the mailbox's reputation. Check the addresses and the mailbox, then switch it on
-  again; bounces from before that don't count.
+  again; bounces from before that don't count. The campaigns it paused stay paused until you start
+  them, and it won't search for more while they are.
 - **Google blocked a search** (its *unusual traffic* check). Wait a day, then switch it on again.
 - every place on the list has been searched, or its business type was deleted.
 

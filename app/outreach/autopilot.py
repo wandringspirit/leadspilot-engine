@@ -148,7 +148,8 @@ class Autopilot:
             if value is not None:
                 setattr(state, field, value)
         state.next_place = min(state.next_place, len(state.places))
-        if req.enabled is not None and req.enabled != state.enabled:
+        # a stopped autopilot is still ``enabled``, so switching it on has to count as a change
+        if req.enabled is not None and (req.enabled != state.enabled or (req.enabled and state.stopped)):
             state.enabled = req.enabled
             if req.enabled:
                 if not state.business_type_id:
