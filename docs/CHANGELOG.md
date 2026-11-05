@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.17.0 – 2026-11-05
+
+### Added
+- **The quote form on the preview websites works.** It only pretended before: it said *We've got it* and
+  sent nothing. A request now waits in the Worker's database until the panel emails it to the business,
+  and the form shows the phone number when a request can't be saved. It also asks for an email address
+  (optional).
+- **A reply puts the website on hold** (no end date, no countdown), unless the reply says no. A button
+  under the website link in a campaign, and `PATCH /api/sites/{slug}`, do it by hand.
+- `python sites/build.py --rebuild` renders every site again with the current design.
+
+### Changed
+- The website emails' layout: the "yours to keep" sentence has its own paragraph, the signature carries the
+  company name, and the footer has the address and the opt-out on two lines. The words are the same.
+
 ## 1.16.1 – 2026-11-05
 
 ### Fixed

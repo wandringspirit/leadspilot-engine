@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
 
+from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -29,6 +30,7 @@ from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.domains import domain_problem
 from app.outreach.manager import OutreachError, OutreachManager
 from app.outreach.master import activity_table, campaigns_table, to_csv
+from app.outreach.site_requests import SiteRequests
 from app.outreach.sites import SiteService
 from app.outreach.visits import Visits
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
@@ -59,7 +61,11 @@ async def lifespan(_: FastAPI):
         drive.start_loop(outreach, master=_master_tables)
     if visits is not None:
         visits.start_loop(outreach.record_visits)
+    if site_requests is not None:
+        site_requests.start_loop()
     yield
+    if site_requests is not None:
+        await site_requests.stop_loop()
     if visits is not None:
         await visits.stop_loop()
     await autopilot.stop_loop()
@@ -83,6 +89,7 @@ sites = SiteService(settings) if settings.PREVIEW_SITES else None
 activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
 visits = Visits(settings) if sites is not None else None
 outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=domain_problem)
+site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not None else None
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 
@@ -282,6 +289,24 @@ async def outreach_status() -> dict:
 async def outreach_check() -> dict:
     """Check the mailbox for replies and bounces now."""
     return await _outreach(outreach.check_now())
+
+
+class SiteUpdate(BaseModel):
+    hold: bool
+
+
+@app.patch("/api/sites/{slug}")
+async def site_update(slug: str, req: SiteUpdate) -> dict:
+    """Put a preview website on hold (no end date, no countdown), or back on its dates."""
+    if sites is None:
+        raise HTTPException(404, "preview websites are switched off")
+    try:
+        changed = sites.set_hold(slug, req.hold)
+    except KeyError:
+        raise HTTPException(404, "website not found") from None
+    if changed:
+        activity.add("Website on hold" if req.hold else "Website hold lifted", f"{slug}, by you")
+    return {"slug": slug, "hold": req.hold, "changed": changed}
 
 
 @app.get("/api/autopilot")

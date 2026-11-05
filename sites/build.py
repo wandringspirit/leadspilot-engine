@@ -1,6 +1,7 @@
 """Build the preview websites of the businesses a search found: the step between searching and emailing.
 
     python sites/build.py job_5deb5c9d7bd1 [job_d38350fa59d5 ...]
+    python sites/build.py --rebuild     # every site again, with the current design (dates untouched)
 
 The panel builds them by itself for the businesses of each new campaign (app/outreach/sites.py); this
 command does the same for whole searches. A business type's trade pack is ``sites/trades/<type>.json``
@@ -228,6 +229,32 @@ def build_job(job_id: str, manifest: dict, sites_dir: Path = SITES) -> tuple[lis
     return built, left_out
 
 
+def rebuild_all(manifest: dict, sites_dir: Path = SITES) -> tuple[list[str], list[str]]:
+    """Render every site in ``manifest`` again from its search; it changes only the sites' files, never
+    ``sites.json``, so the panel can keep running. Returns (slugs rebuilt, lines saying which weren't and why)."""
+    built, problems = [], []
+    for slug, site in manifest.items():
+        path = DATA / "jobs" / f"{site.get('job_id')}.json"
+        if not path.is_file():
+            problems.append(f"{slug}: its search {site.get('job_id')} is gone")
+            continue
+        job = json.loads(path.read_text(encoding="utf-8"))
+        rows = [r for r in job["rows"] if r.get("email") and not email_problem(r["email"])]
+        row = next((r for r in rows if (site.get("place_id") and r.get("place_id") == site["place_id"])
+                    or r["email"].strip().lower() == site.get("email")), None)
+        found = trade_pack(site.get("trade") or "")
+        if row is None or not found:
+            problems.append(f"{slug}: {'not in its search' if row is None else 'no design for its trade'}")
+            continue
+        got, why = build_site(row, searched_city(job["place"], rows), found[1], found[0], json.loads(json.dumps(manifest)),
+                              sites_dir, job_id=site.get("job_id") or "")
+        if got == slug:
+            built.append(slug)
+        else:
+            problems.append(f"{slug}: {why or f'would have become {got}'}")
+    return built, problems
+
+
 def business_type(job: dict) -> dict | None:
     types = json.loads((DATA / "business_types.json").read_text(encoding="utf-8"))
     return (next((t for t in types if t["id"] == job.get("business_type_id")), None)
@@ -236,9 +263,18 @@ def business_type(job: dict) -> dict | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("jobs", nargs="+", help="search ids, e.g. job_5deb5c9d7bd1")
+    ap.add_argument("jobs", nargs="*", help="search ids, e.g. job_5deb5c9d7bd1")
+    ap.add_argument("--rebuild", action="store_true", help="every site again, with the current design")
     args = ap.parse_args()
     manifest = load_manifest()
+    if args.rebuild:
+        built, problems = rebuild_all(manifest)
+        print(f"{len(built)} site(s) rebuilt")
+        for line in problems:
+            print(f"  not rebuilt - {line}")
+        return
+    if not args.jobs:
+        ap.error("name the searches to build, or --rebuild")
     for job_id in args.jobs:
         built, left_out = build_job(job_id.removesuffix(".json"), manifest)
         print(f"{job_id}: {len(built)} site(s) built")

@@ -638,6 +638,18 @@
       link.target = "_blank";
       link.rel = "noopener";
       name.appendChild(link);
+      const held = state.status.sites.held.includes(lead.site);
+      const hold = el("button", "site-link link-button", held ? "Lift the hold" : "Put on hold");
+      hold.type = "button";
+      hold.title = held ? "Back to its end date and countdown" : "No end date, and “being set up” instead of the countdown";
+      hold.addEventListener("click", async () => {
+        try {
+          await api(`/api/sites/${encodeURIComponent(lead.site)}`, { method: "PATCH", body: JSON.stringify({ hold: !held }) });
+          toast(held ? "Hold lifted" : "Website on hold");
+          refreshAll();
+        } catch (err) { toast(err.message, true); }
+      });
+      name.appendChild(hold);
     }
     tr.appendChild(name);
     const email = el("td", "", lead.email);

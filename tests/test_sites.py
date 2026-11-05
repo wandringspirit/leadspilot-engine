@@ -12,7 +12,7 @@ import pytest
 from app.models import Job, JobStatus, PlaceRow
 from app.outreach.mailbox import MailboxMessage
 from app.outreach.manager import OutreachManager
-from app.outreach.models import CampaignCreate
+from app.outreach.models import CampaignCreate, LeadStatus
 from app.outreach.sites import SiteService, _wrangler_problem
 from sites.build import build_site, load_manifest, searched_city, trade_pack
 from sites.deploy import ends_at, prepare
@@ -218,12 +218,25 @@ async def test_the_roofer_emails_link_the_site_and_set_its_end(tmp_path):
         last = datetime.fromisoformat(site["last_email_at"])
         assert ends_at(site) == last + timedelta(days=2)
 
-        # a reply keeps it up while you talk
+        # a reply that says no keeps it up for a while, no more
         manager.mailbox.inbox.append(MailboxMessage(sender="texashomeroof@gmail.com", subject="Re: website",
-                                                    message_id="<r@x>", received_at=clock()))
+                                                    message_id="<r@x>", received_at=clock(),
+                                                    text="No\n\nSent from my iPhone\n> Hi,"))
         await manager._check(clock())
         site = load_manifest(sites.dir)["texas-home-roofing"]
-        assert ends_at(site) == datetime.fromisoformat(site["replied_at"]) + timedelta(days=30)
+        assert not site["hold"] and ends_at(site) == datetime.fromisoformat(site["replied_at"]) + timedelta(days=30)
+
+        # any other reply puts it on hold
+        assert sites.set_hold("texas-home-roofing", False) is False
+        lead = next(lead for c in manager.campaigns.values() for lead in c.leads if lead.site == "texas-home-roofing")
+        lead.status, lead.inbound = LeadStatus.SENT, []
+        manager.mailbox.inbox = [MailboxMessage(sender="texashomeroof@gmail.com", subject="Re: website",
+                                                message_id="<r2@x>", received_at=clock(), text="What does it cost?")]
+        await manager._check(clock())
+        site = load_manifest(sites.dir)["texas-home-roofing"]
+        assert site["hold"] and ends_at(site) is None and sites.status()["held"] == ["texas-home-roofing"]
+        with pytest.raises(KeyError):
+            sites.set_hold("nobody", True)
     finally:
         await sites.stop()
 

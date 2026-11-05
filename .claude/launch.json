@@ -8,6 +8,12 @@
       "port": 8000
     },
     {
+      "name": "leads-pilot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:/Projects/leads-pilot", "run", "dev"],
+      "port": 4321
+    },
+    {
       "name": "sites",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "data/sites"],

@@ -49,7 +49,7 @@ from app.config import Settings
 from app.models import Job, JobStatus, PlaceRow, split_places
 from app.outreach.activity import ActivityLog
 from app.outreach.leads import leads_from_jobs
-from app.outreach.mailbox import (MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
+from app.outreach.mailbox import (declined, MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
                                   build_message, classify, imap_problems, mailbox_problems, new_message_id,
                                   sender_address, sender_header, smtp_problems)
 from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign,
@@ -71,7 +71,8 @@ MAX_FAILURES = 3                         # failed sends in a row before the camp
 STOP_WAIT_S = 90                         # stopping waits this long at most for the email being sent
 LINK_CHECK = timedelta(minutes=2)        # a website opened this soon after its email: a mail server checking it
 PERSON_KINDS = frozenset({"seen", "call", "email", "keep"})   # visits only a person makes
-TAPS = {"call": "Tapped call", "email": "Tapped email", "keep": "Asked to keep website"}
+TAPS = {"call": "Tapped call", "email": "Tapped email", "keep": "Asked to keep website",
+        "quote": "Website form sent"}
 
 _STOPPED_BY = {"reply": LeadStatus.REPLIED, "unsubscribe": LeadStatus.UNSUBSCRIBED, "bounce": LeadStatus.BOUNCED}
 _BusinessTypes = TypeAdapter(list[BusinessType])
@@ -932,6 +933,8 @@ class OutreachManager:
                        message.subject or "", campaign, lead)
             if kind == "reply" and lead.site and self.sites is not None:
                 self.sites.record(lead.site, "replied_at", now)     # online while you talk
+                if not declined(message.text) and self.sites.set_hold(lead.site, True):
+                    self._note("Website on hold", "they replied: no more countdown", campaign, lead)
             self._mark_contacted(campaign, lead, lead.status.value, now)
             if kind == "bounce":
                 bounces += 1

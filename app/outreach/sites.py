@@ -83,6 +83,7 @@ class SiteService:
     def status(self) -> dict:
         last = self.last_upload
         return {"url": self.cfg.SITES_URL.rstrip("/"), "uploading": self._uploading,
+                "held": sorted(slug for slug, site in self._manifest().items() if site.get("hold")),
                 "waiting": len(self.unpublished()),
                 "online": sorted(slug for slug in self._manifest() if self.is_live(slug)),
                 "last_upload": {"at": _iso(last["at"]), "ok_at": _iso(last["ok_at"]), "error": last["error"],
@@ -130,6 +131,20 @@ class SiteService:
         if self._update(slug, event, at):
             self.request_upload()
 
+    def set_hold(self, slug: str, hold: bool) -> bool:
+        """Keep a site online with no end date, or go back to its dates; False when nothing changed."""
+        from sites.build import load_manifest, save_manifest
+        with self._lock:
+            manifest = load_manifest(self.dir)
+            if slug not in manifest:
+                raise KeyError(slug)
+            if bool(manifest[slug].get("hold")) == hold:
+                return False
+            manifest[slug]["hold"] = hold
+            save_manifest(manifest, self.dir)
+        self.request_upload()
+        return True
+
     def _update(self, slug: str, field: str, at: datetime) -> bool:
         from sites.build import load_manifest, save_manifest
         with self._lock:
@@ -139,6 +154,9 @@ class SiteService:
             manifest[slug][field] = at.isoformat(timespec="seconds")
             save_manifest(manifest, self.dir)
             return True
+
+    def manifest(self) -> dict:
+        return self._manifest()
 
     def _manifest(self) -> dict:
         """sites.json, read again only when it changed (the send loop asks for every queued lead)."""

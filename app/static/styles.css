@@ -134,6 +134,7 @@ fieldset.filters legend { font-weight: 600; padding: 0 6px; margin-left: -6px; }
 .chip.area { background: var(--primary-soft); color: var(--primary); }
 small.block { display: block; margin-top: 2px; }
 .site-link { display: block; margin-top: 2px; font-size: 12px; }
+.link-button { padding: 0; border: 0; background: none; color: var(--muted, inherit); cursor: pointer; text-decoration: underline; }
 .site-opened { margin-top: 3px; color: var(--primary); font-size: 12px; font-weight: 600; }
 kbd {
   font-family: var(--mono); font-size: 11px; padding: 0 5px; border: 1px solid var(--border);

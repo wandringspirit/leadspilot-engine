@@ -419,6 +419,14 @@ Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.
   newest first.
 - `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master sheet's files.
 
+## Preview websites
+
+### PATCH `/api/sites/{slug}`
+
+`{"hold": true}` puts a website on hold: no end date, and *Your new website is being set up* instead of the
+countdown. `{"hold": false}` puts it back on its dates. A reply from the business does the first by itself,
+unless the reply says no. The change goes online with the next upload, about 30 seconds later.
+
 ## Google Drive
 
 Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files: [DRIVE.md](DRIVE.md).

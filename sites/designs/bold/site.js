@@ -289,16 +289,33 @@
       const radio = $(`input[data-val="${map[a.dataset.service] || "check"}"]`, form);
       if (radio) { radio.checked = true; go(1); }
     }));
+    let sending = false;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (sending) return;
       const problem = valid();
       if (problem) { err.textContent = problem; err.hidden = false; return; }
       if (at < stepsF.length - 1) { go(at + 1); return; }
       const data = Object.fromEntries(new FormData(form));
       const endpoint = form.dataset.endpoint;
-      try {
-        if (endpoint) await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
-      } catch { /* still thank them; the phone number is on screen */ }
+      if (endpoint) {
+        sending = true;
+        next.disabled = true;
+        let sent = false;
+        try {
+          const page = { slug: decodeURIComponent(location.pathname.split("/")[1] || ""), copy: new URLSearchParams(location.search).has("copy") };
+          const answer = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, ...page }) });
+          sent = answer.ok;
+        } catch { /* said below */ }
+        sending = false;
+        next.disabled = false;
+        if (!sent) {                                     // never thank someone whose request went nowhere
+          const phone = form.dataset.phone;
+          err.textContent = phone ? `That didn't go through. Please call ${phone}.` : "That didn't go through. Please try again.";
+          err.hidden = false;
+          return;
+        }
+      }
       $("[data-qf-name]", form).textContent = data.name ? `, ${data.name.split(" ")[0]}` : "";
       form.classList.add("is-done");
       $("[data-qf-done]", form).hidden = false;

@@ -232,7 +232,7 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
         "preview": preview,
         "preview_ends": ends.isoformat(timespec="seconds"),
         "keep_href": f"mailto:piyush@leadspilot.co?subject={business.replace(' ', '%20')}%20-%20keep%20my%20website",
-        "form_endpoint": "",
+        "form_endpoint": "/_q" if preview else "",   # the Worker's quote route (sites/worker/src/index.js)
         "year": datetime.now().year,
     }
 

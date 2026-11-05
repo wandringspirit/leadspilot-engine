@@ -11,17 +11,26 @@
  * tapped. The visitor's IP address is never stored: only a hash of it (with VISITS_KEY), their network,
  * city and country. The panel reads them with GET /_visits (VISITS_KEY as a bearer token) - the answer also
  * holds the panel's own hash and country, so its own visits are told apart (app/outreach/visits.py).
+ *
+ * The quote form posts to /_q: the request waits in the same database (migrations/0002_requests.sql) until
+ * the panel emails it to the business and deletes it (GET and POST /_requests, app/outreach/site_requests.py).
  */
 
 const HOME = "https://leadspilot.co/";
 const TAPS = new Set(["seen", "call", "email", "keep"]);
 const PAGE_SIZE = 1000;
+const QUOTE_FIELDS = { problem: 100, address: 200, when: 40, name: 100, phone: 30, email: 120 };
+const QUOTES_PER_VISITOR = 5;   // an hour
+const QUOTES_PER_SITE = 20;     // an hour
+const NOT_SAVED = "Your request didn't go through.";
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === "/_v" && request.method === "POST") return beacon(request, env, ctx);
     if (url.pathname === "/_visits") return visits(request, env, url);
+    if (url.pathname === "/_q" && request.method === "POST") return quote(request, env, url);
+    if (url.pathname === "/_requests") return requests(request, env, url);
 
     const slug = decodeURIComponent(url.pathname.split("/")[1] || "");
     if (!slug) return Response.redirect(HOME, 302);
@@ -124,6 +133,81 @@ async function visits(request, env, url) {
   return Response.json({ visits: results, more: results.length === PAGE_SIZE,
                          me: { who: await who(request, env), country: String(cf.country || "") } },
                        { headers: { "Cache-Control": "no-store" } });
+}
+
+// ---------------------------------------------------------------------------
+// quote requests
+// ---------------------------------------------------------------------------
+async function quote(request, env, url) {
+  const origin = request.headers.get("Origin");
+  if (!(request.headers.get("Content-Type") || "").startsWith("application/json") || (origin && origin !== url.origin)) {
+    return Response.json({ error: NOT_SAVED }, { status: 415 });
+  }
+  let data;
+  try {
+    data = JSON.parse((await request.text()).slice(0, 4000));
+  } catch {
+    return Response.json({ error: NOT_SAVED }, { status: 400 });
+  }
+  const slug = typeof data.slug === "string" ? data.slug : "";
+  const site = (await statusOf(env, url))[slug] || null;
+  if (!site || (!site.hold && Date.now() >= Date.parse(site.expires))) {
+    return Response.json({ error: NOT_SAVED }, { status: 404 });
+  }
+  if (data.fax) return Response.json({ ok: true });       // the hidden field: a bot gets no hint it was caught
+  const fields = {};
+  for (const [name, longest] of Object.entries(QUOTE_FIELDS)) {
+    fields[name] = String(data[name] ?? "").replace(/\s+/g, " ").trim().slice(0, longest);
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fields.email)) fields.email = "";
+  if (!fields.name || fields.phone.replace(/\D/g, "").length < 10) {
+    return Response.json({ error: NOT_SAVED }, { status: 400 });
+  }
+  if (!env.VISITS) return Response.json({ error: NOT_SAVED }, { status: 503 });
+  try {
+    const hash = await who(request, env);
+    const hourAgo = new Date(Date.now() - 3600000).toISOString();
+    const seen = await env.VISITS.prepare(
+      "SELECT COALESCE(SUM(who = ?), 0) AS mine, COALESCE(SUM(slug = ?), 0) AS here FROM visits WHERE kind = 'quote' AND at > ?",
+    ).bind(hash, slug, hourAgo).first();
+    if (seen.mine >= QUOTES_PER_VISITOR || seen.here >= QUOTES_PER_SITE) {
+      return Response.json({ error: NOT_SAVED }, { status: 429 });
+    }
+    const cf = request.cf || {};
+    const [at, org, country, city] = [new Date().toISOString(), String(cf.asOrganization || ""), String(cf.country || ""),
+      String(cf.city || "")];
+    const ua = (request.headers.get("User-Agent") || "").slice(0, 200);
+    const copy = data.copy === true ? 1 : 0;
+    await env.VISITS.batch([
+      env.VISITS.prepare(
+        "INSERT INTO requests (at, slug, who, org, country, ua, copy, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).bind(at, slug, hash, org, country, ua, copy, JSON.stringify(fields)),
+      env.VISITS.prepare(
+        "INSERT INTO visits (at, slug, kind, who, org, country, city, ua, copy) VALUES (?, ?, 'quote', ?, ?, ?, ?, ?, ?)",
+      ).bind(at, slug, hash, org, country, city, ua, copy),
+    ]);
+  } catch (err) {
+    console.error("quote request not saved", err);
+    return Response.json({ error: NOT_SAVED }, { status: 503 });
+  }
+  return Response.json({ ok: true });
+}
+
+async function requests(request, env, url) {
+  const key = env.VISITS_KEY || "";
+  if (!key || !env.VISITS || request.headers.get("Authorization") !== `Bearer ${key}`) return notFound();
+  if (request.method === "POST") {
+    const { done } = await request.json();
+    const ids = (Array.isArray(done) ? done : []).map(Number).filter(Number.isInteger);
+    if (ids.length) {
+      await env.VISITS.batch(ids.map((id) => env.VISITS.prepare("DELETE FROM requests WHERE id = ?").bind(id)));
+    }
+    return Response.json({ deleted: ids.length });
+  }
+  const { results } = await env.VISITS.prepare(
+    "SELECT id, at, slug, who, org, country, ua, copy, data FROM requests ORDER BY id LIMIT 100",
+  ).all();
+  return Response.json({ requests: results }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // ---------------------------------------------------------------------------

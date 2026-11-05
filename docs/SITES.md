@@ -56,7 +56,7 @@ The latest of these decides:
 | the first email with the link (`{Website}`) | 14 days | room for follow-ups that go out late (weekends, the daily limit) |
 | the last email, when the emails link the site | 2 days | it says the preview "comes down tomorrow" |
 | the business replied | 30 days | it stays up while you talk |
-| on hold | until the hold is lifted | the business wants to keep it |
+| on hold | until the hold is lifted | set by itself when the business replies, unless the reply says no; the *Put on hold* / *Lift the hold* button under its website link in a campaign does it by hand |
 
 The Roofer emails (a business type with a design starts with them, `SITE_STEPS` in
 `app/outreach/templates.py`) link the site in all three: day 0, day 3, and day 6 - *comes down
@@ -65,6 +65,23 @@ tomorrow*.
 The Worker (`sites/worker/src/index.js`) reads each site's end date from `_status.json`, uploaded with
 the sites (never served): an ended site shows *This preview has ended* (`410`); a site on hold shows
 *Your new website is being set up* instead of the countdown. Every page is `noindex`.
+
+## The quote form
+
+The form on a site posts to the Worker (`POST /_q`), which keeps the request in its database. Within a
+minute, while the panel is running, the panel emails it to the business from the outreach mailbox and
+deletes it (`app/outreach/site_requests.py`). If the panel is off, requests wait and go out when it's back.
+The visitor sees *We've got it* only once the request is saved; otherwise the form shows the business's
+phone number. The panel's lead row shows *Website form sent*, without the visitor's details.
+
+A request goes to **you**, with *[Not sent to ...]* in its subject, when it came from this computer, your
+own country or a test copy of an email, so you can try a form. It also goes to you when the business asked
+not to be emailed or its address doesn't work. A visitor can send 5 requests an hour and a site can receive
+20; a hidden field catches simple bots.
+
+After changing the design, `python sites/build.py --rebuild` renders every site again without touching
+their dates. A new database table needs `wrangler d1 migrations apply leadspilot-visits --remote`, run in
+`sites/worker`.
 
 ## 4. Uploading
 

@@ -82,9 +82,9 @@ SITE_STEPS: list[dict] = [
             "Hi,\n\n"
             "I made a website for {Business}:\n"
             "{Website}\n\n"
-            "It has your Google reviews and the towns you cover. If you like it, it's yours to keep at no cost. "
-            "If not, no problem at all.\n\n"
-            "{SenderName}"
+            "It has your Google reviews and the towns you cover.\n\n"
+            "If you like it, it's yours to keep at no cost. If not, no problem at all.\n\n"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
     {
@@ -93,7 +93,7 @@ SITE_STEPS: list[dict] = [
         "body": (
             "Hi, just checking you saw the site I made for {Business}: {Website}\n\n"
             "Happy to change anything: photos, services, phone number.\n\n"
-            "{SenderName}"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
     {
@@ -103,7 +103,7 @@ SITE_STEPS: list[dict] = [
             "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
             "just reply \"yes\".\n\n"
             "{Website}\n\n"
-            "{SenderName}"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
 ]
@@ -120,7 +120,7 @@ SITE_STEPS_ASK_FIRST: list[dict] = [
             "website on your listing||There's no website on your Google listing]], so I made one for you. It has "
             "your Google reviews and the towns you cover, and it's yours to keep at no cost.\n\n"
             "Can I send you the link?\n\n"
-            "{SenderName}"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
     {
@@ -129,7 +129,7 @@ SITE_STEPS_ASK_FIRST: list[dict] = [
         "body": (
             "Hi, in case it's easier to just look, here's the website I made for {Business}: {Website}\n\n"
             "Happy to change anything: photos, services, phone number.\n\n"
-            "{SenderName}"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
     {
@@ -139,12 +139,12 @@ SITE_STEPS_ASK_FIRST: list[dict] = [
             "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
             "just reply \"yes\".\n\n"
             "{Website}\n\n"
-            "{SenderName}"
+            "{SenderName}[[\n{SenderCompany}]]"
         ),
     },
 ]
 
-SITE_FOOTER = "[[{SenderCompany}, ]]{SenderAddress} · Reply \"no\" and I won't write again."
+SITE_FOOTER = "{SenderAddress}\nReply \"no\" and I won't write again."
 
 DEFAULT_FOOTER = (
     "[[{SenderCompany}\n]]{SenderAddress}\n"

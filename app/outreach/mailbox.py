@@ -131,7 +131,7 @@ def new_message_id(sender: str) -> str:
 
 
 def build_message(*, sender: str, to: str, subject: str, body: str, message_id: str,
-                  earlier_ids: list[str] | None = None, unsubscribe: str = "") -> EmailMessage:
+                  earlier_ids: list[str] | None = None, unsubscribe: str = "", reply_to: str = "") -> EmailMessage:
     """A plain-text email. ``earlier_ids`` (the Message-IDs sent to this lead before) make it a
     reply in the same thread; ``unsubscribe`` is the address a List-Unsubscribe click writes to."""
     message = EmailMessage()
@@ -143,6 +143,8 @@ def build_message(*, sender: str, to: str, subject: str, body: str, message_id: 
     if earlier_ids:
         message["In-Reply-To"] = earlier_ids[-1]
         message["References"] = " ".join(earlier_ids)
+    if reply_to:
+        message["Reply-To"] = reply_to
     if unsubscribe:
         message["List-Unsubscribe"] = f"<mailto:{unsubscribe}?subject=unsubscribe>"
     message.set_content(body)
@@ -152,6 +154,41 @@ def build_message(*, sender: str, to: str, subject: str, body: str, message_id: 
 # --------------------------------------------------------------------------
 # Reading what arrived
 # --------------------------------------------------------------------------
+_JUST_NO = {"no", "nope", "nah", "stop", "remove", "unsubscribe"}
+_DECLINES = re.compile(r"\b(not interested|no thanks|no thank you|no thx|unsubscribe|remove me|stop emailing|"
+                       r"don'?t (email|contact|need|want)|do not (email|contact|need|want)|not looking|not needed|"
+                       r"already have)\b")
+
+
+def declined(text: str) -> bool:
+    """A reply that says no. Only the words above the quoted email count. When in doubt it's False."""
+    lines = []
+    for line in text.replace("\u2019", "'").splitlines():
+        line = line.strip()
+        if line.startswith(">") or (line.lower().startswith("on ") and line.lower().endswith("wrote:")):
+            break
+        if line:
+            lines.append(line.lower())
+    if not lines:
+        return False
+    return lines[0].strip(" .,!?") in _JUST_NO or bool(_DECLINES.search(" ".join(lines)))
+
+
+def reply_text(raw: bytes) -> str:
+    """The readable start of an email (as IMAP returns it, cut short or not); '' when it has none."""
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    part = msg.get_body(preferencelist=("plain", "html"))
+    if part is None:
+        return ""
+    try:
+        content = part.get_content()
+    except (LookupError, ValueError):
+        return ""
+    if part.get_content_type() == "text/html":
+        content = re.sub(r"(?is)<(style|script).*?</\1>|<[^>]+>", " ", content)
+    return content[:2000]
+
+
 @dataclass
 class MailboxMessage:
     """The parts of an incoming email that matter here."""
@@ -164,7 +201,7 @@ class MailboxMessage:
     bounce: bool = False           # a delivery failure report
     delay: bool = False            # a report that delivery is taking long: it may still arrive
     failed: list[str] = field(default_factory=list)   # addresses a bounce names (X-Failed-Recipients)
-    text: str = ""                 # start of the body - only fetched for bounces
+    text: str = ""                 # start of the body - only fetched for bounces and replies ("Re: ...")
 
 
 def parse_headers(raw: bytes, text: str = "") -> MailboxMessage:
@@ -341,6 +378,16 @@ class Mailbox:
                 if message.bounce and not message.failed:
                     status, data = imap.fetch(number.decode(), "(BODY.PEEK[TEXT]<0.30000>)")
                     message.text = b"".join(raw for _, raw in _fetched(data)).decode("utf-8", "replace")
+            answers = [number.decode() for number, message in messages.items()
+                       if not message.bounce and not message.auto and message.subject.lower().startswith("re:")]
+            if answers:                                  # whether a reply says no (``declined``)
+                status, data = imap.fetch(",".join(answers), "(BODY.PEEK[]<0.30000>)")
+                for number, raw in _fetched(data):
+                    if number in messages:
+                        try:
+                            messages[number].text = reply_text(raw)
+                        except Exception as exc:  # noqa: BLE001 - one odd email must not stop the check
+                            log.debug("could not read email %s: %s", number, exc)
             return list(messages.values())
         except (OSError, imaplib.IMAP4.error) as exc:
             raise MailError(f"reading the mailbox failed: {_imap_text(exc)}") from exc

@@ -334,7 +334,7 @@
         {% if phone %}<a class="big-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
         {% if email %}<a class="quote-mail" href="mailto:{{ email }}"><svg aria-hidden="true"><use href="#i-mail"/></svg>{{ email }}</a>{% endif %}
       </div>
-      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-business="{{ business }}" novalidate data-reveal>
+      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-phone="{{ phone }}" data-business="{{ business }}" novalidate data-reveal>
         <div class="qf-progress" aria-hidden="true"><span data-qf-bar></span></div>
         <p class="qf-count" aria-live="polite">Step <b data-qf-step>1</b> of 3</p>
         <fieldset class="qf-step" data-step="1">
@@ -356,7 +356,9 @@
           <legend>Who should we call?</legend>
           <label class="field"><span>Your name</span><input name="name" autocomplete="name" required></label>
           <label class="field"><span>Phone number</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
+          <label class="field"><span>Email (optional)</span><input name="email" type="email" autocomplete="email" inputmode="email"></label>
         </fieldset>
+        <label style="position:absolute;left:-9999px" aria-hidden="true">Fax<input name="fax" tabindex="-1" autocomplete="off"></label>
         <p class="qf-error" data-qf-error role="alert" hidden></p>
         <div class="qf-nav">
           <button class="btn btn-ghost" type="button" data-qf-back hidden>Back</button>
