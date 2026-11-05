@@ -19,7 +19,7 @@ from datetime import datetime
 from app.outreach.models import Campaign, LeadStatus
 
 CAMPAIGN_COLUMNS = ["Campaign", "Business type", "Status", "Created", "Started", "Businesses", "Emailed",
-                    "Waiting", "In sequence", "Replied", "No reply", "Bounced", "Unsubscribed", "Refused",
+                    "Waiting", "In sequence", "Replied", "No reply", "Bounced", "Unsubscribed", "Bad address",
                     "Skipped", "Left out", "Opened website", "Tapped", "Emails sent", "Last email",
                     "Results file"]
 COUNT_COLUMNS = CAMPAIGN_COLUMNS[5:19]
@@ -78,7 +78,7 @@ def _campaign_row(campaign: Campaign) -> dict:
         "No reply": counts[LeadStatus.DONE.value],
         "Bounced": counts[LeadStatus.BOUNCED.value],
         "Unsubscribed": counts[LeadStatus.UNSUBSCRIBED.value],
-        "Refused": counts[LeadStatus.FAILED.value],
+        "Bad address": counts[LeadStatus.FAILED.value],
         "Skipped": counts[LeadStatus.SKIPPED.value],
         "Left out": len(campaign.left_out),
         "Opened website": sum(lead.site_opened_at is not None for lead in campaign.leads),

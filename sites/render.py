@@ -21,6 +21,7 @@ import shutil
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -231,7 +232,7 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
         "logo_tag": f"{pack['label']} · {lead['city']}",
         "preview": preview,
         "preview_ends": ends.isoformat(timespec="seconds"),
-        "keep_href": f"mailto:piyush@leadspilot.co?subject={business.replace(' ', '%20')}%20-%20keep%20my%20website",
+        "keep_href": f"mailto:piyush@leadspilot.co?subject={quote(f'{business} - keep my website')}",
         "form_endpoint": "/_q" if preview else "",   # the Worker's quote route (sites/worker/src/index.js)
         "year": datetime.now().year,
     }

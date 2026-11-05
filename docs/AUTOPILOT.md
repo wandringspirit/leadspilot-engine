@@ -94,7 +94,7 @@ tabs can also be downloaded as CSV from the Outreach tab.
 
 | Tab | What's in it |
 | --- | --- |
-| **Campaigns** | an **All campaigns** row, then a row per campaign: Status, Created, Started, Businesses, Emailed, Waiting, In sequence, Replied, No reply, Bounced, Unsubscribed, Refused, Skipped, Left out, Opened website, Tapped, Emails sent, Last email, and a link to its results file. Rows are green while running, yellow when paused, blue when finished |
+| **Campaigns** | an **All campaigns** row, then a row per campaign: Status, Created, Started, Businesses, Emailed, Waiting, In sequence, Replied, No reply, Bounced, Unsubscribed, Bad address, Skipped, Left out, Opened website, Tapped, Emails sent, Last email, and a link to its results file. Rows are green while running, yellow when paused, blue when finished |
 | **Activity** | the activity log, newest first: When, What, Campaign, Business, Email, Detail. Replies are green, emails sent blue, bounces / refusals / pauses / stops red, campaigns made or started yellow, searches lilac, website visits and taps teal, test copies grey |
 
 The panel makes it once and formats it once: a purple header row that stays at the top, filter

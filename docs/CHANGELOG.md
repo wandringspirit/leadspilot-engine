@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.17.2 – 2026-11-06
+
+### Changed
+- The master sheet's **Refused** column is now **Bad address**. It counts addresses that couldn't take an email,
+  and "Refused" read as if the business had said no.
+
+### Fixed
+- The preview websites' **Keep this site** link: an `&` in the business's name cut the email's subject short.
+  Every site was rebuilt and deployed.
+
 ## 1.17.1 – 2026-11-06
 
 ### Changed

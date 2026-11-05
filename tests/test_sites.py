@@ -2,10 +2,13 @@
 first emails waiting for their websites (sites/, app/outreach/sites.py, docs/SITES.md)."""
 from __future__ import annotations
 
+import html
 import os
 import random
+import re
 import stat
 from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -111,6 +114,18 @@ def test_a_business_without_a_city_gets_the_searched_one(sites_dir):
     again, _ = build_site(roofer_row(city="Katy", state="Texas"), searched_city("Houston", []), pack, trade, manifest,
                           sites_dir)
     assert again == slug and manifest[slug]["city"] == "Katy"
+
+
+def test_the_keep_link_carries_the_whole_name(sites_dir):
+    trade, pack = trade_pack("Roofer")
+    manifest: dict = {}
+    slug, why = build_site(roofer_row(name="Hill & Sons Roofing", place_id="p-hill", email="hill@example.com"),
+                           searched_city("Houston", [{"state": "Texas"}]), pack, trade, manifest, sites_dir)
+    assert why == ""
+    page = (sites_dir / slug / "index.html").read_text(encoding="utf-8")
+    link = re.search(r'class="pv-keep" href="([^"]+)"', page).group(1)
+    url = urlsplit(html.unescape(link))
+    assert parse_qs(url.query) == {"subject": ["Hill & Sons Roofing - keep my website"]}
 
 
 @pytest.mark.parametrize("overrides, reason", [
