@@ -160,15 +160,21 @@ _DECLINES = re.compile(r"\b(not interested|no thanks|no thank you|no thx|unsubsc
                        r"already have)\b")
 
 
-def declined(text: str) -> bool:
-    """A reply that says no. Only the words above the quoted email count. When in doubt it's False."""
+def written_part(text: str) -> list[str]:
+    """The lines someone wrote themselves: those above the email they answer, without the empty ones."""
     lines = []
-    for line in text.replace("\u2019", "'").splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if line.startswith(">") or (line.lower().startswith("on ") and line.lower().endswith("wrote:")):
             break
         if line:
-            lines.append(line.lower())
+            lines.append(line)
+    return lines
+
+
+def declined(text: str) -> bool:
+    """A reply that says no. Only the words above the quoted email count. When in doubt it's False."""
+    lines = [line.lower() for line in written_part(text.replace("\u2019", "'"))]
     if not lines:
         return False
     return lines[0].strip(" .,!?") in _JUST_NO or bool(_DECLINES.search(" ".join(lines)))

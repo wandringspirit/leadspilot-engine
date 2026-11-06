@@ -158,9 +158,14 @@ The inbox (`IMAP_FOLDER`, default `INBOX`) is opened **read-only**: nothing is m
 or deleted.
 
 - **When it's checked:** before every email, and every `OUTREACH_CHECK_MINUTES` inside the window,
-  hourly outside it. Every emailed business is watched for 45 days after its last email.
+  hourly outside it. Every emailed business is watched for 45 days after its last email; one that
+  replied, for 45 days after it last wrote.
 - **Which emails:** those since the first email to a watched business. Only their headers are
-  read, plus the start of a bounce's text.
+  read, plus the start of a bounce's text and of a reply (*Re: ...*).
+- **Alerts:** every reply also sends you an email, *[Leads Pilot] Reply from {business}*, with what
+  they wrote above the quoted email. So outside the send window it can take up to an hour. A later
+  reply is added to the business in the campaign and to the Activity tab, and its status stays
+  `replied`. Bounces of your own answers aren't tracked.
 
 | Arrives | Recognised by | Result |
 | --- | --- | --- |

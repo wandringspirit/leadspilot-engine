@@ -200,7 +200,8 @@ login or an email, all campaigns pause by themselves and say why.
 
 - **Replies.** Open your inbox; Gmail threads each reply with your email. Answer the ones that
   say yes, with the link to their site. Replying yourself, not the tool, is on purpose. In the
-  panel the business shows **replied**; *↻ Check replies* checks the inbox right away.
+  panel the business shows **replied**; *↻ Check replies* checks the inbox right away. Every reply,
+  including later ones in the conversation, also sends you an email: *[Leads Pilot] Reply from {business}*.
 - **Results in Drive.** `DRIVE_FOLDER/<type>/Outreach/<campaign>.csv` has who was emailed when,
   who answered, who bounced. It is updated every few minutes while a campaign runs, and
   *⇪ Save results to Drive* updates it at once.

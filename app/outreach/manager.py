@@ -51,7 +51,7 @@ from app.outreach.activity import ActivityLog
 from app.outreach.leads import leads_from_jobs
 from app.outreach.mailbox import (declined, MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
                                   build_message, classify, imap_problems, mailbox_problems, new_message_id,
-                                  sender_address, sender_header, smtp_problems)
+                                  sender_address, sender_header, smtp_problems, written_part)
 from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign,
                                  CampaignCreate, CampaignStatus, CampaignUpdate, DriveSource, InboundEmail, Lead,
                                  LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
@@ -65,7 +65,8 @@ log = logging.getLogger(__name__)
 
 TICK_S = 20                              # how often the loop looks for work
 FRESH_CHECK = timedelta(minutes=2)       # an email only goes out after a reply check this recent
-WATCH_DAYS = 45                          # replies are looked for this long after a lead's last email
+WATCH_DAYS = 45                          # replies are looked for this long after the last email either way
+ALERT_TEXT_CHARS = 2000                  # how much of a reply its alert quotes
 RETRY_AFTER = timedelta(minutes=5)       # pause after a failed send
 MAX_FAILURES = 3                         # failed sends in a row before the campaigns are paused
 STOP_WAIT_S = 90                         # stopping waits this long at most for the email being sent
@@ -75,6 +76,7 @@ TAPS = {"call": "Tapped call", "email": "Tapped email", "keep": "Asked to keep w
         "quote": "Website form sent"}
 
 _STOPPED_BY = {"reply": LeadStatus.REPLIED, "unsubscribe": LeadStatus.UNSUBSCRIBED, "bounce": LeadStatus.BOUNCED}
+_WATCHED = (LeadStatus.SENT, LeadStatus.DONE, LeadStatus.REPLIED)
 _BusinessTypes = TypeAdapter(list[BusinessType])
 
 
@@ -114,6 +116,36 @@ def steps_problems(steps: list[Step], footer: str) -> list[str]:
         problems.append("the footer needs {SenderAddress} - US law (CAN-SPAM) wants your postal address in "
                         "every email")
     return problems
+
+
+def _last_contact(lead: Lead) -> datetime:
+    """The last email sent to a lead or, once they've answered, the last they wrote if that's later."""
+    moments = [lead.sent[-1].sent_at]
+    if lead.status == LeadStatus.REPLIED:
+        moments += [i.received_at for i in lead.inbound if i.received_at and i.received_at.tzinfo]
+    return max(moments)
+
+
+def _already_noted(lead: Lead, message: MailboxMessage) -> bool:
+    if message.message_id:
+        return any(i.message_id == message.message_id for i in lead.inbound)
+    return any(i.sender == message.sender and i.subject == message.subject and i.received_at == message.received_at
+               for i in lead.inbound)
+
+
+def _alert_text(text: str) -> str:
+    return "\n".join(written_part(text))[:ALERT_TEXT_CHARS]
+
+
+def _alert_body(campaign: Campaign, lead: Lead, inbound: InboundEmail, website: str) -> str:
+    details = [("From", inbound.sender), ("Subject", inbound.subject), ("Phone", lead.phone), ("Website", website),
+               ("Campaign", campaign.name)]
+    return "\n".join([
+        f"{lead.business} replied to your email.", "",
+        *(["They wrote:", "", inbound.alert_text] if inbound.alert_text else ["Open their email to read it."]), "",
+        *[f"{label}: {value}" for label, value in details if value], "",
+        "Answer from their own email in your inbox. This alert only went to you.",
+    ])
 
 
 class OutreachManager:
@@ -871,10 +903,11 @@ class OutreachManager:
     # Replies and bounces
     # ------------------------------------------------------------------
     def _watched(self, now: datetime) -> list[tuple[Campaign, Lead]]:
-        """Leads that were emailed and haven't answered yet (for WATCH_DAYS after their last email)."""
+        """Leads whose emails are looked for: those who haven't answered, for WATCH_DAYS after their last email,
+        and those who have, for WATCH_DAYS after they last wrote (the conversation goes on in your inbox)."""
         since = now - timedelta(days=WATCH_DAYS)
         return [(c, lead) for c in self.campaigns.values() for lead in c.leads
-                if lead.status in (LeadStatus.SENT, LeadStatus.DONE) and lead.sent and lead.sent[-1].sent_at >= since]
+                if lead.status in _WATCHED and lead.sent and _last_contact(lead) >= since]
 
     async def _check(self, now: datetime) -> None:
         watched = self._watched(now)
@@ -910,12 +943,13 @@ class OutreachManager:
                 continue
             key, kind = hit
             campaign, lead = leads[key]
-            if lead.status not in (LeadStatus.SENT, LeadStatus.DONE):
-                continue                                  # an earlier email in this check stopped it already
-            if message.message_id and any(i.message_id == message.message_id for i in lead.inbound):
+            if lead.status not in _WATCHED or (lead.status == LeadStatus.REPLIED and kind == "bounce"):
+                continue                                  # an earlier email stopped it already; they can be reached
+            if _already_noted(lead, message):
                 continue
             lead.inbound.append(InboundEmail(kind=kind, received_at=message.received_at, sender=message.sender,
-                                             subject=message.subject, message_id=message.message_id))
+                                             subject=message.subject, message_id=message.message_id,
+                                             alert_text=_alert_text(message.text) if kind == "reply" else None))
             changed[campaign.id] = campaign
             if kind == "delay":
                 log.info("Delivery to %s <%s> is taking long (%s) - the follow-ups continue", lead.business,
@@ -948,6 +982,29 @@ class OutreachManager:
         for campaign in changed.values():
             self._save(campaign)
         self.last_check.update(ok_at=now, error="", emails=len(messages), replies=replies, bounces=bounces)
+        await self._send_alerts()
+
+    async def _send_alerts(self) -> None:
+        """Tell you about each reply in an email of its own. One that can't go out is tried after the next check."""
+        me = sender_address(self.cfg)
+        for campaign in self.campaigns.values():
+            for lead in campaign.leads:
+                for inbound in lead.inbound:
+                    if inbound.alert_text is None:
+                        continue
+                    website = self.sites.url(lead.site) if self.sites is not None and lead.site else ""
+                    message = build_message(sender=sender_header(self.cfg), to=me,
+                                            subject=" ".join(f"[Leads Pilot] Reply from {lead.business}".split()),
+                                            body=_alert_body(campaign, lead, inbound, website),
+                                            message_id=new_message_id(me))
+                    try:
+                        await self.mailbox.send(message)
+                    except MailError as exc:
+                        log.warning("A reply alert couldn't be emailed, it's tried again after the next check: %s", exc)
+                        return
+                    inbound.alert_text = None
+                    self._save(campaign)
+                    log.info("Reply alert for %s emailed to you", lead.business)
 
     # ------------------------------------------------------------------
     # Who was emailed already

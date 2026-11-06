@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.18.0 – 2026-11-06
+
+### Added
+- **An email to you for every reply**, subject *[Leads Pilot] Reply from {business}*, with what they wrote and
+  their phone number. It goes to the outreach mailbox, and one that can't go out is tried again after the next
+  check. Replies that were already noted don't get one.
+
+### Fixed
+- **Later replies were invisible.** After a business's first reply the panel stopped looking at its emails, so
+  the campaign and the sheet's Activity tab never showed the rest of the conversation. A business that replied
+  is now watched for 45 days after it last wrote.
+
 ## 1.17.2 – 2026-11-06
 
 ### Changed

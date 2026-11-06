@@ -47,6 +47,7 @@ class InboundEmail(BaseModel):
     sender: str = ""
     subject: str = ""
     message_id: str = ""
+    alert_text: str | None = None  # a reply's words, until the alert about it has gone out to you
 
 
 class Lead(BaseModel):

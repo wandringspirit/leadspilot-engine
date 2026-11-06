@@ -17,7 +17,7 @@ from app.outreach.leads import email_problem, leads_from_jobs, search_city
 from app.outreach.mailbox import (MailAuthError, MailError, MailboxMessage, RecipientRefused, build_message,
                                   classify, imap_date, mail_password, mailbox_problems, parse_headers)
 from app.outreach.manager import OutreachError, OutreachManager, steps_problems
-from app.outreach.models import (BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate, CampaignStatus,
+from app.outreach.models import (InboundEmail, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate, CampaignStatus,
                                  CampaignUpdate, Lead, LeadStatus, LeadUpdate, SendTestRequest, Step)
 from app.outreach.schedule import SendWindow, WindowError, day_label, days_label, parse_days, parse_hours
 from app.outreach.templates import (compose, display_name, missing_fields, render, required_fields,
@@ -669,3 +669,105 @@ def test_an_address_that_cant_receive_email_is_skipped(tmp_path):
     run(manager.tick())                                                      # no new check for a follow-up
     assert mailbox.sent[-1]["To"] == "hampshire@gmail.com" and mailbox.sent[-1]["Subject"].startswith("Re: ")
     assert asked[count:] == []
+
+
+# --------------------------------------------------------------------------
+# later replies and reply alerts
+# --------------------------------------------------------------------------
+def alerts(mailbox):
+    return [m for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot] Reply from")]
+
+
+def sender_address(cfg):
+    from app.outreach.mailbox import sender_address as address
+    return address(cfg)
+
+
+def replied_lead(tmp_path, clock=None):
+    """Palm Breeze was emailed and answered once, and that first alert went out."""
+    manager, mailbox, campaign, job = started(tmp_path, clock)
+    run(manager.tick())
+    first = reply("palmbreeze@gmail.com", "Re: website", message_id="<first@x>")
+    first.text = "I like it.\n\nOn Tue, Piyush wrote:\n> Hi, I made a website"
+    mailbox.inbox = [first]
+    run(manager.check_now())
+    return manager, mailbox, campaign, campaign.leads[0]
+
+
+def test_a_reply_alerts_you_once_with_what_they_wrote(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    assert lead.status == LeadStatus.REPLIED
+    alert = alerts(mailbox)[0]
+    body = alert.get_content()
+    assert alert["To"] == sender_address(manager.cfg) and alert["Reply-To"] is None
+    assert "I like it." in body and "I made a website" not in body and "(713) 555-0101" in body
+    run(manager.check_now())
+    assert len(alerts(mailbox)) == 1
+
+
+def test_a_later_reply_is_noted_and_alerts_you(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    later = reply("palmbreeze@gmail.com", "Re: website", message_id="<later@x>")
+    later.text = "Here is the domain."
+    mailbox.inbox.append(later)
+    run(manager.check_now())
+    assert lead.status == LeadStatus.REPLIED and [i.message_id for i in lead.inbound] == ["<first@x>", "<later@x>"]
+    assert len(alerts(mailbox)) == 2 and "Here is the domain." in alerts(mailbox)[1].get_content()
+    assert all(i.alert_text is None for i in lead.inbound)
+
+
+def test_a_reply_without_a_message_id_alerts_once(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    mailbox.inbox.append(reply("palmbreeze@gmail.com", "Domain", message_id=""))
+    run(manager.check_now())
+    run(manager.check_now())
+    assert len(lead.inbound) == 2 and len(alerts(mailbox)) == 2
+
+
+def test_an_alert_that_cant_go_out_is_tried_again(tmp_path):
+    manager, mailbox, campaign, _ = started(tmp_path)
+    run(manager.tick())
+    mailbox.inbox = [reply("palmbreeze@gmail.com", "Re: website", message_id="<first@x>")]
+    mailbox.send_error = MailError("the internet is down")
+    run(manager.check_now())                                        # the check itself still worked
+    assert campaign.leads[0].status == LeadStatus.REPLIED and manager.last_check["error"] == ""
+    assert not alerts(mailbox) and campaign.leads[0].inbound[0].alert_text is not None
+    mailbox.send_error = None
+    run(manager.check_now())
+    assert len(alerts(mailbox)) == 1 and campaign.leads[0].inbound[0].alert_text is None
+
+
+def test_a_reply_noted_before_alerts_existed_gets_none(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    mailbox.sent.clear()
+    restored = InboundEmail.model_validate({"kind": "reply", "message_id": "<old@x>"})     # as saved by 1.17
+    assert restored.alert_text is None
+    lead.inbound.append(restored)
+    run(manager.check_now())
+    assert not alerts(mailbox)
+
+
+def test_a_bounce_doesnt_change_a_business_that_replied(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    bounce = MailboxMessage(sender="mailer-daemon@googlemail.com", subject="Delivery failed", message_id="<b@x>",
+                            bounce=True, failed=["palmbreeze@gmail.com"], received_at=TUESDAY_9AM)
+    mailbox.inbox.append(bounce)
+    run(manager.check_now())
+    assert lead.status == LeadStatus.REPLIED and len(lead.inbound) == 1
+
+
+def test_a_later_unsubscribe_still_stops_everything(tmp_path):
+    manager, mailbox, _, lead = replied_lead(tmp_path)
+    mailbox.inbox.append(reply("palmbreeze@gmail.com", "unsubscribe", message_id="<u@x>"))
+    run(manager.check_now())
+    assert lead.status == LeadStatus.UNSUBSCRIBED and len(alerts(mailbox)) == 1
+
+
+def test_a_business_that_replied_is_watched_45_days_after_it_last_wrote(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, _, lead = replied_lead(tmp_path, clock)
+    lead.inbound[0].received_at = clock.now + timedelta(days=30)
+    clock.now = TUESDAY_9AM + timedelta(days=74)                    # 44 days after they last wrote
+    assert (lead.id in [item.id for _, item in manager._watched(clock.now)])
+    clock.now = TUESDAY_9AM + timedelta(days=76)
+    assert (lead.id not in [item.id for _, item in manager._watched(clock.now)])
