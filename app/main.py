@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from app import __version__, settings_editor
 from app.config import settings
 from app.control import browse_url, control, keep_awake
-from app.drive.client import DriveError
+from app.drive.client import LOST_BODY, LOST_SUBJECT, DriveError
 from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
 from app.jobs import ACTIVE_STATES, JobManager
@@ -132,19 +132,13 @@ async def _job_finished(job: Job) -> None:
 
 manager.on_finished = _job_finished
 
-DRIVE_LOST_BODY = (
-    "Google ended Leads Pilot's sign-in to your Google Drive (it expired or was revoked), so search files and "
-    "campaign results aren't uploaded until you connect it again.\n\n"
-    "Open the panel › Outreach › Setup › Connect Google Drive.\n\n"
-    "If this happens every 7 days, your Google Cloud OAuth app is still in Testing: publish it "
-    "(docs/PLAYBOOK.md step 2.4), then connect again.")
 _alerts: set = set()                              # the alert tasks still running
 
 
 def _drive_lost() -> None:
     """Google ended the Drive sign-in: say so in the activity log and email you (once - it's forgotten now)."""
     activity.add("Google Drive disconnected", "Google ended the sign-in - connect it again in the Outreach tab")
-    task = asyncio.get_running_loop().create_task(outreach.email_me("Google Drive disconnected", DRIVE_LOST_BODY))
+    task = asyncio.get_running_loop().create_task(outreach.email_me(LOST_SUBJECT, LOST_BODY))
     _alerts.add(task)
     task.add_done_callback(_alerts.discard)
 

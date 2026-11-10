@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.3 – 2026-11-11
+
+### Added
+- **`ALERT_TO`** (Settings › You, in the emails › *Alerts to*): where emails about the panel itself go – the
+  *Google Drive disconnected* alert – instead of the campaigns' From address. Comma-separated; empty: as before.
+
 ## 1.19.2 – 2026-11-11
 
 ### Added

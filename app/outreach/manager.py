@@ -987,12 +987,14 @@ class OutreachManager:
         await self._send_alerts()
 
     async def email_me(self, subject: str, body: str) -> bool:
-        """A note to yourself, at the From address (e.g. Google Drive disconnected). False: it couldn't go out."""
+        """A note to yourself (e.g. Google Drive disconnected), to ALERT_TO - else the From address. False: it
+        couldn't go out."""
         if mailbox_problems(self.cfg):
             log.warning("Couldn't email you %r: the mailbox settings aren't complete", subject)
             return False
         me = sender_address(self.cfg)
-        message = build_message(sender=sender_header(self.cfg), to=me, subject=f"[Leads Pilot] {subject}", body=body,
+        to = ", ".join(a.strip() for a in self.cfg.ALERT_TO.split(",") if a.strip()) or me
+        message = build_message(sender=sender_header(self.cfg), to=to, subject=f"[Leads Pilot] {subject}", body=body,
                                 message_id=new_message_id(me))
         try:
             await self.mailbox.send(message)

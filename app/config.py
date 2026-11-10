@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     SENDER_NAME: str = ""                 # From name and {SenderName}
     SENDER_COMPANY: str = ""              # {SenderCompany}
     SENDER_ADDRESS: str = ""              # {SenderAddress}: your postal address (US law: in every email)
+    ALERT_TO: str = ""                    # where alerts about the panel go (Google Drive disconnected …),
+                                          # comma-separated; empty: the From address
     OUTREACH_AUTOSEND: bool = True        # false: the server never sends on its own
     OUTREACH_TIMEZONE: str = "America/Chicago"  # time zone of the send window (your leads')
     OUTREACH_DAYS: str = "mon-fri"        # days emails go out

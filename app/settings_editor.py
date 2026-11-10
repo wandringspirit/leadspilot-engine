@@ -98,6 +98,9 @@ OPTIONS = (
     Option("SENDER_ADDRESS", "sender", "Postal address",
            "{SenderAddress}, in every email's footer – US law (CAN-SPAM) wants it", "Street, City, State ZIP",
            needed="email"),
+    Option("ALERT_TO", "sender", "Alerts to",
+           "Where emails about the panel itself go – Google Drive disconnected … Comma-separated; empty: the From "
+           "address", "you@gmail.com"),
     # --- sending ---
     Option("OUTREACH_AUTOSEND", "sending", "Send automatically",
            "Off: the server never sends on its own – campaigns wait"),

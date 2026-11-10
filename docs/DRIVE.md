@@ -91,7 +91,7 @@ The crawler talks to the Drive REST API with **your own OAuth client** (type *De
    deleted and the panel asks you to connect again: a red **Google Drive is disconnected** banner with a
    *Connect Google Drive* button on every tab, and *⚠ Google Drive disconnected* in the browser tab's title
    (checked every minute; remembered in `data/google_drive_lost.json` across restarts, gone once you connect
-   or press *Disconnect*). You also get an email about it (*[Leads Pilot] Google Drive disconnected*, to the
+   or press *Disconnect*). You also get an email about it (*[Leads Pilot] Google Drive disconnected*, to `ALERT_TO` – else the
    campaigns' From address) and the activity log says *Google Drive disconnected* – until you connect again,
    nothing is uploaded.
 

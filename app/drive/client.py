@@ -58,6 +58,16 @@ class DriveError(Exception):
         self.status = status
 
 
+#: the email you get when Google ends the sign-in (main.py, OutreachManager.email_me)
+LOST_SUBJECT = "Google Drive disconnected"
+LOST_BODY = (
+    "Google ended Leads Pilot's sign-in to your Google Drive (it expired or was revoked), so search files and "
+    "campaign results aren't uploaded until you connect it again.\n\n"
+    "Open the panel › Outreach › Setup › Connect Google Drive (the red banner at the top has the button too).\n\n"
+    "If this happens every 7 days, your Google Cloud OAuth app is still in Testing: publish it "
+    "(docs/PLAYBOOK.md step 2.4), then connect again.")
+
+
 class DriveAuthError(DriveError):
     """Not signed in (any more): connect Google Drive again in the panel."""
 

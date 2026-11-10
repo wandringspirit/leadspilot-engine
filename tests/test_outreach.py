@@ -781,5 +781,8 @@ async def test_email_me_sends_a_note_to_yourself(tmp_path):
     note = mailbox.sent[-1]
     assert note["Subject"] == "[Leads Pilot] Google Drive disconnected"
     assert note["To"] in note["From"]                       # to the From address
+    manager.cfg.ALERT_TO = "me@gmail.com, other@example.com"         # ALERT_TO wins
+    assert await manager.email_me("Google Drive disconnected", "Connect it again.")
+    assert mailbox.sent[-1]["To"] == "me@gmail.com, other@example.com"
     mailbox.send_error = MailError("server down")
     assert not await manager.email_me("Google Drive disconnected", "Connect it again.")
