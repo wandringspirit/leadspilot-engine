@@ -96,6 +96,19 @@ class Settings(BaseSettings):
                                           # Drive ("Leads"), a folder's URL or id; empty = My Drive itself
     DRIVE_AUTO_UPLOAD: bool = True        # upload each search's CSV when it finishes
 
+    # --- Cloud: searching on one computer, sending on another (docs/CLOUD.md) ---
+    ROLE: str = "all"                     # all: this computer searches and sends · sender: the cloud server -
+                                          # its searches are run by a searcher · searcher: only runs the
+                                          # sender's searches, never sends
+    CLOUD_URL: str = ""                   # searcher: the sender's panel, e.g. https://panel.leadspilot.co
+    SEARCHER_TOKEN: str = ""              # the same long random text on both: the sender only hands its
+                                          # searches to a computer that knows it
+    CLOUD_ACCESS_ID: str = ""             # searcher: a Cloudflare Access service token in front of the sender
+    CLOUD_ACCESS_SECRET: str = ""         # (CF-Access-Client-Id / -Secret) - empty: none
+    TRUSTED_HOSTS: str = ""               # sender: names the panel is opened at through a login in front of
+                                          # it (Cloudflare Access), e.g. panel.leadspilot.co - Settings, Stop
+                                          # and Restart work there too
+
     @property
     def jobs_dir(self) -> Path:
         return self.DATA_DIR / "jobs"

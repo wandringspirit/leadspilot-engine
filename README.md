@@ -69,6 +69,8 @@ Name | City | State | Country | Email | Website | Phone | Phone Unformatted | Ur
 - **Google Drive** – each search's CSV lands in `<your folder>/<business type>/`, campaigns can
   run from a CSV / Google Sheet there, and each campaign's results are kept next to them. See
   [docs/DRIVE.md](docs/DRIVE.md).
+- **Cloud server** – campaigns can send from a server that's always on while this computer only runs
+  the searches it hands out (Google blocks searches from cloud servers). See [docs/CLOUD.md](docs/CLOUD.md).
 - **CLI** for scripted or scheduled runs (`python cli.py dentists "Austin, TX" --website without -n 50`).
 - **JSON API** (FastAPI, OpenAPI docs at `/docs`) so the crawler can be driven by other tools.
 - Jobs are persisted on disk, survive restarts, can be cancelled, and partial results are kept.
@@ -234,6 +236,7 @@ both. The most useful switches:
 | `SENDER_NAME` / `SENDER_ADDRESS` | *(empty)* | who the emails are from; your postal address goes in every footer |
 | `OUTREACH_HOURS` / `OUTREACH_DAILY_LIMIT` | `8-12` / `30` | when emails go out (in `OUTREACH_TIMEZONE`) and how many a day |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `DRIVE_FOLDER` | *(empty)* | Google Drive ([playbook §2](docs/PLAYBOOK.md#2-google-drive)) |
+| `ROLE` / `CLOUD_URL` / `SEARCHER_TOKEN` | `all` / *(empty)* | sending from a cloud server, searching here ([docs/CLOUD.md](docs/CLOUD.md)) |
 
 Every setting is listed in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#configuration-reference).
 
@@ -296,6 +299,7 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
 | [docs/AUTOPILOT.md](docs/AUTOPILOT.md) | the autopilot (searches and campaigns by themselves) and the master sheet |
 | [docs/SITES.md](docs/SITES.md) | preview websites: how each business's site is made, who gets one, how long it stays online |
+| [docs/CLOUD.md](docs/CLOUD.md) | the cloud server: sending from there while this computer only searches |
 | [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |

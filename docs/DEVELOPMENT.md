@@ -37,6 +37,7 @@ app/
   jobs.py              JobManager (background tasks, persistence, enrichment application),
                        PlaceFilter (applies filters while scraping), result_notice()
   logbuffer.py         in-memory ring buffer behind the panel's Live logs (+ job id tagging)
+  remote.py            RemoteSearcher - ROLE=searcher: runs the cloud server's searches (docs/CLOUD.md)
   scraper/
     maps.py            MapsScraper (Playwright) + build_row(); Search, several searches per job
     area.py            map sections for whole-area searches (pure geometry)
@@ -124,8 +125,8 @@ were skipped and why, how many searches / map sections ran, and why the scan sto
 
 Settings are read from environment variables, then from `.env` in the project root
 (`app/config.py`). The panel's Settings tab shows and changes all of them: it writes `.env` and
-applies new values at once, except `HOST`, `PORT`, `DATA_DIR`, `LOG_BUFFER_SIZE` and `KEEP_AWAKE`, which are only
-read when the server starts. A setting that is also an environment variable can't be changed there.
+applies new values at once, except `HOST`, `PORT`, `DATA_DIR`, `LOG_BUFFER_SIZE`, `KEEP_AWAKE`, `ROLE` and the
+preview-website settings, which are only read when the server starts. A setting that is also an environment variable can't be changed there.
 `tests/test_docs.py` checks that every setting is listed here, `tests/test_settings.py` that every
 one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 
@@ -215,6 +216,17 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `DRIVE_FOLDER` | *(empty = My Drive)* | where the business-type folders go: a folder name / path in My Drive, or a folder's URL / id |
 | `DRIVE_AUTO_UPLOAD` | `true` | upload each search when it finishes and campaign results while they run (`false`: only the *Save to Drive* buttons; the tests set it) |
 
+### Cloud server ([CLOUD.md](CLOUD.md))
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ROLE` | `all` | `all`: this computer searches and sends. `sender`: the cloud server – it sends, and its searches wait for a search computer. `searcher`: only runs the sender's searches; no email, reply check, autopilot or website upload runs here (after a restart) |
+| `CLOUD_URL` | *(empty)* | searcher: the sender's panel, e.g. `https://panel.leadspilot.co` |
+| `SEARCHER_TOKEN` | *(empty)* | the same long random text on both computers; the sender only hands its searches to a request carrying it (`Authorization: Bearer …`) |
+| `CLOUD_ACCESS_ID` | *(empty)* | searcher: a Cloudflare Access service token's client ID (`CF-Access-Client-Id`) |
+| `CLOUD_ACCESS_SECRET` | *(empty)* | … and its secret (`CF-Access-Client-Secret`) |
+| `TRUSTED_HOSTS` | *(empty)* | sender: comma-separated names its panel is opened at through Cloudflare Access; Settings, Stop and Restart work there as on `127.0.0.1` |
+
 ## 5. Tests
 
 ```bash
@@ -246,6 +258,7 @@ python -m pytest -q tests/test_extractors.py -k obfusc
 | `test_sites.py` | preview websites: who gets one (searched city and state, out-of-area businesses, supply shops, low ratings), how long each stays online, what gets uploaded, a campaign's first emails waiting for their websites, a trade without a design, upload errors |
 | `test_drive.py` | lead files (the crawler's CSV and hand-made ones), sign-in and token refresh, folders per business type, uploads that update in place, shared folders – against a fake Google (`httpx.MockTransport`) |
 | `test_settings.py` | the Settings tab: every setting listed, values written to `.env` and read back exactly (quotes, `#`, backslashes), the rest of the file kept, validation, environment variables winning, a broken `.env`; the settings / stop / restart routes and who may call them; `start.py` installing only when `requirements.txt` changed and finding a running panel |
+| `test_remote.py` | two computers ([CLOUD.md](CLOUD.md)): a sender's searches waiting, handed out once, progress, results, kept across a restart, given up after silence (and the autopilot searching the place again), cancelled; the remote routes and their token; Settings at a `TRUSTED_HOSTS` name; a search computer running a search against the real routes (`httpx.ASGITransport`) and saying what's wrong |
 | `test_docs.py` | documentation consistency (see §7) |
 
 The suite never sends an email or touches Google Drive: `tests/conftest.py` sets

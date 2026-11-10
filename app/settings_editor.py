@@ -66,6 +66,9 @@ GROUPS = (
     Group("drive", "Google Drive",
           "An OAuth client of type Desktop app from the Google Cloud console – docs/PLAYBOOK.md step 2 shows how. "
           "After saving, press Connect Google Drive in the Outreach tab."),
+    Group("cloud", "Cloud server",
+          "Sending from a cloud server that's always on, searching on this computer (Google blocks searches from "
+          "cloud servers) – docs/CLOUD.md. Leave Role on all to do both here."),
     Group("search", "Searching Google Maps"),
     Group("enrich", "Finding emails and phones"),
     Group("server", "Panel", "These only take effect after a restart."),
@@ -133,6 +136,22 @@ OPTIONS = (
            "Empty: My Drive itself", "Leads"),
     Option("DRIVE_AUTO_UPLOAD", "drive", "Upload automatically",
            "Each search's CSV when it finishes, and campaign results while they run"),
+    # --- cloud ---
+    Option("ROLE", "cloud", "Role",
+           "all: this computer searches and sends. sender: the cloud server – it sends, and its searches wait "
+           "for the search computer. searcher: this computer only runs the cloud server's searches and never "
+           "sends", choices=("all", "sender", "searcher"), restart=True),
+    Option("CLOUD_URL", "cloud", "Cloud panel's address", "searcher: where the sender's panel is online",
+           "https://panel.leadspilot.co"),
+    Option("SEARCHER_TOKEN", "cloud", "Search computer's key",
+           "The same long random text on both computers – the sender only hands its searches to one that "
+           "knows it", secret=True),
+    Option("CLOUD_ACCESS_ID", "cloud", "Cloudflare Access client ID",
+           "searcher: the service token that lets it past the login in front of the cloud panel"),
+    Option("CLOUD_ACCESS_SECRET", "cloud", "Cloudflare Access client secret", secret=True),
+    Option("TRUSTED_HOSTS", "cloud", "Panel addresses behind a login",
+           "sender: the names its panel is opened at through Cloudflare Access – Settings, Stop and Restart "
+           "work there too. Never a name without a login in front of it", "panel.leadspilot.co"),
     # --- search ---
     Option("HEADLESS", "search", "Hide the browser", "Off: watch Chromium work through Google Maps (debugging)"),
     Option("REGION_CODE", "search", "Country bias", "Google's gl parameter, e.g. us – empty: none", "us"),

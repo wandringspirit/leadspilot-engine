@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.0 – 2026-11-11
+
+### Added
+- **Sending from a cloud server, searching on this computer** ([CLOUD.md](CLOUD.md)). A new setting `ROLE`:
+  `all` (as before: one computer does everything), `sender` (the cloud server - it sends, checks replies,
+  runs the autopilot and the websites, and its searches wait for the search computer) or `searcher` (the
+  laptop - it only runs the cloud server's searches and never sends). Google blocks searches from cloud
+  servers, so they stay on the laptop; campaigns keep sending while it's closed.
+  - The search computer asks for a search every minute (`POST /api/remote/next`), runs it under the same id,
+    reports progress every 30 s and sends the result back; the cloud makes the campaign as if it had searched.
+  - A search whose search computer goes quiet for 20 minutes (asleep, offline) ends *interrupted* and the
+    autopilot searches the place again; a cancelled search stops on the laptop at its next report.
+  - The remote routes need `SEARCHER_TOKEN` (`Authorization: Bearer`); the laptop can also send a Cloudflare
+    Access service token (`CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`).
+  - `TRUSTED_HOSTS`: Settings, Stop and Restart also work in the cloud panel opened through Cloudflare Access.
+  - `GET /api/remote` says who searches and when the other computer was last heard from.
+
 ## 1.18.4 – 2026-11-11
 
 ### Changed

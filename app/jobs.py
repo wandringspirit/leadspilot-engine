@@ -66,7 +66,7 @@ class JobManager:
             except Exception as exc:  # noqa: BLE001
                 log.warning("skipping unreadable job file %s: %s", file, exc)
                 continue
-            if job.status in ACTIVE_STATES:
+            if job.status in ACTIVE_STATES and not job.remote:   # a searcher's search carries on without us
                 job.status = JobStatus.INTERRUPTED
                 job.progress.message = "Server restarted while the job was running"
             self.jobs[job.id] = job
@@ -112,10 +112,21 @@ class JobManager:
     # ------------------------------------------------------------------
     def create_scrape(self, query: str, limit: int, *, business: str = "", place: str = "",
                       whole_area: bool = False, filters: SearchFilters | None = None, enrich: bool = False,
-                      headless: bool | None = None, business_type_id: str = "") -> Job:
+                      headless: bool | None = None, business_type_id: str = "", job_id: str = "") -> Job:
+        """Start a search. ROLE=sender: it waits for a searcher computer instead (``claim_remote``).
+        ``job_id``: a searcher runs the sender's search under the sender's id."""
         job = Job(query=query.strip(), business=business.strip(), place=place.strip(), whole_area=whole_area,
                   limit=limit, filters=filters or SearchFilters(), enrich=enrich,
                   business_type_id=business_type_id.strip())
+        if job_id:
+            job.id = job_id
+        if self.cfg.ROLE == "sender":
+            job.remote = True
+            job.progress = Progress(phase="queued", message="Waiting for the search computer")
+            self.jobs[job.id] = job
+            self.save(job)
+            log.info("Job %s waits for the search computer: %r, %d result(s) wanted", job.id, job.query, job.limit)
+            return job
         # schedule first: if no event loop is running we must not leave a ghost job behind
         task = asyncio.create_task(self._run_scrape(job, headless=headless), name=job.id)
         self.jobs[job.id] = job
@@ -224,7 +235,76 @@ class JobManager:
             log.info("Cancelling job %s", job_id)
             task.cancel()
             return True
+        job = self.jobs.get(job_id)
+        if job is not None and job.remote and job.status in ACTIVE_STATES:
+            log.info("Cancelling job %s - the search computer stops it the next time it reports", job_id)
+            self._end_remote(job, JobStatus.CANCELLED, f"Cancelled with {len(job.rows)} rows collected")
+            self._finished(job)
+            return True
         return False
+
+    # ------------------------------------------------------------------
+    # Searches a searcher computer runs for us (ROLE=sender, docs/CLOUD.md)
+    # ------------------------------------------------------------------
+    def claim_remote(self, now: datetime | None = None) -> Job | None:
+        """The oldest search waiting for a searcher - now it's the searcher's - or None."""
+        waiting = [j for j in self.jobs.values() if j.remote and j.status == JobStatus.QUEUED]
+        if not waiting:
+            return None
+        job = min(waiting, key=lambda j: j.created_at)
+        job.status = JobStatus.RUNNING
+        job.remote_seen_at = now or datetime.now(timezone.utc)
+        job.progress = Progress(phase="collecting", message="The search computer is starting it")
+        self.save(job)
+        log.info("Job %s handed to the search computer: %r", job.id, job.query)
+        return job
+
+    def remote_progress(self, job_id: str, progress: Progress, rows: int, now: datetime | None = None) -> bool:
+        """The searcher's progress report; False: stop - the search was cancelled or given up on."""
+        job = self.jobs.get(job_id)
+        if job is None or not job.remote or job.status not in ACTIVE_STATES:
+            return False
+        job.status = JobStatus.RUNNING
+        job.progress = progress
+        job.remote_seen_at = now or datetime.now(timezone.utc)
+        job.stats["rows_so_far"] = rows
+        self.save(job)
+        return True
+
+    def remote_result(self, result: Job) -> Job:
+        """The searcher's finished search: it becomes ours, and the finished-job hook runs as if we had
+        searched. ValueError: not a search we're waiting for (cancelled, given up on, already in)."""
+        job = self.jobs.get(result.id)
+        if job is None or not job.remote:
+            raise LookupError("no such search")
+        if job.status not in ACTIVE_STATES:
+            raise ValueError(f"the search was {job.status.value} here - its result isn't wanted any more")
+        if result.status in ACTIVE_STATES:
+            raise ValueError("the search hasn't finished")
+        for field in ("status", "progress", "rows", "error", "notice", "stats"):
+            setattr(job, field, getattr(result, field))
+        job.finished_at = result.finished_at or datetime.now(timezone.utc)
+        self.save(job)
+        log.info("Job %s %s on the search computer: %d row(s)", job.id, job.status.value, len(job.rows))
+        self._finished(job)
+        return job
+
+    def expire_remote(self, now: datetime, after_s: float) -> list[Job]:
+        """Searches whose searcher hasn't reported for ``after_s`` (it slept, lost its connection, crashed)
+        end as interrupted - the autopilot searches the place again."""
+        expired = [j for j in self.jobs.values() if j.remote and j.status == JobStatus.RUNNING
+                   and j.remote_seen_at is not None and (now - j.remote_seen_at).total_seconds() > after_s]
+        for job in expired:
+            log.warning("Job %s: the search computer hasn't reported for %d min - given up", job.id, after_s // 60)
+            self._end_remote(job, JobStatus.INTERRUPTED, "The search computer stopped reporting", now=now)
+            self._finished(job)
+        return expired
+
+    def _end_remote(self, job: Job, status: JobStatus, message: str, *, now: datetime | None = None) -> None:
+        job.status = status
+        job.progress.message = message
+        job.finished_at = now or datetime.now(timezone.utc)
+        self.save(job)
 
     async def shutdown(self, timeout: float = 15.0) -> None:
         """Stop the running searches and enrichments before the server's event loop ends.

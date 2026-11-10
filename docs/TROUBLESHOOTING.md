@@ -98,6 +98,22 @@
 | Job shows `blocked` | Google showed its "unusual traffic" check – see the red banner above the results and *Scraping* above. |
 | Copy CSV does nothing | the clipboard API needs a secure context (`http://localhost` is fine; a plain LAN IP is not) – use Download instead. |
 
+## Cloud server
+
+The laptop (`ROLE=searcher`) says what's wrong in `GET /api/remote` and once in its log ([CLOUD.md](CLOUD.md)).
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| *"CLOUD_URL is empty"* / *"SEARCHER_TOKEN is empty"* | the laptop's cloud settings aren't filled in | Settings › Cloud server |
+| *"it asks for a login - set CLOUD_ACCESS_ID …"* | Cloudflare Access sent the laptop to its login page | create a service token in Cloudflare Zero Trust, allow it in the panel's Access application, put its ID and secret in the laptop's settings |
+| *"it refused the SEARCHER_TOKEN"* (`401`) | the token differs between the two computers | paste the same one on both |
+| *"it doesn't hand out searches"* (`404`) | the cloud server isn't `ROLE=sender`, or has no `SEARCHER_TOKEN`, or was not restarted after setting `ROLE` | fix its settings, restart it |
+| *"can't be reached"* | no internet, the cloud server or its tunnel is down | `systemctl status leadspilot cloudflared` on the server |
+| Searches stay *Waiting for the search computer* | the laptop is off, asleep, or its panel isn't `ROLE=searcher` | open the laptop; its panel starts with Windows |
+| A search ends *"The search computer stopped reporting"* | the laptop slept or went offline mid-search for 20 minutes | nothing: the autopilot searches the place again (three failures in a row: it moves on) |
+| The laptop logs *"the cloud server didn't take …"* | the search was cancelled there or given up on before the result arrived | nothing – it was searched again |
+| Settings / Stop / Restart answer `403` in the cloud panel | its name isn't in `TRUSTED_HOSTS` | add it (only a name behind Cloudflare Access) |
+
 ## Where to look
 
 - **Live logs** section at the bottom of the panel: the same lines as the server console, filterable by

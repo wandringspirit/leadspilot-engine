@@ -162,6 +162,8 @@ class Job(BaseModel):
     drive_file_id: str = ""             # the CSV's copy in Google Drive (docs/DRIVE.md)
     drive_link: str = ""
     drive_path: str = ""                # e.g. "Roofer/roofing_in_houston_no_website_email_29_09_2026.csv"
+    remote: bool = False                # ROLE=sender: a searcher computer runs it (docs/CLOUD.md)
+    remote_seen_at: datetime | None = None  # ... and last said it's still on it
 
     # ---- helpers --------------------------------------------------------
     def touch(self) -> None:

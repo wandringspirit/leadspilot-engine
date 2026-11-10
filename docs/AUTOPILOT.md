@@ -35,6 +35,11 @@ needed.
 | `searches_per_day` | 2 | at most this many searches a day, one at a time |
 | `limit` | 60 | businesses wanted per search |
 
+With a cloud server (`ROLE=sender`, [CLOUD.md](CLOUD.md)) the autopilot runs there, and its searches
+wait until the search computer (the laptop) takes them: while it's closed, nothing new is searched, and
+campaigns keep sending. A search whose laptop goes quiet for 20 minutes (asleep, offline) ends as
+*interrupted* and counts as a failed search: the place is searched again.
+
 ### When it holds back
 
 - a search is running;

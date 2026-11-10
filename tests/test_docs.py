@@ -30,6 +30,7 @@ REQUIRED_DOCS = [
     "docs/AUTOPILOT.md",
     "docs/DRIVE.md",
     "docs/SITES.md",
+    "docs/CLOUD.md",
 ]
 
 

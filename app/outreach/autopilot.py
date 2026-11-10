@@ -48,6 +48,8 @@ RUNS_KEPT = 200
 #: stopped on purpose.
 RETRIED = {JobStatus.FAILED, JobStatus.INTERRUPTED}
 FAILS_BEFORE_SKIP = 3
+#: ROLE=sender: a search whose search computer hasn't reported for this long is given up (and searched again)
+REMOTE_SILENCE_S = 20 * 60
 
 #: Texas first: Houston's suburbs, Dallas–Fort Worth, San Antonio, Austin
 DEFAULT_PLACES = [
@@ -239,6 +241,10 @@ class Autopilot:
     async def _tick(self, now: datetime) -> str:
         """One look; returns why it didn't search ('' when it did)."""
         state = self.state
+        if self.cfg.ROLE == "sender" and self.jobs.expire_remote(now, REMOTE_SILENCE_S):
+            # the search computer slept or lost its connection: job_finished puts the place first in line
+            # again - only then may the next search start
+            return "the search computer stopped reporting"
         self._close_lost_runs(now)
         if not state.enabled:
             return "switched off"
@@ -289,7 +295,8 @@ class Autopilot:
             job = self.jobs.get(run.job_id)
             if job is not None and job.status in ACTIVE_STATES:
                 continue
-            if job is not None and job.status != JobStatus.INTERRUPTED and job.finished_at is not None:
+            if job is not None and job.finished_at is not None and (job.status != JobStatus.INTERRUPTED
+                                                                     or job.remote):
                 continue                                 # finished; job_finished is on its way
             run.finished_at, run.note = now, "the search didn't finish (the panel stopped?) - it is searched again"
             if run.place in self.state.places:

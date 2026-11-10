@@ -124,7 +124,9 @@ names are kept verbatim.
   },
   "drive_file_id": "1AbC…",         // its CSV in Google Drive (DRIVE.md), "" until uploaded
   "drive_link": "https://drive.google.com/file/d/1AbC…/view",
-  "drive_path": "Plumber/plumbers_in_austin_tx_no_website_phone_or_email_20_09_2026.csv"
+  "drive_path": "Plumber/plumbers_in_austin_tx_no_website_phone_or_email_20_09_2026.csv",
+  "remote": false,                  // ROLE=sender: the search computer runs it (CLOUD.md)
+  "remote_seen_at": null            // ... and last reported then
 }
 ```
 

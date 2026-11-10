@@ -6,10 +6,12 @@ checks that every route is mentioned).
 """
 from __future__ import annotations
 
+import hmac
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -24,7 +26,7 @@ from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
 from app.jobs import ACTIVE_STATES, JobManager
 from app.logbuffer import LEVELS, LOG_FORMAT, install as install_log_buffer, install_file as install_log_file, log_buffer
-from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, ScrapeRequest
+from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, Progress, ScrapeRequest
 from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.domains import domain_problem
@@ -33,6 +35,7 @@ from app.outreach.master import activity_table, campaigns_table, daily_table, to
 from app.outreach.site_requests import SiteRequests
 from app.outreach.sites import SiteService
 from app.outreach.visits import Visits
+from app.remote import RemoteSearcher
 from app.outreach.models import (BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate,
                                  CampaignStatus, CampaignSummary, CampaignUpdate, DriveSource, Lead, LeadUpdate,
                                  SendTestRequest)
@@ -53,18 +56,26 @@ async def lifespan(_: FastAPI):
              __version__, len(manager.jobs), settings.HEADLESS, settings.DETAIL_CONCURRENCY)
     if settings.KEEP_AWAKE and keep_awake(True):
         log.info("Keeping the computer awake while the panel runs (KEEP_AWAKE)")
-    outreach.start_loop()
-    autopilot.start_loop()
-    if sites is not None and sites.unpublished():
-        sites.request_upload()                  # an upload that hadn't happened when the server stopped
+    if SEARCHER:                                # only the cloud server's searches - it sends, not this computer
+        log.info("ROLE=searcher: searching for %s, nothing is sent from here", settings.CLOUD_URL or "(no CLOUD_URL)")
+        searcher.start_loop()
+    else:
+        outreach.start_loop()
+        autopilot.start_loop()
+        if sites is not None and sites.unpublished():
+            sites.request_upload()              # an upload that hadn't happened when the server stopped
+        if visits is not None:
+            visits.start_loop(outreach.record_visits)
+        if site_requests is not None:
+            site_requests.start_loop()
+    if settings.ROLE == "sender":
+        log.info("ROLE=sender: searches wait for the search computer%s",
+                 "" if settings.SEARCHER_TOKEN else " - but SEARCHER_TOKEN is empty, so none can ask for them")
     if settings.DRIVE_AUTO_UPLOAD:
         drive.start_loop(outreach, master=_master_tables)
-    if visits is not None:
-        visits.start_loop(outreach.record_visits)
-    if site_requests is not None:
-        site_requests.start_loop()
     yield
     await manager.shutdown()                    # first, while Playwright still answers (see JobManager.shutdown)
+    await searcher.stop_loop()
     if site_requests is not None:
         await site_requests.stop_loop()
     if visits is not None:
@@ -94,6 +105,9 @@ outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visi
 site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not None else None
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
+SEARCHER = settings.ROLE == "searcher"          # read once: ROLE takes effect after a restart
+searcher = RemoteSearcher(settings, manager)
+remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the search computer last asked
 
 
 def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
@@ -276,6 +290,64 @@ async def get_logs(
             raise HTTPException(400, f"level must be one of {', '.join(LEVELS)}")
         min_level = LEVELS[level.upper()]
     return log_buffer.entries(since=since, limit=limit, job_id=job_id, min_level=min_level)
+
+
+# ----------------------------------------------------------------------
+# Searching on another computer (docs/CLOUD.md)
+# ----------------------------------------------------------------------
+class RemoteHello(BaseModel):
+    version: str = ""
+
+
+class RemoteProgress(BaseModel):
+    progress: Progress
+    rows: int = 0
+
+
+@app.get("/api/remote")
+async def remote_status() -> dict:
+    """Who searches: this computer (all), a search computer (sender), or this one for the cloud (searcher)."""
+    if SEARCHER:
+        return searcher.status()
+    if settings.ROLE == "sender":
+        jobs = [j for j in manager.jobs.values() if j.remote and j.status in ACTIVE_STATES]
+        return {"role": "sender", "token_set": bool(settings.SEARCHER_TOKEN),
+                "last_contact": remote_contact["at"].isoformat() if remote_contact["at"] else None,
+                "searcher_version": remote_contact["version"],
+                "waiting": sum(j.status == JobStatus.QUEUED for j in jobs),
+                "searching": [j.query for j in jobs if j.status == JobStatus.RUNNING]}
+    return {"role": "all"}
+
+
+@app.post("/api/remote/next")
+async def remote_next(request: Request, req: RemoteHello | None = None) -> Response:
+    """The search computer asks for a search: the oldest waiting one, now its own - 204: none waiting."""
+    _search_computer(request, req.version if req else "")
+    job = manager.claim_remote()
+    if job is None:
+        return Response(status_code=204)
+    spec = job.model_dump(mode="json", include={"id", "query", "business", "place", "whole_area", "limit",
+                                                "filters", "enrich", "business_type_id"})
+    return JSONResponse({"job": spec})
+
+
+@app.post("/api/remote/jobs/{job_id}/progress")
+async def remote_progress(job_id: str, req: RemoteProgress, request: Request) -> dict:
+    """The search computer's progress; ``stop``: the search was cancelled here or given up on."""
+    _search_computer(request)
+    return {"stop": not manager.remote_progress(job_id, req.progress, req.rows)}
+
+
+@app.post("/api/remote/jobs/{job_id}/result", response_model=JobSummary)
+async def remote_result(job_id: str, result: Job, request: Request) -> JobSummary:
+    """The search computer's finished search - the autopilot makes its campaign as if it had searched here."""
+    _search_computer(request)
+    if result.id != job_id:
+        raise HTTPException(400, "the search's id doesn't match the address")
+    try:
+        return manager.remote_result(result).summary()
+    except (LookupError, ValueError) as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 # ----------------------------------------------------------------------
@@ -563,16 +635,39 @@ _LOOPBACK_CLIENTS = ("127.0.0.1", "::1")
 _LOOPBACK_NAMES = ("127.0.0.1", "localhost", "::1")
 
 
+def _trusted_hosts() -> set[str]:
+    return {name.strip().lower() for name in settings.TRUSTED_HOSTS.split(",") if name.strip()}
+
+
 def _this_computer(request: Request) -> None:
     """Settings, Stop and Restart only for the panel opened on this computer: not for other computers on the
     network (HOST=0.0.0.0), and not for other web sites - their requests carry their own Origin (or, sent
-    through a DNS name pointing at 127.0.0.1, a Host that isn't one of ours)."""
+    through a DNS name pointing at 127.0.0.1, a Host that isn't one of ours). TRUSTED_HOSTS: the cloud
+    server's panel, opened through Cloudflare Access - its tunnel connects from this computer too."""
     client = request.client.host if request.client else ""
     origin = request.headers.get("origin", "")
-    same_origin = not origin or origin.rstrip("/") == f"{request.url.scheme}://{request.url.netloc}"
-    if client not in _LOOPBACK_CLIENTS or request.url.hostname not in _LOOPBACK_NAMES or not same_origin:
+    hostname = (request.url.hostname or "").lower()
+    if hostname in _trusted_hosts():               # https outside, http from the tunnel: compare the names
+        same_origin = not origin or (urlparse(origin).hostname or "").lower() == hostname
+    else:
+        same_origin = not origin or origin.rstrip("/") == f"{request.url.scheme}://{request.url.netloc}"
+    if (client not in _LOOPBACK_CLIENTS or not same_origin
+            or (hostname not in _LOOPBACK_NAMES and hostname not in _trusted_hosts())):
         raise HTTPException(403, "only the panel opened on this computer can do this - open "
                                  f"http://127.0.0.1:{request.url.port or settings.PORT}")
+
+
+def _search_computer(request: Request, version: str = "") -> None:
+    """The remote routes are only for the search computer: this server must be ROLE=sender and the request
+    must carry its SEARCHER_TOKEN."""
+    if settings.ROLE != "sender" or not settings.SEARCHER_TOKEN:
+        raise HTTPException(404, "this server doesn't hand out searches - set ROLE=sender and SEARCHER_TOKEN")
+    sent = request.headers.get("authorization", "").encode()
+    if not hmac.compare_digest(sent, f"Bearer {settings.SEARCHER_TOKEN}".encode()):
+        raise HTTPException(401, "wrong SEARCHER_TOKEN")
+    remote_contact["at"] = datetime.now(timezone.utc)
+    if version:
+        remote_contact["version"] = version
 
 
 def _server_info() -> dict:
@@ -582,7 +677,7 @@ def _server_info() -> dict:
 
 async def _apply_settings(names: set[str]) -> None:
     """Saved settings the running server takes up now (everything else is read where it's used)."""
-    if "OUTREACH_AUTOSEND" in names:
+    if "OUTREACH_AUTOSEND" in names and not SEARCHER:   # a search computer never sends
         if settings.OUTREACH_AUTOSEND:
             outreach.start_loop()
         else:

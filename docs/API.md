@@ -20,6 +20,10 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | GET | `/api/outreach` | mailbox settings, send window, today's count, the last reply check |
 | POST | `/api/outreach/check` | check the mailbox for replies and bounces now |
 | GET / PATCH | `/api/autopilot` | the autopilot: status / switch it on or off, places, limits |
+| GET | `/api/remote` | who searches: this computer, a search computer, or this one for the cloud server |
+| POST | `/api/remote/next` | the search computer takes the oldest waiting search (`ROLE=sender`) |
+| POST | `/api/remote/jobs/{job_id}/progress` | the search computer's progress; answers whether to stop |
+| POST | `/api/remote/jobs/{job_id}/result` | the search computer's finished search |
 | GET | `/api/activity` | what happened, newest first |
 | GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv`; also `daily.csv` |
 | GET | `/api/master/daily` | day by day: emails sent (first emails, follow-ups) and what came back |
@@ -424,6 +428,31 @@ Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.
   own calendar, oldest first, from the first day anything happened through today (days without anything
   included). *Websites opened* counts a business on the day of its first visit. `GET /api/master/daily.csv` is
   the same as a file. The panel draws it as the *Day by day* charts.
+
+## Searching on another computer
+
+The cloud server (`ROLE=sender`) doesn't search: its searches wait for the search computer
+(`ROLE=searcher`), which asks for them – [CLOUD.md](CLOUD.md). The three `POST` routes are only for it:
+they need `ROLE=sender`, a `SEARCHER_TOKEN` and the header `Authorization: Bearer <SEARCHER_TOKEN>` –
+`404` without the first two, `401` with a wrong token.
+
+- `GET /api/remote` → on `ROLE=all`: `{"role": "all"}`; on the sender: `{"role": "sender", "token_set": true,
+  "last_contact": "2026-11-11T14:02:10Z", "searcher_version": "1.19.0", "waiting": 1, "searching":
+  ["roofer in Katy, TX"]}`; on the search computer: `{"role": "searcher", "cloud_url", "state": "waiting for
+  a search", "last_contact", "pending": ["job_…"]}`.
+- `POST /api/remote/next` `{version?}` → `{"job": {"id", "query", "business", "place", "whole_area", "limit",
+  "filters", "enrich", "business_type_id"}}` – the oldest waiting search, now *running* and the search
+  computer's; `204` when none waits.
+- `POST /api/remote/jobs/{job_id}/progress` `{"progress": {phase, message, current, total, percent}, "rows":
+  3}` → `{"stop": false}`; `true` when the search was cancelled, given up on (20 minutes without a report)
+  or is unknown – the search computer then cancels it.
+- `POST /api/remote/jobs/{job_id}/result` – the finished job as the search computer has it (the job JSON,
+  [DATA_MODEL.md](DATA_MODEL.md)) → the job summary; the finished-job hook runs (the autopilot makes the
+  campaign). `409` when the search isn't wanted any more (cancelled, given up on, already sent) or hasn't
+  finished, `400` when the id doesn't match the address.
+
+On the sender, `POST /api/scrape` makes such a waiting search too, and cancelling one marks it cancelled at
+once (the search computer stops at its next report).
 
 ## Preview websites
 

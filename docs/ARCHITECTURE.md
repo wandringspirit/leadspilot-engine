@@ -121,6 +121,7 @@ flowchart LR
 | **Mailbox** | `app/outreach/mailbox.py` | `smtplib` / `imaplib` in a worker thread; building the plain-text emails (threaded follow-ups, `List-Unsubscribe`) and reading what arrives (reply, auto-reply, bounce, unsubscribe). |
 | **DriveClient / DriveSync** | `app/drive/*.py` | Google Drive over httpx: the OAuth sign-in (PKCE, the answer comes back to `/`), folders per business type, uploading search CSVs and campaign results, reading lead files ([DRIVE.md](DRIVE.md)). |
 | **Panel** | `app/static/*` | *Search* tab: form with the business-type list, progress card, results table with per-row *Find* buttons, history list, CSV download / copy / *Save to Drive*, *Email these businesses*, live log viewer. *Outreach* tab (`outreach.js`): setup checklist, mailbox status, campaigns, business types and their email editor with live previews. |
+| **Search computer** | `app/remote.py`, `JobManager.claim_remote` … | Two computers ([CLOUD.md](CLOUD.md)): on `ROLE=sender` a new search isn't run but waits as *queued* (`Job.remote`) until the search computer takes it (`POST /api/remote/next`); `RemoteSearcher` (`ROLE=searcher`) runs it under the same id, reports progress and sends the result back, and the sender's finished-job hook runs as if it had searched. A search whose search computer stays silent for 20 minutes is given up as *interrupted* (`expire_remote`, from the autopilot's tick). |
 | **CLI** | `cli.py` | Same pipeline without the server. |
 
 ## 3. A scrape job, end to end
@@ -301,6 +302,7 @@ what the *This job only* filter in the panel uses.
 ```
 data/
   jobs/job_<id>.json        full Job (query, status, progress, rows, stats)
+  remote.json               ROLE=searcher: the cloud server's searches still to report (CLOUD.md)
   exports/<job>.csv         last CSV download of a job (convenience copy)
   exports/<query>.csv       CLI output default location
   campaigns/camp_<id>.json  a campaign with its leads, what was sent and what came back
