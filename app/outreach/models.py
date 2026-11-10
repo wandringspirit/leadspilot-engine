@@ -179,10 +179,14 @@ class Campaign(BaseModel):
             counts[lead.status.value] += 1
         return counts
 
+    def nobody_to_email(self) -> bool:
+        """A draft whose search found businesses but left every one out (emailed before, not its own address …)."""
+        return self.status == CampaignStatus.DRAFT and not self.leads and bool(self.left_out)
+
     def summary(self) -> "CampaignSummary":
         return CampaignSummary(
             id=self.id, name=self.name, trade=self.trade, business_type_name=self.business_type_name, status=self.status,
-            error=self.error, leads=len(self.leads), counts=self.counts(),
+            error=self.error, leads=len(self.leads), left_out=len(self.left_out), counts=self.counts(),
             emails_sent=sum(len(lead.sent) for lead in self.leads), steps=len(self.steps), job_ids=self.job_ids,
             created_at=self.created_at, started_at=self.started_at, finished_at=self.finished_at,
         )
@@ -196,6 +200,7 @@ class CampaignSummary(BaseModel):
     status: CampaignStatus
     error: str = ""
     leads: int
+    left_out: int = 0
     counts: dict[str, int] = Field(description="Leads per status")
     emails_sent: int
     steps: int

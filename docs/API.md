@@ -21,7 +21,8 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | POST | `/api/outreach/check` | check the mailbox for replies and bounces now |
 | GET / PATCH | `/api/autopilot` | the autopilot: status / switch it on or off, places, limits |
 | GET | `/api/activity` | what happened, newest first |
-| GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv` |
+| GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv`; also `daily.csv` |
+| GET | `/api/master/daily` | day by day: emails sent (first emails, follow-ups) and what came back |
 | GET / POST | `/api/business-types` | list / add business types |
 | GET / PATCH / DELETE | `/api/business-types/{type_id}` | one business type: read, change, delete |
 | GET | `/api/business-types/{type_id}/preview` | its emails for two made-up businesses |
@@ -418,6 +419,11 @@ Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.
 - `GET /api/activity?limit=100` → `[{"at", "what", "detail", "campaign", "business", "email"}]`,
   newest first.
 - `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master sheet's files.
+- `GET /api/master/daily` → `{"columns": ["Day", "First emails", "Follow-ups", "Replies", "Websites opened",
+  "Bounces", "Unsubscribes"], "rows": [["2026-11-09", 3, 7, 0, 1, 0, 0], …]}` - a row per day of the computer's
+  own calendar, oldest first, from the first day anything happened through today (days without anything
+  included). *Websites opened* counts a business on the day of its first visit. `GET /api/master/daily.csv` is
+  the same as a file. The panel draws it as the *Day by day* charts.
 
 ## Preview websites
 

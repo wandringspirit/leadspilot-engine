@@ -12,17 +12,24 @@
  * city and country. The panel reads them with GET /_visits (VISITS_KEY as a bearer token) - the answer also
  * holds the panel's own hash and country, so its own visits are told apart (app/outreach/visits.py).
  *
- * The quote form posts to /_q: the request waits in the same database (migrations/0002_requests.sql) until
- * the panel emails it to the business and deletes it (GET and POST /_requests, app/outreach/site_requests.py).
+ * The quote form posts to /_q. A real request goes straight to the business: the Worker posts it to the
+ * Make.com webhook (the MAKE_WEBHOOK secret), whose scenario emails it to the address in _status.json ("to")
+ * and answers "sent". Anything else - a test (?copy, or sent from OWNER_COUNTRY), a business that must not be
+ * emailed ("to" is empty), no webhook, or a webhook that didn't answer "sent" - waits in the database
+ * (migrations/0002_requests.sql) until the panel emails it and deletes it (GET and POST /_requests,
+ * app/outreach/site_requests.py), so a request is never lost while the laptop is off.
  */
 
 const HOME = "https://leadspilot.co/";
 const TAPS = new Set(["seen", "call", "email", "keep"]);
 const PAGE_SIZE = 1000;
-const QUOTE_FIELDS = { problem: 100, address: 200, when: 40, name: 100, phone: 30, email: 120 };
+const QUOTE_FIELDS = { problem: 100, details: 500, address: 200, when: 40, name: 100, phone: 30, email: 120 };
 const QUOTES_PER_VISITOR = 5;   // an hour
 const QUOTES_PER_SITE = 20;     // an hour
 const NOT_SAVED = "Your request didn't go through.";
+const QUOTE_LABELS = [["problem", "What they need"], ["details", "Details"], ["address", "Where"], ["when", "How soon"],
+                      ["name", "Name"], ["phone", "Phone"], ["email", "Email"]];
+const MAKE_TIMEOUT_MS = 10000;
 
 export default {
   async fetch(request, env, ctx) {
@@ -178,10 +185,12 @@ async function quote(request, env, url) {
       String(cf.city || "")];
     const ua = (request.headers.get("User-Agent") || "").slice(0, 200);
     const copy = data.copy === true ? 1 : 0;
+    const straight = Boolean(site.to && !copy && env.MAKE_WEBHOOK && country !== (env.OWNER_COUNTRY || ""));
+    const sent = straight && await toMake(env, slug, site, fields, at, url);
     await env.VISITS.batch([
-      env.VISITS.prepare(
+      ...(sent ? [] : [env.VISITS.prepare(                     // waits for the panel
         "INSERT INTO requests (at, slug, who, org, country, ua, copy, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      ).bind(at, slug, hash, org, country, ua, copy, JSON.stringify(fields)),
+      ).bind(at, slug, hash, org, country, ua, copy, JSON.stringify(fields))]),
       env.VISITS.prepare(
         "INSERT INTO visits (at, slug, kind, who, org, country, city, ua, copy) VALUES (?, ?, 'quote', ?, ?, ?, ?, ?, ?)",
       ).bind(at, slug, hash, org, country, city, ua, copy),
@@ -191,6 +200,33 @@ async function quote(request, env, url) {
     return Response.json({ error: NOT_SAVED }, { status: 503 });
   }
   return Response.json({ ok: true });
+}
+
+// The request, emailed by the Make scenario: true only when it answers "sent" (its Webhook response module) -
+// a scenario that is off only queues it ("Accepted"), so the panel delivers that one instead.
+async function toMake(env, slug, site, fields, at, url) {
+  const siteUrl = `${url.origin}/${slug}/`;
+  const lines = QUOTE_LABELS.filter(([key]) => fields[key]).map(([key, label]) => `${label}: ${fields[key]}`);
+  const text = [`New request from your website, ${siteUrl}`, "", ...lines, "",
+                "Call them back soon: they may be asking other roofers too."].join("\n");
+  const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const payload = {
+    to: site.to, business: site.business || slug, site_url: siteUrl, at,
+    subject: `New inspection request from ${fields.name}`, text, html: escape(text).replace(/\n/g, "<br>\n"),
+    reply_to: fields.email, ...fields,
+  };
+  try {
+    const response = await fetch(env.MAKE_WEBHOOK, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(MAKE_TIMEOUT_MS),
+    });
+    const answer = (await response.text()).trim().toLowerCase();
+    if (response.ok && answer === "sent") return true;
+    console.error("Make didn't send the quote request", response.status, answer.slice(0, 200));
+  } catch (err) {
+    console.error("Make couldn't be reached", String(err));
+  }
+  return false;
 }
 
 async function requests(request, env, url) {

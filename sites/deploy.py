@@ -5,12 +5,13 @@
     python sites/deploy.py --prepare    # only make data/deploy/public (for: wrangler dev)
     python sites/deploy.py --login      # log in to Cloudflare for this project (opens the browser)
     python sites/deploy.py --visits-key # a new VISITS_KEY: the Worker's secret and .env's SITES_VISITS_KEY
+    python sites/deploy.py --make-webhook # set the Make.com webhook that emails quote requests at once
 
 The panel does this by itself after it builds a campaign's sites and after first emails go out
 (app/outreach/sites.py). The sites come from ``sites/build.py`` (``data/sites/sites.json``). This copies
 the ones that haven't ended into ``data/deploy/public/<slug>/``, with ``_status.json`` - each site's end
-date and whether it is on hold - which the Worker reads on every request. Files that didn't change
-aren't uploaded again.
+date, whether it is on hold, and where its quote requests go (``deliver_to``) - which the Worker reads on
+every request and never serves. Files that didn't change aren't uploaded again.
 
 How long a site stays online (``ends_at``), from the latest thing that happened: 30 days after the
 business replied; 2 days after the last email, which links the site and says it comes down tomorrow;
@@ -90,10 +91,32 @@ def prepare(sites_dir: Path = SITES, public: Path = PUBLIC, now: datetime | None
         _remove(old)
     for slug in live:
         shutil.copytree(sites_dir / slug, public / slug)
+    contacted = _contacted(sites_dir.parent / "contacted.json")
     status = {slug: {"expires": ends[slug].isoformat(timespec="seconds") if ends[slug] else None,
-                     "hold": bool(manifest[slug].get("hold"))} for slug in live}
-    (public / "_status.json").write_text(json.dumps(status, indent=1) + "\n", encoding="utf-8")
+                     "hold": bool(manifest[slug].get("hold")),
+                     "business": manifest[slug].get("business") or "",
+                     "to": deliver_to(manifest[slug], contacted)} for slug in live}
+    (public / "_status.json").write_text(json.dumps(status, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     return live
+
+
+#: what data/contacted.json says about a business that must not get an email (app/outreach/site_requests.py)
+NOT_EMAILED = {"unsubscribed", "bounced", "failed"}
+
+
+def deliver_to(site: dict, contacted: dict) -> str:
+    """Where the Worker sends the site's quote requests straight away (through the Make webhook): the
+    business's address, or "" when it must not be emailed - then the request waits for the panel, which
+    sends it to you."""
+    address = (site.get("email") or "").strip().lower()
+    return "" if not address or (contacted.get(address) or {}).get("status") in NOT_EMAILED else address
+
+
+def _contacted(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, ValueError):
+        return {}
 
 
 def wrangler_command(*, dry_run: bool = False) -> list[str]:
@@ -159,9 +182,39 @@ def visits_key() -> int:
     return 0
 
 
+def make_webhook() -> int:
+    """Set (or, with nothing typed, remove) the Worker's MAKE_WEBHOOK secret: the Make.com webhook that emails
+    a website's quote requests to its business straight away. It is asked for here and never printed or kept
+    in a file - whoever has it can make the scenario send email."""
+    import getpass
+    if not WRANGLER.is_file():
+        print("Cloudflare's wrangler isn't installed - run  npm install  in sites/worker", file=sys.stderr)
+        return 1
+    print("Paste the Make.com webhook address (it stays hidden) and press Enter.\n"
+          "Its scenario must end with a Webhook response whose body is: sent\n"
+          "Press Enter without typing anything to remove the webhook: requests then wait for the panel.")
+    url = getpass.getpass("Webhook: ").strip()
+    if url and (not url.startswith("https://hook.") or " " in url):
+        print("That isn't a Make.com webhook address (https://hook.….make.com/…) - nothing was changed.", file=sys.stderr)
+        return 1
+    command = ["node", str(WRANGLER), "secret", "put" if url else "delete", "MAKE_WEBHOOK", "--config",
+               str(WORKER / "wrangler.jsonc")]
+    result = subprocess.run(command, cwd=WORKER, env=wrangler_env(), input=url or "y\n", text=True,
+                            capture_output=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        print("The Worker's secret couldn't be changed:\n" + (result.stdout + result.stderr).strip()[-800:],
+              file=sys.stderr)
+        return result.returncode
+    print("MAKE_WEBHOOK is set on the Worker: real quote requests now go straight to the business." if url else
+          "MAKE_WEBHOOK is removed: quote requests wait for the panel again.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--make-webhook", action="store_true",
+                      help="set or remove the Make.com webhook that emails quote requests to the business at once")
     mode.add_argument("--dry-run", action="store_true", help="check everything, upload nothing")
     mode.add_argument("--prepare", action="store_true", help="only make data/deploy/public")
     mode.add_argument("--login", action="store_true", help="log in to Cloudflare for this project")
@@ -173,6 +226,8 @@ def main() -> int:
         return login()
     if args.visits_key:
         return visits_key()
+    if args.make_webhook:
+        return make_webhook()
     slugs = prepare()
     print(f"{len(slugs)} site(s) ready in {PUBLIC}")
     if args.prepare:

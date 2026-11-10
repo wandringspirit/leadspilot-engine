@@ -29,7 +29,7 @@ from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.domains import domain_problem
 from app.outreach.manager import OutreachError, OutreachManager
-from app.outreach.master import activity_table, campaigns_table, to_csv
+from app.outreach.master import activity_table, campaigns_table, daily_table, to_csv
 from app.outreach.site_requests import SiteRequests
 from app.outreach.sites import SiteService
 from app.outreach.visits import Visits
@@ -327,12 +327,20 @@ async def get_activity(limit: int = Query(100, ge=1, le=5000)) -> list[dict]:
     return activity.entries(limit)
 
 
+@app.get("/api/master/daily")
+async def master_daily() -> dict:
+    """Day by day: emails sent (first emails, follow-ups) and what came back - the panel's chart."""
+    columns, rows = daily_table(outreach.list_campaigns())
+    return {"columns": columns, "rows": rows}
+
+
 @app.get("/api/master/{part}.csv")
 async def master_csv(part: str) -> Response:
-    """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log)."""
-    tables = _master_tables()
+    """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log), and
+    ``daily`` (a row per day)."""
+    tables = {**_master_tables(), "daily": daily_table(outreach.list_campaigns())}
     if part not in tables:
-        raise HTTPException(404, "the master sheet has campaigns.csv and activity.csv")
+        raise HTTPException(404, "the master sheet has campaigns.csv, activity.csv and daily.csv")
     return Response(content=to_csv(tables[part]), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="leads-pilot-{part}.csv"'})
 

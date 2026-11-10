@@ -3,6 +3,7 @@ first emails waiting for their websites (sites/, app/outreach/sites.py, docs/SIT
 from __future__ import annotations
 
 import html
+import json
 import os
 import random
 import re
@@ -70,10 +71,21 @@ def test_prepare_uploads_only_sites_still_up(tmp_path):
     assert (public / "fresh" / "index.html").is_file() and not (public / "ended").exists()
     status = (public / "_status.json").read_text(encoding="utf-8")
     assert '"hold": true' in status and "2026-11-14" in status
+    assert json.loads(status)["fresh"]["to"] == ""                       # no address: requests wait for the panel
     # read-only folders (copied from a read-only design folder) are still replaced next time
     os.chmod(public / "fresh", stat.S_IREAD)
     os.chmod(public / "fresh" / "index.html", stat.S_IREAD)
     assert prepare(sites, public, now) == ["fresh", "kept"]
+
+
+def test_quote_requests_go_straight_to_the_business_unless_it_must_not_be_emailed():
+    from sites.deploy import deliver_to
+    contacted = {"gone@x.com": {"status": "bounced"}, "stop@x.com": {"status": "unsubscribed"},
+                 "ok@x.com": {"status": "emailed"}}
+    assert deliver_to({"email": " OK@x.com "}, contacted) == "ok@x.com"
+    assert deliver_to({"email": "new@x.com"}, contacted) == "new@x.com"
+    assert deliver_to({"email": "gone@x.com"}, contacted) == deliver_to({"email": "stop@x.com"}, contacted) == ""
+    assert deliver_to({}, contacted) == ""
 
 
 # --------------------------------------------------------------------------

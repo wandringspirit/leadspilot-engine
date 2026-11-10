@@ -288,6 +288,36 @@
         </details>
       </section>
 
+      <!-- day by day: emails sent and what came back (/api/master/daily) -->
+      <section class="card" id="daily-card">
+        <div class="card-head wrap">
+          <h2>Day by day</h2>
+          <div class="toolbar">
+            <div class="segmented" id="daily-range" role="radiogroup" aria-label="Days shown">
+              <label><input type="radio" name="daily-range" value="14"><span>2 weeks</span></label>
+              <label><input type="radio" name="daily-range" value="30" checked><span>30 days</span></label>
+              <label><input type="radio" name="daily-range" value="0"><span>All</span></label>
+            </div>
+            <button class="btn small" type="button" id="daily-table-btn" aria-pressed="false">Table</button>
+            <a class="btn small" href="/api/master/daily.csv">⇩ CSV</a>
+          </div>
+        </div>
+        <div class="stat-row" id="daily-stats"></div>
+        <div class="viz" id="daily-charts">
+          <figure class="viz-chart">
+            <figcaption><strong>Emails sent</strong> <span class="viz-legend" id="daily-legend-sent"></span></figcaption>
+            <div class="viz-plot" id="daily-sent"></div>
+          </figure>
+          <figure class="viz-chart">
+            <figcaption><strong>What came back</strong> <span class="viz-legend" id="daily-legend-back"></span></figcaption>
+            <div class="viz-plot" id="daily-back"></div>
+          </figure>
+          <div class="viz-tip" id="daily-tip" role="status" hidden></div>
+        </div>
+        <div class="table-wrap" id="daily-table-box" hidden><table class="viz-table" id="daily-table"></table></div>
+        <small class="muted block" id="daily-note">Days are your computer's days. Texas mornings are your evenings, so a day's emails all fall on one date.</small>
+      </section>
+
       <!-- everything that happened; the master sheet in Google Drive -->
       <section class="card" id="activity-card">
         <div class="card-head wrap">
@@ -500,6 +530,7 @@
   <script src="/static/app.js?v={{version}}"></script>
   <script src="/static/outreach.js?v={{version}}"></script>
   <script src="/static/autopilot.js?v={{version}}"></script>
+  <script src="/static/daily.js?v={{version}}"></script>
   <script src="/static/settings.js?v={{version}}"></script>
 </body>
 </html>

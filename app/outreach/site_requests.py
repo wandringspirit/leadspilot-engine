@@ -1,6 +1,9 @@
 """Quote form requests from the preview websites (docs/SITES.md).
 
-The form on a website posts to its Worker, which keeps the request in its database. Every ``EVERY_S`` the
+The form on a website posts to its Worker. A real request the Worker sends to the business straight away,
+through a Make.com webhook (``sites/worker/src/index.js``; the ``MAKE_WEBHOOK`` secret, set with
+``python sites/deploy.py --make-webhook``). The rest - while no webhook is set or it didn't answer "sent", a
+form you tried yourself, a business that must not be emailed - it keeps in its database. Every ``EVERY_S`` the
 panel fetches the waiting ones (``GET <SITES_URL>/_requests``, ``SITES_VISITS_KEY`` as the bearer token),
 emails each to the business from the outreach mailbox and deletes it there (``POST /_requests``). A request
 that can't be emailed stays and is tried again, so it arrives once the panel is back; nothing is kept once
@@ -30,8 +33,8 @@ log = logging.getLogger(__name__)
 
 EVERY_S = 60
 TIMEOUT_S = 30
-LABELS = (("problem", "What they need"), ("address", "Where"), ("when", "How soon"), ("name", "Name"),
-          ("phone", "Phone"), ("email", "Email"))
+LABELS = (("problem", "What they need"), ("details", "Details"), ("address", "Where"), ("when", "How soon"),
+          ("name", "Name"), ("phone", "Phone"), ("email", "Email"))
 #: what ``contacted.json`` says about a business that must not get this email
 NOT_EMAILED = {"unsubscribed", "bounced", "failed"}
 

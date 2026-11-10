@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 
 from app.outreach.models import Campaign, LeadStatus
 
@@ -67,7 +67,7 @@ def _campaign_row(campaign: Campaign) -> dict:
     return {
         "Campaign": campaign.name,
         "Business type": campaign.business_type_name,
-        "Status": campaign.status.value + (f" ({campaign.error})" if campaign.error else ""),
+        "Status": _status(campaign),
         "Created": _local(campaign.created_at),
         "Started": _local(campaign.started_at),
         "Businesses": len(campaign.leads),
@@ -87,6 +87,45 @@ def _campaign_row(campaign: Campaign) -> dict:
         "Last email": _local(max(sent)) if sent else "",
         "Results file": campaign.drive_link,
     }
+
+
+DAILY_COLUMNS = ["Day", "First emails", "Follow-ups", "Replies", "Websites opened", "Bounces", "Unsubscribes"]
+_INBOUND_COLUMN = {"reply": "Replies", "bounce": "Bounces", "unsubscribe": "Unsubscribes"}
+
+
+def daily_table(campaigns: list[Campaign], today: date | None = None) -> Table:
+    """A row per day (the computer's own days, oldest first, through ``today``, days without anything
+    included): emails sent - first emails and follow-ups - and what came back."""
+    days: dict[date, dict[str, int]] = {}
+
+    def add(moment: datetime | None, column: str) -> None:
+        if moment is not None:
+            day = (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone().date()
+            days.setdefault(day, dict.fromkeys(DAILY_COLUMNS[1:], 0))[column] += 1
+
+    for campaign in campaigns:
+        for lead in campaign.leads:
+            for email in lead.sent:
+                add(email.sent_at, "First emails" if email.step == 1 else "Follow-ups")
+            for message in lead.inbound:
+                if message.kind in _INBOUND_COLUMN:
+                    add(message.received_at, _INBOUND_COLUMN[message.kind])
+            add(lead.site_opened_at, "Websites opened")
+    if not days:
+        return DAILY_COLUMNS, []
+    first, last = min(days), max(max(days), today or datetime.now().astimezone().date())
+    rows, day = [], first
+    while day <= last:
+        counts = days.get(day) or dict.fromkeys(DAILY_COLUMNS[1:], 0)
+        rows.append([day.isoformat(), *(counts[c] for c in DAILY_COLUMNS[1:])])
+        day += timedelta(days=1)
+    return DAILY_COLUMNS, rows
+
+
+def _status(campaign: Campaign) -> str:
+    if campaign.nobody_to_email():
+        return f"nobody to email ({len(campaign.left_out)} left out)"
+    return campaign.status.value + (f" ({campaign.error})" if campaign.error else "")
 
 
 def _local(moment: datetime | str | None) -> str:

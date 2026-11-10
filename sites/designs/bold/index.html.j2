@@ -330,39 +330,42 @@
       <div class="quote-copy" data-reveal>
         <p class="kicker">{{ t.quote_kicker }}</p>
         <h2 class="h2">{{ t.quote_title[0] }} <em>{{ t.quote_title[1] }}</em></h2>
-        <p class="lead">Three quick questions and we'll call you back to set a time. Rather talk now? Call us.</p>
+        <p class="lead">Tell us what's going on and we'll call you back to set a time. Rather talk now? Call us.</p>
         {% if phone %}<a class="big-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
         {% if email %}<a class="quote-mail" href="mailto:{{ email }}"><svg aria-hidden="true"><use href="#i-mail"/></svg>{{ email }}</a>{% endif %}
       </div>
       <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-phone="{{ phone }}" data-business="{{ business }}" novalidate data-reveal>
-        <div class="qf-progress" aria-hidden="true"><span data-qf-bar></span></div>
-        <p class="qf-count" aria-live="polite">Step <b data-qf-step>1</b> of 3</p>
-        <fieldset class="qf-step" data-step="1">
-          <legend>{{ t.quote_question }}</legend>
-          <div class="qf-opts">
+        <h3 class="qf-title">Request your free inspection</h3>
+        <p class="qf-sub">It takes under a minute. We'll call you back to set a time.</p>
+        <div class="qf-quick" role="group" aria-labelledby="qf-quick">
+          <p class="qf-label" id="qf-quick">Quick start</p>
+          <div class="qf-chips">
             {% for o in t.quote_options %}
-            <label class="opt"><input type="radio" name="problem" value="{{ o.label }}" data-val="{{ o.value }}" required><span><svg aria-hidden="true"><use href="#i-{{ o.icon }}"/></svg>{{ o.label }}</span></label>
+            <button class="qchip" type="button" data-chip="{{ o.value }}" aria-pressed="false"><svg aria-hidden="true"><use href="#i-{{ o.icon }}"/></svg>{{ o.label }}</button>
             {% endfor %}
           </div>
-        </fieldset>
-        <fieldset class="qf-step" data-step="2" hidden>
-          <legend>Where's the property?</legend>
+        </div>
+        <div class="qf-fields">
+          <label class="field"><span>Your name</span><input name="name" autocomplete="name" required></label>
+          <label class="field"><span>Phone number</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
           <label class="field"><span>Street address or ZIP code</span><input name="address" autocomplete="street-address" required></label>
+          <label class="field"><span>Email (optional)</span><input name="email" type="email" autocomplete="email" inputmode="email"></label>
+          <label class="field"><span>What do you need?</span>
+            <select name="problem" required>
+              <option value="">Choose one…</option>
+              {% for o in t.quote_options %}<option value="{{ o.label }}" data-val="{{ o.value }}">{{ o.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
           <label class="field"><span>How soon do you need us?</span>
             <select name="when"><option>As soon as possible</option><option>This week</option><option>In the next month</option><option>Just planning ahead</option></select>
           </label>
-        </fieldset>
-        <fieldset class="qf-step" data-step="3" hidden>
-          <legend>Who should we call?</legend>
-          <label class="field"><span>Your name</span><input name="name" autocomplete="name" required></label>
-          <label class="field"><span>Phone number</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
-          <label class="field"><span>Email (optional)</span><input name="email" type="email" autocomplete="email" inputmode="email"></label>
-        </fieldset>
+          <label class="field field-wide"><span>Anything we should know? (optional)</span><textarea name="details" rows="3" maxlength="500"></textarea></label>
+        </div>
         <label style="position:absolute;left:-9999px" aria-hidden="true">Fax<input name="fax" tabindex="-1" autocomplete="off"></label>
         <p class="qf-error" data-qf-error role="alert" hidden></p>
         <div class="qf-nav">
-          <button class="btn btn-ghost" type="button" data-qf-back hidden>Back</button>
-          <button class="btn btn-accent btn-lg" type="submit" data-qf-next>Next<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          <button class="btn btn-accent btn-lg" type="submit" data-qf-next>Send request<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
         </div>
         <div class="qf-done" data-qf-done hidden>
           <svg class="qf-tick" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="m15 27 7 7 15-16"/></svg>

@@ -20,6 +20,9 @@
     { "binding": "VISITS", "database_name": "leadspilot-visits",
       "database_id": "1d9a4474-a927-46e6-9a98-97ce8e5162bb", "migrations_dir": "migrations" }
   ],
+  // a quote request sent from this country is you trying the form: it goes to the panel (which emails it to
+  // you), never to the business. The Make webhook itself is the MAKE_WEBHOOK secret, never in this file.
+  "vars": { "OWNER_COUNTRY": "IN" },
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },

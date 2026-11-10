@@ -14,7 +14,7 @@ from app.outreach.activity import ActivityLog
 from app.outreach.autopilot import BOUNCE_LIMIT, Autopilot, AutopilotUpdate
 from app.outreach.manager import OutreachError, OutreachManager
 from app.outreach.master import activity_csv, campaigns_csv
-from app.outreach.models import CampaignStatus, LeadStatus
+from app.outreach.models import CampaignStatus, LeadStatus, LeftOut
 from tests.test_outreach import TUESDAY_9AM, Clock, FakeMailbox, make_settings, plumbers_job
 
 
@@ -158,3 +158,47 @@ async def test_the_master_sheet(tmp_path):
     assert log[0] == "When,What,Campaign,Business,Email,Detail" and ",Email sent," in log[1]
     # the log survives a restart
     assert ActivityLog(tmp_path / "activity.jsonl").entries()[0]["what"] == "Email sent"
+
+
+async def test_the_daily_table_counts_first_emails_follow_ups_and_what_came_back(tmp_path):
+    from datetime import date, datetime, timedelta
+    from app.outreach.master import DAILY_COLUMNS, daily_table
+    from app.outreach.models import InboundEmail, SentEmail
+    pilot, outreach, jobs, activity, clock = make_autopilot(tmp_path)
+    await pilot.tick()
+    await finish(pilot, jobs)
+    campaign = outreach.get(pilot.state.runs[-1].campaign_id)
+    noon = datetime(2026, 11, 2, 12).astimezone()                     # a Monday noon, the computer's own time
+    a, b = campaign.leads[0], campaign.leads[1]
+    a.sent = [SentEmail(step=1, sent_at=noon, message_id="1", subject="s"),
+              SentEmail(step=2, sent_at=noon + timedelta(days=3), message_id="2", subject="Re: s")]
+    b.sent = [SentEmail(step=1, sent_at=noon, message_id="3", subject="s")]
+    a.inbound = [InboundEmail(kind="reply", received_at=noon + timedelta(days=3, hours=1)),
+                 InboundEmail(kind="auto_reply", received_at=noon)]          # not counted
+    b.inbound = [InboundEmail(kind="bounce", received_at=noon + timedelta(minutes=5))]
+    a.site_opened_at = noon + timedelta(hours=1)
+    columns, rows = daily_table([campaign], today=date(2026, 11, 6))
+    assert columns == DAILY_COLUMNS
+    assert [r[0] for r in rows] == ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"]
+    by_day = {r[0]: dict(zip(columns, r)) for r in rows}
+    assert by_day["2026-11-02"] | {"Day": ""} == {"Day": "", "First emails": 2, "Follow-ups": 0, "Replies": 0,
+                                                 "Websites opened": 1, "Bounces": 1, "Unsubscribes": 0}
+    assert by_day["2026-11-05"]["Follow-ups"] == 1 and by_day["2026-11-05"]["Replies"] == 1
+    assert sum(by_day["2026-11-03"][c] for c in columns[1:]) == 0          # a day without anything is still a row
+    assert daily_table([]) == (DAILY_COLUMNS, [])
+
+
+async def test_the_master_sheet_says_when_a_search_left_nobody_to_email(tmp_path):
+    pilot, outreach, jobs, activity, clock = make_autopilot(tmp_path)
+    await pilot.tick()
+    await finish(pilot, jobs)
+    campaign = outreach.get(pilot.state.runs[-1].campaign_id)
+    campaign.status, campaign.left_out = CampaignStatus.DRAFT, [LeftOut(name=lead.business, email=lead.email,
+                                                                        reason="emailed before") for lead in campaign.leads]
+    campaign.leads = []
+    assert campaign.nobody_to_email() and campaign.summary().left_out == len(campaign.left_out) > 0
+    row = list(csv.reader(io.StringIO(campaigns_csv([campaign]).decode("utf-8-sig"))))[2]
+    assert row[2] == f"nobody to email ({len(campaign.left_out)} left out)"
+    campaign.left_out = []                               # a draft you are still setting up
+    assert not campaign.nobody_to_email()
+    assert list(csv.reader(io.StringIO(campaigns_csv([campaign]).decode("utf-8-sig"))))[2][2] == "draft"

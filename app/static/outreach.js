@@ -287,7 +287,7 @@
       const main = el("div", "job-main");
       main.appendChild(el("div", "job-query", c.name));
       if (c.business_type_name) main.append(el("span", "chip small type", c.business_type_name), " ");
-      main.appendChild(el("span", `pill tiny ${c.status}`, c.status));
+      main.appendChild(el("span", `pill tiny ${c.status}`, campaignStatus(c)));
       main.appendChild(el("div", "job-meta", `${c.emails_sent} sent · ${c.counts.replied} replied · ` +
         plural(c.leads, "business", "businesses")));
       li.appendChild(main);
@@ -322,7 +322,8 @@
 
   function show(kind) {
     els.intro.hidden = kind !== "intro";
-    for (const id of ["autopilot-card", "activity-card"]) $(id).hidden = kind !== "intro";
+    for (const id of ["autopilot-card", "daily-card", "activity-card"]) $(id).hidden = kind !== "intro";
+    if (kind === "intro" && window.LeadsDaily) window.LeadsDaily.refresh();
     els.newCard.hidden = kind !== "new";
     els.campCard.hidden = kind !== "campaign";
     els.leadsCard.hidden = kind !== "campaign";
@@ -498,14 +499,19 @@
   // ------------------------------------------------------------------
   // a campaign
   // ------------------------------------------------------------------
+  // a draft whose search found businesses but left every one out (the list has counts, a campaign has lists)
+  function count(v) { return Array.isArray(v) ? v.length : v || 0; }
+  function nobodyToEmail(c) { return c.status === "draft" && !count(c.leads) && count(c.left_out) > 0; }
+  function campaignStatus(c) { return nobodyToEmail(c) ? "nobody to email" : c.status; }
+
   function renderCampaign() {
     const c = state.campaign;
     els.campTitle.textContent = c.name;
-    els.campStatus.textContent = c.status;
+    els.campStatus.textContent = campaignStatus(c);
     els.campStatus.className = "pill " + c.status;
     els.campTypeChip.hidden = !c.business_type_name;
     els.campTypeChip.textContent = c.business_type_name ? `emails from ${c.business_type_name}` : "";
-    const canStart = c.status === "draft" || c.status === "paused";
+    const canStart = (c.status === "draft" && !nobodyToEmail(c)) || c.status === "paused";
     els.campStart.hidden = !canStart;
     els.campStart.textContent = c.status === "paused" ? "▶ Resume sending" : "▶ Start sending";
     els.campPause.hidden = c.status !== "running";

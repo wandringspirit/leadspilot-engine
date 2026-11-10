@@ -249,53 +249,52 @@
   /* ---- quote form ---- */
   const form = $("[data-quote]");
   if (form) {
-    const stepsF = $$(".qf-step", form);
-    const back = $("[data-qf-back]", form);
+    // one form, everything visible; the Quick start chips fill the "what's going on" dropdown
     const next = $("[data-qf-next]", form);
-    const bar = $("[data-qf-bar]", form);
-    const count = $("[data-qf-step]", form);
     const err = $("[data-qf-error]", form);
-    let at = 0;
-    const go = (i) => {
-      at = i;
-      stepsF.forEach((s, n) => { s.hidden = n !== i; });
-      back.hidden = i === 0;
-      next.firstChild.textContent = i === stepsF.length - 1 ? "Send request" : "Next";
-      bar.style.transform = `scaleX(${(i + 1) / stepsF.length})`;
-      count.textContent = i + 1;
+    const need = form.elements.problem;
+    const chips = $$("[data-chip]", form);
+    const sync = () => {
+      const val = need.selectedOptions[0] ? need.selectedOptions[0].dataset.val : "";
+      chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.chip === val)));
+    };
+    const pick = (val) => {
+      const option = $$("option", need).find((o) => o.dataset.val === val);
+      if (!option) return;
+      need.value = option.value;
+      need.removeAttribute("aria-invalid");
       err.hidden = true;
+      sync();
     };
+    chips.forEach((c) => c.addEventListener("click", () => pick(c.dataset.chip)));
+    need.addEventListener("change", sync);
+    // a service card or "we'll check it for free" link elsewhere on the page picks it too
+    const SERVICE = { "storm-damage": "storm", "leak-detection": "leak", "roof-replacement": "replace", "roof-repair": "leak" };
+    $$("[data-pick]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.pick] || "check")));
+    $$("[data-service]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.service] || "check")));
+    const fields = $$("input[required], select[required]", form);
+    fields.forEach((f) => f.addEventListener("input", () => { f.removeAttribute("aria-invalid"); err.hidden = true; }));
     const valid = () => {
-      const step = stepsF[at];
-      const radios = $$("input[type=radio]", step);
-      if (radios.length && !radios.some((r) => r.checked)) return "Pick the option that fits best.";
-      for (const input of $$("input:not([type=radio])[required]", step)) {
-        const bad = !input.value.trim() || (input.type === "tel" && input.value.replace(/\D/g, "").length < 10);
-        input.setAttribute("aria-invalid", String(bad));
-        if (bad) { input.focus(); return input.type === "tel" ? "Please enter a 10-digit phone number." : `Please fill in "${input.labels[0].firstElementChild.textContent}".`; }
+      let first = null, message = "";
+      for (const f of fields) {
+        const bad = !f.value.trim() || (f.type === "tel" && f.value.replace(/\D/g, "").length < 10);
+        f.setAttribute("aria-invalid", String(bad));
+        if (bad && !first) {
+          first = f;
+          message = f === need ? "Please choose what you need."
+            : f.type === "tel" ? "Please enter a 10-digit phone number."
+            : `Please fill in "${f.labels[0].firstElementChild.textContent}".`;
+        }
       }
-      return "";
+      if (first) first.focus();
+      return message;
     };
-    $$("input[type=radio]", form).forEach((r) => r.addEventListener("change", () => setTimeout(() => { if (at === 0) go(1); }, 260)));
-    back.addEventListener("click", () => go(at - 1));
-    $$("[data-pick]").forEach((a) => a.addEventListener("click", () => {
-      const map = { "storm-damage": "storm", "leak-detection": "leak", "roof-replacement": "replace", "roof-repair": "leak", gutters: "check" };
-      const want = map[a.dataset.pick] || "check";
-      const radio = $(`input[data-val="${want}"]`, form);
-      if (radio) { radio.checked = true; go(1); }
-    }));
-    $$("[data-service]").forEach((a) => a.addEventListener("click", () => {
-      const map = { "storm-damage": "storm", "leak-detection": "leak", "roof-replacement": "replace", "roof-repair": "leak" };
-      const radio = $(`input[data-val="${map[a.dataset.service] || "check"}"]`, form);
-      if (radio) { radio.checked = true; go(1); }
-    }));
     let sending = false;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (sending) return;
       const problem = valid();
       if (problem) { err.textContent = problem; err.hidden = false; return; }
-      if (at < stepsF.length - 1) { go(at + 1); return; }
       const data = Object.fromEntries(new FormData(form));
       const endpoint = form.dataset.endpoint;
       if (endpoint) {
@@ -324,7 +323,7 @@
         location.href = `mailto:${form.dataset.email}?subject=${encodeURIComponent("Inspection request")}&body=${encodeURIComponent(body)}`;
       }
     });
-    go(0);
+    sync();
   }
 
   /* ---- FAQ: smooth open/close ---- */

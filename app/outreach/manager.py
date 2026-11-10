@@ -970,6 +970,8 @@ class OutreachManager:
                 if not declined(message.text) and self.sites.set_hold(lead.site, True):
                     self._note("Website on hold", "they replied: no more countdown", campaign, lead)
             self._mark_contacted(campaign, lead, lead.status.value, now)
+            if kind in ("bounce", "unsubscribe") and lead.site and self.sites is not None:
+                self.sites.request_upload()      # its website's quote requests stop going to it (sites/deploy.py)
             if kind == "bounce":
                 bounces += 1
                 log.warning("Bounce for %s <%s> - the address doesn't work, no more emails to it", lead.business,

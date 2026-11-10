@@ -31,7 +31,7 @@ GREY = {"red": 0.94, "green": 0.94, "blue": 0.94}
 TEAL = {"red": 0.8, "green": 0.94, "blue": 0.92}
 
 #: rows coloured by the Status column (C) - paused carries its reason, so it is matched at the start
-CAMPAIGN_COLOURS = [("^running", GREEN), ("^paused", YELLOW), ("^finished", BLUE)]
+CAMPAIGN_COLOURS = [("^running", GREEN), ("^paused", YELLOW), ("^finished", BLUE), ("^nobody to email", GREY)]
 #: rows coloured by What (B)
 ACTIVITY_COLOURS = [
     ("^(Reply)$", GREEN),

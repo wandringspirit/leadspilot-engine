@@ -68,14 +68,31 @@ the sites (never served): an ended site shows *This preview has ended* (`410`); 
 
 ## The quote form
 
-The form on a site posts to the Worker (`POST /_q`), which keeps the request in its database. Within a
-minute, while the panel is running, the panel emails it to the business from the outreach mailbox and
-deletes it (`app/outreach/site_requests.py`). If the panel is off, requests wait and go out when it's back.
+One form, everything visible: name, phone, address or ZIP, email (optional), *What do you need?*, *How soon*
+and *Anything we should know?* (optional). The **Quick start** chips above it (It's leaking, Storm or hail
+damage, I need a new roof, Just want it checked) fill the *What do you need?* dropdown, and a service card
+or *We'll check it for free* link elsewhere on the page picks one too.
+
+It posts to the Worker (`POST /_q`). **A real request goes to the business straight away**, laptop on or
+off: the Worker posts it to a Make.com webhook (the Worker's `MAKE_WEBHOOK` secret, set with
+`python sites/deploy.py --make-webhook`), whose scenario emails it to the business and answers `sent`. The
+address comes from `_status.json` (`to`, written by `sites/deploy.py`: empty when the business bounced,
+unsubscribed or its address was refused). The webhook gets `to`, `business`, `subject`, `text`, `html`,
+`reply_to` (the visitor's email), `site_url`, `at` and each field on its own.
+
+The scenario: **Webhooks → Custom webhook**, then **Gmail → Send an email** (from the outreach mailbox; To
+`to`, Subject `subject`, Content `html`, Reply-To `reply_to`), then **Webhooks → Webhook response** (status
+200, body `sent`). Only `sent` counts: a scenario that is off only queues a request and answers *Accepted*,
+and an error answers something else, so then the Worker keeps it in its database and the panel emails it
+within a minute while it runs (`app/outreach/site_requests.py`) - a request is never lost. (Switching a
+scenario back on sends what it queued: that one arrives twice.)
+
 The visitor sees *We've got it* only once the request is saved; otherwise the form shows the business's
 phone number. The panel's lead row shows *Website form sent*, without the visitor's details.
 
 A request goes to **you**, with *[Not sent to ...]* in its subject, when it came from this computer, your
-own country or a test copy of an email, so you can try a form. It also goes to you when the business asked
+own country (`OWNER_COUNTRY` in `sites/worker/wrangler.jsonc`) or a test copy of an email, so you can try a
+form: those never go to Make. It also goes to you when the business asked
 not to be emailed or its address doesn't work. A visitor can send 5 requests an hour and a site can receive
 20; a hidden field catches simple bots.
 

@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.18.1 – 2026-11-10
+
+### Added
+- **Quote requests reach the business straight away, laptop on or off.** The Worker posts a real request
+  from a preview website's form to a Make.com webhook, whose scenario emails it to the business
+  (`python sites/deploy.py --make-webhook` sets the webhook). Tests, businesses that bounced or unsubscribed,
+  and any request Make didn't confirm (`sent`) still wait for the panel, so none is lost. A bounce or
+  unsubscribe uploads the sites again, so that business's requests stop going to it.
+- **Day by day charts** in the Autopilot view: the emails sent each day (first emails and follow-ups, with the
+  daily limit) and what came back (replies, websites opened, bounces, unsubscribes), for 2 weeks, 30 days or
+  everything, with a table view and a CSV (`/api/master/daily`, `daily.csv`).
+
+### Changed
+- **The preview websites' quote form is one form, everything visible**, instead of three steps. *Quick
+  start* chips (It's leaking, Storm or hail damage, I need a new roof, Just want it checked) fill its *What do
+  you need?* dropdown, and there's a new optional *Anything we should know?* box.
+- **A campaign whose search left every business out now says "nobody to email"** instead of "draft", in the
+  panel and on the master sheet (grey, with how many were left out), and it has no Start button. A draft you
+  are still setting up keeps saying "draft".
+
 ## 1.18.0 – 2026-11-06
 
 ### Added
