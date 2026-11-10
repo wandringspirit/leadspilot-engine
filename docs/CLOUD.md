@@ -85,8 +85,8 @@ wrong token, `401`.
 
 ## 4. The cloud server
 
-> **Status:** the server itself is ready (first bullet below); the panel service, the tunnel and the
-> login are being set up next.
+> **Status:** the server and the panel service are running (`ROLE=sender`, sending off, no mailbox login,
+> autopilot off – it can't email anyone). The tunnel and the login come next; then the move (§5).
 
 What runs where:
 
@@ -104,10 +104,13 @@ flowchart LR
   You Go* so Oracle doesn't reclaim the idle server, with a 1 USD budget alert at 1 % so any charge is
   noticed at once. Only the SSH port is open (Oracle's iptables rules); unattended upgrades are on; the
   time zone is Asia/Kolkata; a 2 GB swap file.
-- **Login.** SSH with the key `~/.ssh/leadspilot_oracle` as user `ubuntu`. The private key never leaves
-  the laptop.
-- **The panel** listens on `127.0.0.1:8000` only and runs as a systemd service, so it starts with the
-  server and after a crash.
+- **Login.** `ssh leadspilot-cloud` – an entry in the laptop's `~/.ssh/config` for user `ubuntu` with the
+  key `~/.ssh/leadspilot_oracle`. The private key never leaves the laptop.
+- **The panel** is `~/leadspilot-engine` (its own `venv`, Node.js for wrangler in `/usr/local`), listens on
+  `127.0.0.1:8000` only and runs as the systemd service `leadspilot` (`Restart=always`,
+  `LEAD_CRAWLER_LAUNCHER=1` so the panel's Restart button works), so it starts with the server and after a
+  crash. Its `.env` (mode 600) holds `ROLE=sender` and the `SEARCHER_TOKEN` made on the server.
+  `journalctl -u leadspilot -f` shows its log, as does `data/logs/panel.log`.
 - **Reaching it.** A Cloudflare Tunnel (`cloudflared`, outbound only – no port is opened) publishes it at
   the panel's name; **Cloudflare Access** in front of it lets only your Google account in. The laptop gets
   past the login with an Access **service token** (`CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) and then
@@ -119,8 +122,10 @@ flowchart LR
   Drive itself: the sign-in (`data/google_drive.json`) is copied from the laptop. If Google ends it (you get
   the *Google Drive disconnected* email), connect on the laptop and copy the file again – or publish the
   Google app so it doesn't end every 7 days ([PLAYBOOK.md](PLAYBOOK.md) step 2).
-- **Updates.** New versions are pushed to GitHub as now; the server pulls them (read-only deploy key) and
-  restarts the service.
+- **Updates.** The laptop's git has a second remote, `cloud` (`leadspilot-cloud:leadspilot.git`, a bare
+  repository on the server). `git push cloud main` after pushing to GitHub: the repository's
+  `post-receive` hook checks the code out into `~/leadspilot-engine`, installs changed requirements, runs
+  `npm ci` for the worker and restarts the service. The server never needs a GitHub login.
 
 ## 5. Moving the sending to the cloud
 
