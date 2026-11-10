@@ -134,6 +134,32 @@ async def test_a_blocked_search_stops_it_and_a_lost_one_is_searched_again(tmp_pa
     assert "Google blocked" in pilot.state.stopped
 
 
+async def test_a_failed_search_is_searched_again_once(tmp_path):
+    pilot, _, jobs, activity, clock = make_autopilot(tmp_path)
+    pilot.update(AutopilotUpdate(searches_per_day=5))
+
+    async def fail():
+        job = jobs.get(pilot.state.runs[-1].job_id)
+        job.status, job.error, job.finished_at = JobStatus.FAILED, "TargetClosedError: browser closed", clock()
+        await pilot.job_finished(job)
+        clock.advance(minutes=1)
+        await pilot.tick()
+
+    await pilot.tick()
+    await fail()                                        # e.g. the browser didn't survive the laptop sleeping
+    assert [r.place for r in pilot.state.runs] == ["Katy, TX", "Katy, TX"]
+    assert pilot.state.runs[0].note.endswith("- it is searched again")
+    assert activity.entries()[1]["what"] == "Search stopped"
+    await fail()                                        # twice in a row: on to the next place
+    assert [r.place for r in pilot.state.runs] == ["Katy, TX", "Katy, TX", "Pearland, TX"]
+    assert not pilot.state.runs[1].note.endswith("searched again")
+    # a search cancelled on purpose isn't searched again
+    job = jobs.get(pilot.state.runs[-1].job_id)
+    job.status, job.finished_at = JobStatus.CANCELLED, clock()
+    await pilot.job_finished(job)
+    assert pilot.status()["next"] == "" and not pilot.state.runs[-1].failed
+
+
 def test_editing_the_places_keeps_the_next_one(tmp_path):
     pilot, *_ = make_autopilot(tmp_path)
     pilot.state.next_place = 1                          # Pearland next

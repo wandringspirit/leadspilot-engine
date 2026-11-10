@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.18.3 – 2026-11-11
+
+### Fixed
+- **A search that fails with an error is searched again** instead of the autopilot quietly moving on to the
+  next place - for instance when the browser didn't survive the laptop sleeping. Once: a place whose search
+  fails twice in a row is skipped, so one bad place can't use up every day's searches.
+
 ## 1.18.2 – 2026-11-11
 
 ### Fixed

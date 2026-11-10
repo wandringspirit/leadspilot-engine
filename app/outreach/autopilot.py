@@ -43,6 +43,9 @@ TICK_S = 60
 BOUNCE_WINDOW = 20
 BOUNCE_LIMIT = 2
 RUNS_KEPT = 200
+#: a search that ended this way is searched again (once; a second failure in a row moves on to the next place),
+#: e.g. the browser didn't survive the laptop sleeping. A cancelled search was stopped on purpose.
+RETRIED = {JobStatus.FAILED, JobStatus.INTERRUPTED}
 
 #: Texas first: Houston's suburbs, Dallas–Fort Worth, San Antonio, Austin
 DEFAULT_PLACES = [
@@ -68,6 +71,7 @@ class AutopilotRun(BaseModel):
     campaign_id: str = ""
     emailing: int = 0                    # of them, in the campaign
     note: str = ""
+    failed: bool = False                 # ended with an error (RETRIED): searched again once
 
 
 class AutopilotState(BaseModel):
@@ -292,6 +296,15 @@ class Autopilot:
         if changed:
             self._save()
 
+    def _requeue(self, run: AutopilotRun) -> bool:
+        """Put a failed search's place first in line again - unless its previous search failed too."""
+        run.failed = True
+        earlier = [r for r in self.state.runs if r.place == run.place and r is not run]
+        if earlier and earlier[-1].failed or run.place not in self.state.places:
+            return False
+        self.state.next_place = min(self.state.next_place, self.state.places.index(run.place))
+        return True
+
     def _recent_bounces(self) -> int:
         since = self.state.on_since
         emailed = [lead for c in self.outreach.campaigns.values() for lead in c.leads
@@ -327,6 +340,8 @@ class Autopilot:
             return
         if job.status != JobStatus.COMPLETED:
             run.note = f"the search {job.status.value}" + (f": {job.error}" if job.error else "")
+            if job.status in RETRIED and self._requeue(run):
+                run.note += " - it is searched again"
             self._save()
             self.activity.add("Search stopped", f"{job.query}: {run.note}")
             return
