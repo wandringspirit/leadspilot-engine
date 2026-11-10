@@ -7,6 +7,7 @@
 | Double-clicking `start.bat` says *Python 3.11 or newer is needed* | Install it from <https://www.python.org/downloads/>, tick *Add python.exe to PATH*, then double-click `start.bat` again. |
 | *Installing failed* in the start window | usually no internet connection, or a proxy; the lines above it say which package. Fix that, then start again; `start.bat --reinstall` installs everything once more. |
 | The desktop shortcut is missing, or does nothing after the folder moved | `start.bat --shortcut` (from a terminal in the project folder) makes it again. |
+| *Restart* (or Stop) during a search: the log says *Shutting down* but the panel never comes back | fixed in 1.18.2: the search's browser kept the old process alive. Close the panel's window and start it again with the shortcut; the search shows *interrupted* - run it again. |
 | *The websites couldn't be uploaded: PermissionError: [WinError 5] Access is denied* | fixed in 1.12.0: a read-only folder in `data/deploy/public` couldn't be emptied. Restart the panel. |
 | `playwright: command not found` / `Executable doesn't exist at …chrome-win…` | Run `python -m playwright install chromium` inside the activated virtual environment (or `start.bat --reinstall`). |
 | Linux: Chromium fails to start with missing `libnss3` / `libatk` … | `python -m playwright install-deps chromium` (needs sudo) |

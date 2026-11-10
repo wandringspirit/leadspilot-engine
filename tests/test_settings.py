@@ -266,3 +266,25 @@ def test_the_launcher_finds_a_running_panel_and_stops_it():
     assert start.panel_version(url) is None and not start.port_taken(url)
     with start.ctrl_c_as_key() as pressed:                                       # no key pressed in a test run
         assert pressed() is False
+
+
+def test_exit_if_stuck_ends_a_lingering_process_only_under_run_py(monkeypatch):
+    import app.control as control_module
+    from app.control import ServerControl
+
+    exits: list[int] = []
+    done = threading.Event()
+
+    def fake_exit(code):
+        exits.append(code)
+        done.set()
+
+    monkeypatch.setattr(control_module.os, "_exit", fake_exit)
+    ctl = ServerControl()
+    ctl.server = FakeServer()
+    ctl.exit_if_stuck(after=0.01)                 # tests and --reload: never
+    assert not done.wait(0.2) and exits == []
+    ctl.owns_process = True
+    ctl.exit_code = RESTART_CODE
+    ctl.exit_if_stuck(after=0.01)
+    assert done.wait(2) and exits == [RESTART_CODE]   # start.py still sees "start me again"

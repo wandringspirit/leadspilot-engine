@@ -64,6 +64,7 @@ async def lifespan(_: FastAPI):
     if site_requests is not None:
         site_requests.start_loop()
     yield
+    await manager.shutdown()                    # first, while Playwright still answers (see JobManager.shutdown)
     if site_requests is not None:
         await site_requests.stop_loop()
     if visits is not None:
@@ -76,6 +77,7 @@ async def lifespan(_: FastAPI):
     if settings.KEEP_AWAKE:
         keep_awake(False)
     log.info("Shutting down")
+    control.exit_if_stuck()
 
 
 app = FastAPI(

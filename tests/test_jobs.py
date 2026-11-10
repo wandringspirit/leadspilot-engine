@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import AsyncExitStack
 
 import app.jobs as jobs
@@ -384,3 +385,55 @@ def test_notice_after_several_places():
                            "4 of them match")
     assert text.endswith("Some searches hit Google's limit of about 120 results — search the whole area "
                          "(section by section) to find more.")
+
+
+class _HangingScraper:
+    """A search that runs until it is cancelled, and closes its 'browser' when it is."""
+
+    closed = False
+
+    def __init__(self, cfg, *, headless=None, on_progress=None, on_row=None):
+        from app.scraper.maps import ScrapeStats
+        self.stats = ScrapeStats()
+
+    async def scrape(self, query, limit, *, selector=None):
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await asyncio.sleep(0)               # the real scraper awaits Playwright here
+            type(self).closed = True
+
+
+def test_shutdown_stops_a_running_search_as_interrupted(tmp_path, monkeypatch):
+    monkeypatch.setattr(jobs, "MapsScraper", _HangingScraper)
+    cfg = Settings(DATA_DIR=tmp_path)
+    cfg.jobs_dir.mkdir(parents=True, exist_ok=True)
+    finished: list[str] = []
+
+    async def scenario():
+        manager = jobs.JobManager(cfg)
+
+        async def on_finished(job):
+            finished.append(job.id)
+
+        manager.on_finished = on_finished
+        job = manager.create_scrape("roofing in Katy, TX", 5)
+        for _ in range(20):                      # let the search start
+            await asyncio.sleep(0)
+        await manager.shutdown(timeout=5)
+        await asyncio.sleep(0)
+        return job, manager
+
+    job, manager = asyncio.run(scenario())
+    assert _HangingScraper.closed
+    assert job.status.value == "interrupted"
+    assert job.progress.message == "Server restarted while the job was running"
+    assert finished == []                        # no campaign or upload for a search cut short
+    assert not manager._tasks
+    assert jobs.JobManager(cfg).jobs[job.id].status.value == "interrupted"
+
+
+def test_shutdown_without_running_jobs_returns_at_once(tmp_path):
+    cfg = Settings(DATA_DIR=tmp_path)
+    cfg.jobs_dir.mkdir(parents=True, exist_ok=True)
+    asyncio.run(jobs.JobManager(cfg).shutdown())

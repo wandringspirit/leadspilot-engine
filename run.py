@@ -33,6 +33,7 @@ def main() -> int:
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="info",
                                            access_log=args.access_log))
     control.server = server                    # the panel's Stop / Restart buttons
+    control.owns_process = True                # ... and nothing left over keeps a stopped panel running
     try:
         server.run()                           # exits the process with 3 when it can't start (port taken ...)
     except KeyboardInterrupt:                  # uvicorn raises Ctrl+C again once it has shut down cleanly

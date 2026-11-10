@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.18.2 – 2026-11-11
+
+### Fixed
+- **Restart (or Stop) during a search no longer hangs the panel.** The log said *Shutting down*, but the
+  process never ended, so the panel didn't come back: when the server's event loop ended, Python cancelled
+  Playwright's own connection to the browser together with the search, and the search then waited forever
+  for its browser to close. Running searches and email lookups now stop first, while the browser still
+  answers (a search stopped this way is saved as *interrupted*, as after any restart), and a process still
+  running 10 seconds after the panel has shut down is ended anyway.
+
 ## 1.18.1 – 2026-11-10
 
 ### Added

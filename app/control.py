@@ -8,10 +8,13 @@ installed.
 """
 from __future__ import annotations
 
+import logging
 import os
+import threading
 from typing import Protocol
 
 RESTART_CODE = 75                          # run.py's exit code for "start me again" (uvicorn uses 3 for failures)
+EXIT_GRACE_S = 10.0                        # how long the process may linger after the app has shut down
 LAUNCHER_ENV = "LEAD_CRAWLER_LAUNCHER"     # start.py sets it to "1" for the server it runs
 
 
@@ -23,6 +26,7 @@ class ServerControl:
     def __init__(self) -> None:
         self.server: _Server | None = None     # set by run.py; None when started some other way
         self.exit_code = 0
+        self.owns_process = False              # run.py: this server is the whole process (exit_if_stuck)
 
     @property
     def can_stop(self) -> bool:
@@ -38,6 +42,30 @@ class ServerControl:
             raise RuntimeError("the server was not started with run.py")
         self.exit_code = RESTART_CODE if restart else 0
         self.server.should_exit = True             # uvicorn finishes the open requests, then shuts down
+
+    def exit_if_stuck(self, after: float = EXIT_GRACE_S) -> None:
+        """Called once the app has shut down: end the process ``after`` seconds later if it still runs.
+
+        Something left over (a browser, a thread) must never keep a stopped panel alive - start.py only
+        starts it again once this process has ended. Does nothing unless run.py started the server (tests,
+        ``--reload``).
+        """
+        if not self.owns_process:
+            return
+
+        def force() -> None:
+            log = logging.getLogger(__name__)
+            log.warning("Still running %.0fs after shutting down - ending the process", after)
+            for handler in logging.getLogger().handlers:
+                try:
+                    handler.flush()
+                except Exception:  # noqa: BLE001 - exiting anyway
+                    pass
+            os._exit(self.exit_code)
+
+        timer = threading.Timer(after, force)
+        timer.daemon = True                        # a process that ends by itself doesn't wait for it
+        timer.start()
 
 
 def browse_url(host: str, port: int) -> str:

@@ -101,7 +101,7 @@ flowchart LR
 | --- | --- | --- |
 | **Settings** | `app/config.py` | Typed configuration from environment / `.env` (pydantic-settings). |
 | **Settings tab** | `app/settings_editor.py` | Every setting's group, label and help; reads `.env`, writes only the lines that change, validates, and puts new values into the running `settings` object (the few read only at start-up wait for a restart). |
-| **Server control** | `app/control.py`, `run.py`, `start.py` | Stop and Restart from the panel: `run.py` hands its uvicorn server to `control`; `start.py` restarts it when it exits with `RESTART_CODE`. |
+| **Server control** | `app/control.py`, `run.py`, `start.py` | Stop and Restart from the panel: `run.py` hands its uvicorn server to `control`; `start.py` restarts it when it exits with `RESTART_CODE`. On the way out the running searches stop first (`JobManager.shutdown`, while Playwright still answers; saved as *interrupted*), and a process still alive 10 s after the app has shut down is ended (`control.exit_if_stuck`), so a Restart never hangs. |
 | **Models** | `app/models.py` | `PlaceRow` (one output row), `Job` (a search – business, place, filters – with its rows, status, progress and notice), request bodies. |
 | **Filters** | `app/filters.py` | `SearchFilters`: the *Website* and *Must have* rules as pure functions (used on the feed, on scraped places and to decide when an email lookup can help). |
 | **API** | `app/main.py` | REST routes, CSV download, static panel, cache headers. |

@@ -50,6 +50,7 @@ class JobManager:
         # the CSV to Google Drive with it
         self.on_finished: Callable[[Job], Awaitable[None]] | None = None
         self._hooks: set[asyncio.Task] = set()
+        self._shutting_down = False
         self._load_from_disk()
 
     # ------------------------------------------------------------------
@@ -183,9 +184,14 @@ class JobManager:
                 log.info("Job %s %s: %d row(s) in %.1fs", job.id, job.status.value, len(job.rows),
                          asyncio.get_event_loop().time() - started)
             except asyncio.CancelledError:
-                job.status = JobStatus.CANCELLED
-                job.progress.message = f"Cancelled with {len(job.rows)} rows collected"
-                log.warning("Job %s cancelled with %d row(s) collected", job.id, len(job.rows))
+                if self._shutting_down:                  # as if the job file were loaded after a restart
+                    job.status = JobStatus.INTERRUPTED
+                    job.progress.message = "Server restarted while the job was running"
+                    log.warning("Job %s stopped by the shutdown with %d row(s) collected", job.id, len(job.rows))
+                else:
+                    job.status = JobStatus.CANCELLED
+                    job.progress.message = f"Cancelled with {len(job.rows)} rows collected"
+                    log.warning("Job %s cancelled with %d row(s) collected", job.id, len(job.rows))
             except Exception as exc:  # noqa: BLE001
                 log.exception("Job %s failed: %s", job.id, exc)
                 job.status = JobStatus.FAILED
@@ -199,7 +205,7 @@ class JobManager:
 
     def _finished(self, job: Job) -> None:
         """Run ``on_finished`` for a job in a task of its own - it must never hold up or break the job."""
-        if self.on_finished is None:
+        if self.on_finished is None or self._shutting_down:
             return
 
         async def call() -> None:
@@ -219,6 +225,25 @@ class JobManager:
             task.cancel()
             return True
         return False
+
+    async def shutdown(self, timeout: float = 15.0) -> None:
+        """Stop the running searches and enrichments before the server's event loop ends.
+
+        They must stop while Playwright still works: when the loop ends, asyncio cancels every task at once,
+        Playwright's own connection to the browser among them, and a search closing its browser then waits
+        for an answer that never comes - the process never exits. A search stopped here is saved as
+        *interrupted*, as if the server had restarted, and its finished-job hook doesn't run.
+        """
+        self._shutting_down = True
+        tasks = [task for task in self._tasks.values() if not task.done()]
+        if not tasks:
+            return
+        log.info("Stopping %d running job(s) before shutting down", len(tasks))
+        for task in tasks:
+            task.cancel()
+        _, pending = await asyncio.wait(tasks, timeout=timeout)
+        if pending:
+            log.warning("%d job(s) didn't stop within %.0fs", len(pending), timeout)
 
     # ------------------------------------------------------------------
     # Enrichment
