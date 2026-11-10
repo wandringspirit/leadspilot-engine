@@ -88,7 +88,9 @@ The crawler talks to the Drive REST API with **your own OAuth client** (type *De
    `data/google_drive.json`. The file is git-ignored; treat it like a password.
 4. Access tokens are renewed automatically every hour. If Google refuses the refresh token, for
    example because it was revoked or the app stayed in *Testing* for more than 7 days, the file is
-   deleted and the panel asks you to connect again.
+   deleted and the panel asks you to connect again. You also get an email about it (*[Leads Pilot] Google
+   Drive disconnected*, to the campaigns' From address) and the activity log says *Google Drive
+   disconnected* – until you connect again, nothing is uploaded.
 
 The scope is **full Drive access** (`https://www.googleapis.com/auth/drive`). The narrower
 *"files this app created"* scope can't write into folders you made or read lead files you put

@@ -25,6 +25,7 @@ import time
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Callable
 from urllib.parse import urlencode
 
 import httpx
@@ -85,6 +86,7 @@ def _quote(value: str) -> str:
 class DriveClient:
     def __init__(self, cfg: Settings, *, transport: httpx.AsyncBaseTransport | None = None,
                  token_file: Path | None = None, clock=time.time) -> None:
+        self.on_lost: Callable[[], None] | None = None   # Google ended the sign-in (main.py emails you)
         self.cfg = cfg
         self.token_file = token_file or cfg.DATA_DIR / "google_drive.json"
         self._transport = transport
@@ -192,6 +194,12 @@ class DriveClient:
                     self.token = None
                     with suppress(OSError):
                         self.token_file.unlink(missing_ok=True)
+                    log.warning("Google Drive: Google ended the sign-in (expired or revoked) - connect it again")
+                    if self.on_lost is not None:
+                        try:
+                            self.on_lost()
+                        except Exception:  # noqa: BLE001 - telling you must not break the Drive call's error
+                            log.exception("Google Drive: could not report the lost sign-in")
                 raise DriveAuthError("Google refused the sign-in (it expired or was revoked) - connect Google Drive "
                                      "again")
             raise DriveError(f"Google refused the sign-in: {error} {data.get('error_description', '')}".strip())

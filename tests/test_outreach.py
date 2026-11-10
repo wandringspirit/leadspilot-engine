@@ -771,3 +771,15 @@ def test_a_business_that_replied_is_watched_45_days_after_it_last_wrote(tmp_path
     assert (lead.id in [item.id for _, item in manager._watched(clock.now)])
     clock.now = TUESDAY_9AM + timedelta(days=76)
     assert (lead.id not in [item.id for _, item in manager._watched(clock.now)])
+
+
+async def test_email_me_sends_a_note_to_yourself(tmp_path):
+    from app.outreach.mailbox import MailError
+
+    manager, mailbox = make_manager(tmp_path)
+    assert await manager.email_me("Google Drive disconnected", "Connect it again.")
+    note = mailbox.sent[-1]
+    assert note["Subject"] == "[Leads Pilot] Google Drive disconnected"
+    assert note["To"] in note["From"]                       # to the From address
+    mailbox.send_error = MailError("server down")
+    assert not await manager.email_me("Google Drive disconnected", "Connect it again.")

@@ -115,6 +115,10 @@ flowchart LR
 - **Settings, Stop and Restart** in the cloud panel work at the names in `TRUSTED_HOSTS` – the tunnel
   connects from the server itself, and Access has already checked who you are. Never list a name there
   that has no login in front of it.
+- **Google Drive.** Google only sends its sign-in back to `127.0.0.1`, so the cloud panel can't connect
+  Drive itself: the sign-in (`data/google_drive.json`) is copied from the laptop. If Google ends it (you get
+  the *Google Drive disconnected* email), connect on the laptop and copy the file again – or publish the
+  Google app so it doesn't end every 7 days ([PLAYBOOK.md](PLAYBOOK.md) step 2).
 - **Updates.** New versions are pushed to GitHub as now; the server pulls them (read-only deploy key) and
   restarts the service.
 

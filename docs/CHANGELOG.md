@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.1 – 2026-11-11
+
+### Added
+- **An email when Google Drive disconnects.** When Google ends the Drive sign-in (it expired or was revoked -
+  every 7 days while the Google app is in *Testing*), you get *[Leads Pilot] Google Drive disconnected* at the
+  campaigns' From address, and the activity log says so. Before, only the panel's Setup list and the log
+  showed it, and searches and campaign results quietly stopped uploading.
+
 ## 1.19.0 – 2026-11-11
 
 ### Added

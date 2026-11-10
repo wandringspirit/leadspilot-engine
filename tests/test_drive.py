@@ -186,11 +186,16 @@ def test_expired_access_token_is_refreshed(tmp_path):
 def test_revoked_sign_in(tmp_path):
     google = FakeGoogle()
     client = signed_in(tmp_path, google)
+    lost: list[bool] = []
+    client.on_lost = lambda: lost.append(True)
     client.token.refresh_token = "revoked"
     client.token.expires_at = 0
     with pytest.raises(DriveAuthError, match="connect Google Drive again"):
         run(client.get_file("anything"))
-    assert not client.connected
+    assert not client.connected and lost == [True]           # reported once: the sign-in is forgotten now
+    with pytest.raises(DriveAuthError):
+        run(client.get_file("anything"))
+    assert lost == [True]
 
 
 # --------------------------------------------------------------------------
