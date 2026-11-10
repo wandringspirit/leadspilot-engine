@@ -84,6 +84,7 @@ class DriveSync:
         return {
             "configured": self.client.configured,
             "connected": self.connected,
+            "lost_at": "" if self.connected else self.client.lost_at,   # Google ended the sign-in then
             "email": self.client.email,
             "folder": self.cfg.DRIVE_FOLDER.strip() or "My Drive",
             "auto_upload": self.cfg.DRIVE_AUTO_UPLOAD,

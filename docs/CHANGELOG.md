@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.2 – 2026-11-11
+
+### Added
+- **A banner when Google Drive disconnects.** When Google ends the Drive sign-in, every tab of the panel shows a
+  red *Google Drive is disconnected* banner with a *Connect Google Drive* button, and the browser tab's title
+  starts with *⚠ Google Drive disconnected* - visible even when the panel is a background tab. It stays until
+  you connect again (or press *Disconnect*), also across restarts; `GET /api/drive` has `lost_at`.
+
 ## 1.19.1 – 2026-11-11
 
 ### Added

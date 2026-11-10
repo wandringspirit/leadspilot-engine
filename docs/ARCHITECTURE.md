@@ -309,6 +309,7 @@ data/
   business_types.json       the business types and their emails (after the first change)
   contacted.json            every address that got a first email - never emailed again
   google_drive.json         the Google Drive sign-in (a refresh token - keep it private)
+  google_drive_lost.json    when Google ended that sign-in - the panel's red banner until you connect again
 ```
 
 Nothing else is stored. Deleting `data/` resets the application – including the list of

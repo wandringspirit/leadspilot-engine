@@ -196,6 +196,9 @@ def test_revoked_sign_in(tmp_path):
     with pytest.raises(DriveAuthError):
         run(client.get_file("anything"))
     assert lost == [True]
+    assert client.lost_at and client.lost_file.is_file()      # the panel's banner, also after a restart
+    run(client.disconnect())                                   # you acted on it: the banner goes
+    assert not client.lost_at and not client.lost_file.exists()
 
 
 # --------------------------------------------------------------------------

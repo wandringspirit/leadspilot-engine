@@ -22,6 +22,7 @@ import re
 import secrets
 import tempfile
 import time
+from datetime import datetime, timezone
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -89,10 +90,12 @@ class DriveClient:
         self.on_lost: Callable[[], None] | None = None   # Google ended the sign-in (main.py emails you)
         self.cfg = cfg
         self.token_file = token_file or cfg.DATA_DIR / "google_drive.json"
+        self.lost_file = self.token_file.with_name(self.token_file.stem + "_lost.json")
         self._transport = transport
         self._clock = clock
         self._pending: dict[str, tuple[str, str, float]] = {}   # state -> (code verifier, redirect uri, when)
         self.token: Token | None = self._load()
+        self.lost_at: str = self._load_lost()      # when Google ended the sign-in ('' = it didn't) - the panel's banner
 
     # ------------------------------------------------------------------
     # Sign-in
@@ -151,14 +154,30 @@ class DriveClient:
         about = (await self.request("GET", f"{API}/about", params={"fields": "user(emailAddress)"})).json()
         self.token.email = about.get("user", {}).get("emailAddress", "")
         self._save()
+        self._set_lost("")
         log.info("Google Drive connected (%s)", self.token.email or "account without an email")
         return self.token.email
+
+    def _load_lost(self) -> str:
+        try:
+            return str(json.loads(self.lost_file.read_text(encoding="utf-8")).get("at", ""))
+        except (OSError, ValueError, AttributeError):
+            return ""
+
+    def _set_lost(self, at: str) -> None:
+        self.lost_at = at
+        with suppress(OSError):
+            if at:
+                self.lost_file.write_text(json.dumps({"at": at}), encoding="utf-8")
+            else:
+                self.lost_file.unlink(missing_ok=True)
 
     async def disconnect(self) -> None:
         """Forget the sign-in, and tell Google to revoke it (best effort)."""
         token, self.token = self.token, None
         with suppress(OSError):
             self.token_file.unlink(missing_ok=True)
+        self._set_lost("")                          # you did it: no banner
         if token and token.refresh_token:
             with suppress(httpx.HTTPError):
                 async with self._http() as http:
@@ -195,6 +214,7 @@ class DriveClient:
                     with suppress(OSError):
                         self.token_file.unlink(missing_ok=True)
                     log.warning("Google Drive: Google ended the sign-in (expired or revoked) - connect it again")
+                    self._set_lost(datetime.now(timezone.utc).isoformat(timespec="seconds"))
                     if self.on_lost is not None:
                         try:
                             self.on_lost()

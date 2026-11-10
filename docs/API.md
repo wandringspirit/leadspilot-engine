@@ -39,7 +39,7 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | POST | `/api/campaigns/{campaign_id}/test` | send one of its emails to yourself |
 | PATCH | `/api/campaigns/{campaign_id}/leads/{lead_id}` | rename a business in the emails, leave it out / include it |
 | POST | `/api/campaigns/{campaign_id}/drive` | upload its results to Google Drive now |
-| GET | `/api/drive` | Google Drive: set up? connected as whom? which folder? |
+| GET | `/api/drive` | Google Drive: set up? connected as whom? which folder? when Google ended the sign-in (`lost_at`) |
 | POST | `/api/drive/connect` | the Google consent page to open |
 | POST | `/api/drive/disconnect` | forget (and revoke) the Drive sign-in |
 | GET | `/api/drive/files` | lead files in a business type's Drive folder |
@@ -466,11 +466,12 @@ unless the reply says no. The change goes online with the next upload, about 30 
 
 Setting it up: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive); folders and files: [DRIVE.md](DRIVE.md).
 
-- `GET /api/drive` → `{"configured": true, "connected": true, "email": "pat@gmail.com",
+- `GET /api/drive` → `{"configured": true, "connected": true, "lost_at": "", "email": "pat@gmail.com",
   "folder": "Leads", "auto_upload": true, "problems": [], "last_error": "", "master": {"campaigns":
   {"name", "link", "at"}, "activity": {…}}, "sheets_off": "…"}` – `master`: where the master sheet
   went: `{"sheet": {…}}` (the Google Sheet) or the two CSV files, with `sheets_off` saying why
-  (the Google Sheets API is off).
+  (the Google Sheets API is off). `lost_at`: when Google ended the sign-in (expired or revoked) while it's
+  not connected again - the panel's red banner; `""` otherwise.
 - `POST /api/drive/connect` → `{"auth_url": "https://accounts.google.com/o/oauth2/v2/auth?…"}` –
   open it in the browser; Google sends the browser back to `/` of this server, which stores the
   sign-in and redirects to `/?drive=connected#outreach` (or `/?drive=error&message=…`). `400` when

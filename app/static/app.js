@@ -284,6 +284,7 @@
 
   async function refreshDrive() {
     try { state.drive = await api("/api/drive"); } catch { state.drive = null; }
+    showDriveAlert(state.drive);
     updateBusinessHint();
     if (state.current) setToolbar(state.current.rows.length > 0, ACTIVE.has(state.current.status));
   }
@@ -928,6 +929,27 @@
     setLogsCollapsed(collapsed);
     startLogPolling();
   }
+
+  // ------------------------------------------------------------------
+  // Google ended the Drive sign-in: a banner on every tab, ⚠ in the browser tab's title
+  // ------------------------------------------------------------------
+  const TITLE = document.title;
+  function showDriveAlert(drive) {
+    const lost = Boolean(drive && drive.lost_at && !drive.connected);
+    $("drive-alert").hidden = !lost;
+    document.title = lost ? `⚠ Google Drive disconnected – ${TITLE}` : TITLE;
+    if (lost) {
+      $("drive-alert-text").textContent = `Google ended the sign-in on ${fmtDate(drive.lost_at)}. Searches and `
+        + "campaign results aren't uploaded until you connect it again.";
+    }
+  }
+  $("drive-alert-connect").addEventListener("click", async () => {
+    try {
+      const { auth_url: url } = await api("/api/drive/connect", { method: "POST" });
+      location.href = url;               // Google sends the browser back to this panel
+    } catch (err) { toast(err.message, true); }
+  });
+  setInterval(() => { if (!document.hidden) refreshDrive(); }, 60000);
 
   // shared with outreach.js (loaded after this file)
   window.panel = {

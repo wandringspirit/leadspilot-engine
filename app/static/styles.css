@@ -193,6 +193,12 @@ kbd {
 .notice.alert .notice-icon { background: var(--danger); font-style: normal; }
 .notice.alert strong { display: block; margin-bottom: 2px; color: var(--danger); }
 
+/* Google ended the Drive sign-in: on every tab until it's connected again */
+.global-alert { align-items: center; max-width: 1400px; margin: 12px auto 0; width: calc(100% - 32px); box-sizing: border-box; }
+.global-alert-text { flex: 1 1 auto; min-width: 0; }
+.global-alert .btn { flex: 0 0 auto; }
+@media (max-width: 640px) { .global-alert { flex-wrap: wrap; } }
+
 /* ---------- toolbar + table ---------- */
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .toolbar input[type=search] { width: 180px; padding: 7px 10px; }
