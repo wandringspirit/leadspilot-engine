@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.18.4 – 2026-11-11
+
+### Changed
+- **A place whose autopilot search fails is skipped after three failures in a row** instead of two.
+
 ## 1.18.3 – 2026-11-11
 
 ### Fixed

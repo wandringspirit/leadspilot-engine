@@ -134,7 +134,7 @@ async def test_a_blocked_search_stops_it_and_a_lost_one_is_searched_again(tmp_pa
     assert "Google blocked" in pilot.state.stopped
 
 
-async def test_a_failed_search_is_searched_again_once(tmp_path):
+async def test_a_failed_search_is_searched_again_up_to_three_times(tmp_path):
     pilot, _, jobs, activity, clock = make_autopilot(tmp_path)
     pilot.update(AutopilotUpdate(searches_per_day=5))
 
@@ -150,9 +150,11 @@ async def test_a_failed_search_is_searched_again_once(tmp_path):
     assert [r.place for r in pilot.state.runs] == ["Katy, TX", "Katy, TX"]
     assert pilot.state.runs[0].note.endswith("- it is searched again")
     assert activity.entries()[1]["what"] == "Search stopped"
-    await fail()                                        # twice in a row: on to the next place
-    assert [r.place for r in pilot.state.runs] == ["Katy, TX", "Katy, TX", "Pearland, TX"]
-    assert not pilot.state.runs[1].note.endswith("searched again")
+    await fail()                                        # twice: still searched again
+    assert [r.place for r in pilot.state.runs] == ["Katy, TX"] * 3
+    await fail()                                        # three times in a row: on to the next place
+    assert [r.place for r in pilot.state.runs] == ["Katy, TX"] * 3 + ["Pearland, TX"]
+    assert not pilot.state.runs[2].note.endswith("searched again")
     # a search cancelled on purpose isn't searched again
     job = jobs.get(pilot.state.runs[-1].job_id)
     job.status, job.finished_at = JobStatus.CANCELLED, clock()

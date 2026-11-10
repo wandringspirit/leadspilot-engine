@@ -54,7 +54,7 @@ The autopilot switches itself off, says why, and writes it in the activity log w
 - **Google blocked a search** (its *unusual traffic* check). Wait a day, then switch it on again.
 - every place on the list has been searched, or its business type was deleted.
 
-A search that didn't finish (the panel was closed during it) is searched again. So is one that failed with an error (say the browser didn't survive the laptop sleeping) - once: when that place's search fails twice in a row, the next place is searched. A search you cancelled isn't searched again. Each try counts toward the searches a day.
+A search that didn't finish (the panel was closed during it) is searched again. So is one that failed with an error (say the browser didn't survive the laptop sleeping), until it has failed three times in a row: then the next place is searched. A search you cancelled isn't searched again. Each try counts toward the searches a day.
 
 ### Every day, on its own
 

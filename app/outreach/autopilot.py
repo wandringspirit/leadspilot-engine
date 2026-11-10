@@ -43,9 +43,11 @@ TICK_S = 60
 BOUNCE_WINDOW = 20
 BOUNCE_LIMIT = 2
 RUNS_KEPT = 200
-#: a search that ended this way is searched again (once; a second failure in a row moves on to the next place),
-#: e.g. the browser didn't survive the laptop sleeping. A cancelled search was stopped on purpose.
+#: a search that ended this way is searched again (e.g. the browser didn't survive the laptop sleeping) - until
+#: FAILS_BEFORE_SKIP of that place's searches in a row failed: then the next place. A cancelled search was
+#: stopped on purpose.
 RETRIED = {JobStatus.FAILED, JobStatus.INTERRUPTED}
+FAILS_BEFORE_SKIP = 3
 
 #: Texas first: Houston's suburbs, Dallas–Fort Worth, San Antonio, Austin
 DEFAULT_PLACES = [
@@ -297,10 +299,14 @@ class Autopilot:
             self._save()
 
     def _requeue(self, run: AutopilotRun) -> bool:
-        """Put a failed search's place first in line again - unless its previous search failed too."""
+        """Put a failed search's place first in line again - unless FAILS_BEFORE_SKIP in a row have failed."""
         run.failed = True
-        earlier = [r for r in self.state.runs if r.place == run.place and r is not run]
-        if earlier and earlier[-1].failed or run.place not in self.state.places:
+        fails = 0
+        for earlier in reversed([r for r in self.state.runs if r.place == run.place]):
+            if not earlier.failed:
+                break
+            fails += 1
+        if fails >= FAILS_BEFORE_SKIP or run.place not in self.state.places:
             return False
         self.state.next_place = min(self.state.next_place, self.state.places.index(run.place))
         return True
