@@ -112,7 +112,7 @@ The laptop (`ROLE=searcher`) says what's wrong in `GET /api/remote` and once in 
 | Searches stay *Waiting for the search computer* | the laptop is off, asleep, or its panel isn't `ROLE=searcher` | open the laptop; its panel starts with Windows |
 | A search ends *"The search computer stopped reporting"* | the laptop slept or went offline mid-search for 20 minutes | nothing: the autopilot searches the place again (three failures in a row: it moves on) |
 | The laptop logs *"the cloud server didn't take …"* | the search was cancelled there or given up on before the result arrived | nothing – it was searched again |
-| Settings / Stop / Restart answer `403` in the cloud panel | its name isn't in `TRUSTED_HOSTS` | add it (only a name behind Cloudflare Access) |
+| Settings / Stop / Restart answer `403` in the cloud panel | its name isn't in `TRUSTED_HOSTS`, or the panel trusts forwarded headers (before 1.19.4) | add it (only a name behind Cloudflare Access); update the server (`git push cloud main`) |
 
 ## Where to look
 

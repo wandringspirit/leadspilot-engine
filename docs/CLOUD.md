@@ -86,7 +86,9 @@ wrong token, `401`.
 ## 4. The cloud server
 
 > **Status:** the server and the panel service are running (`ROLE=sender`, sending off, no mailbox login,
-> autopilot off – it can't email anyone). The tunnel and the login come next; then the move (§5).
+> autopilot off – it can't email anyone). The panel is online at `https://panel.leadspilot.co` behind
+> Cloudflare Access (application *Leads Pilot panel*, policy *Me*: your email, a one-time code, 1-month
+> session; `TRUSTED_HOSTS=panel.leadspilot.co`). Next: the laptop's service token, then the move (§5).
 
 What runs where:
 

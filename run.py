@@ -25,13 +25,16 @@ def main() -> int:
     args = parser.parse_args()
     if args.reload:
         uvicorn.run("app.main:app", host=args.host, port=args.port, reload=True, log_level="info",
-                    access_log=args.access_log)
+                    access_log=args.access_log, proxy_headers=False)
         return 0
 
     from app.main import app
 
+    # proxy_headers=False: the request's client stays the one that connected. With uvicorn's default, a
+    # Cloudflare Tunnel's X-Forwarded-For (it connects from 127.0.0.1) made it the visitor's address, and
+    # Settings, Stop and Restart refused the cloud panel at TRUSTED_HOSTS (main._this_computer).
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="info",
-                                           access_log=args.access_log))
+                                           access_log=args.access_log, proxy_headers=False))
     control.server = server                    # the panel's Stop / Restart buttons
     control.owns_process = True                # ... and nothing left over keeps a stopped panel running
     try:

@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.4 – 2026-11-11
+
+### Fixed
+- **Settings, Stop and Restart in the cloud panel** (`https://panel.leadspilot.co`, `TRUSTED_HOSTS`) said *only
+  the panel opened on this computer can do this*: uvicorn took the Cloudflare Tunnel's `X-Forwarded-For` as the
+  visitor's address. The panel now ignores forwarded headers (`run.py`, `proxy_headers=False`).
+
 ## 1.19.3 – 2026-11-11
 
 ### Added
