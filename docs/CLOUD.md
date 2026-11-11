@@ -88,7 +88,8 @@ wrong token, `401`.
 > **Status:** the server and the panel service are running (`ROLE=sender`, sending off, no mailbox login,
 > autopilot off – it can't email anyone). The panel is online at `https://panel.leadspilot.co` behind
 > Cloudflare Access (application *Leads Pilot panel*, policy *Me*: your email, a one-time code, 1-month
-> session; `TRUSTED_HOSTS=panel.leadspilot.co`). Next: the laptop's service token, then the move (§5).
+> session; `TRUSTED_HOSTS=panel.leadspilot.co`). The laptop's service token (policy *Laptop*, token
+> `laptop-searcher`) gets past the login. Next: the move (§5).
 
 What runs where:
 
@@ -102,10 +103,16 @@ flowchart LR
 ```
 
 - **Server.** Oracle Cloud *Always Free*, home region Mumbai: `VM.Standard.A1.Flex` (Ampere ARM),
-  1 OCPU, 6 GB memory, Ubuntu 24.04, 47 GB boot volume, an ephemeral public IP. The account is on *Pay As
-  You Go* so Oracle doesn't reclaim the idle server, with a 1 USD budget alert at 1 % so any charge is
-  noticed at once. Only the SSH port is open (Oracle's iptables rules); unattended upgrades are on; the
-  time zone is Asia/Kolkata; a 2 GB swap file.
+  1 OCPU, 6 GB memory, Ubuntu 24.04, 47 GB boot volume, an ephemeral public IP. A 1 USD budget alert at
+  1 % notices any charge at once. Only the SSH port is open (Oracle's iptables rules); unattended upgrades
+  are on; the time zone is Asia/Kolkata; a 2 GB swap file.
+- **Idle reclamation.** Oracle takes back an *Always Free* server that is idle for 7 days: CPU, network
+  **and** memory all under 20 % (95th percentile). The panel alone uses about 10 % memory and almost no
+  CPU, so it would count as idle. Until the account is upgraded to *Pay As You Go* (exempt, still free
+  within the Always Free limits), the systemd service `memory-ballast` holds 1.3 GB of memory (locked, no
+  CPU, no network; `/usr/local/lib/memory-ballast.py`), keeping memory at about 33 %. It is the first
+  thing the kernel ends if memory runs short (`OOMScoreAdjust=1000`). After the upgrade:
+  `sudo systemctl disable --now memory-ballast`.
 - **Login.** `ssh leadspilot-cloud` – an entry in the laptop's `~/.ssh/config` for user `ubuntu` with the
   key `~/.ssh/leadspilot_oracle`. The private key never leaves the laptop.
 - **The panel** is `~/leadspilot-engine` (its own `venv`, Node.js for wrangler in `/usr/local`), listens on
