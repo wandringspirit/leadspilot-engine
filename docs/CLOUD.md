@@ -85,11 +85,11 @@ wrong token, `401`.
 
 ## 4. The cloud server
 
-> **Status:** the server and the panel service are running (`ROLE=sender`, sending off, no mailbox login,
-> autopilot off – it can't email anyone). The panel is online at `https://panel.leadspilot.co` behind
-> Cloudflare Access (application *Leads Pilot panel*, policy *Me*: your email, a one-time code, 1-month
-> session; `TRUSTED_HOSTS=panel.leadspilot.co`). The laptop's service token (policy *Laptop*, token
-> `laptop-searcher`) gets past the login. Next: the move (§5).
+> **Status: live since 2026-11-12.** The cloud server sends (`ROLE=sender`: campaigns, follow-ups, reply
+> checks, preview websites, the autopilot); the laptop only searches (`ROLE=searcher`). The panel is online
+> at `https://panel.leadspilot.co` behind Cloudflare Access (application *Leads Pilot panel*, policy *Me*:
+> your email, a one-time code, 1-month session; `TRUSTED_HOSTS=panel.leadspilot.co`). The laptop gets past
+> the login with the service token `laptop-searcher` (policy *Laptop*).
 
 What runs where:
 
@@ -149,6 +149,17 @@ Done once, outside the send window (19:30–23:30 IST, Monday to Friday), so no 
 
 From then on, change sending settings (emails per day, hours …), campaigns and the autopilot **in the
 cloud panel**; the laptop's copies of the campaigns are only a snapshot and no longer change.
+
+A search the laptop is running carries on through a restart or an update of the cloud panel (`git push
+cloud main`): the cloud keeps it as the laptop's and takes its result when it comes.
+
+**Done on 2026-11-12** (outside the send window). The server's `.env` is the laptop's (mailbox, sender,
+Google Drive app, `SITES_VISITS_KEY` …) without `CLOUD_URL` / `CLOUD_ACCESS_*`, plus `ROLE=sender`,
+`HOST=127.0.0.1`, `PORT=8000`, its `SEARCHER_TOKEN`, `KEEP_AWAKE=false` and `TRUSTED_HOSTS`. Its data
+before the move is kept in `~/leadspilot-engine/data.pre-move` and `.env.pre-move`. **To undo it**: stop the
+server's panel (`sudo systemctl stop leadspilot`), copy its `data/` back to the laptop (the campaigns and
+the contacted list changed there), then on the laptop remove `ROLE` (or set `ROLE=all`) and start its
+panel – never let both send.
 
 ## 6. What the panels show
 
