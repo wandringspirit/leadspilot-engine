@@ -169,7 +169,9 @@ panel – never let both send.
 
 ## 6. Not watching the panels
 
-The cloud server emails you (`ALERT_TO`) when something needs a look – the autopilot stopped, a campaign
+The two computers watch each other: the **laptop** emails you when it can't reach the cloud server for 30
+minutes (*Cloud server not reachable* – nothing is sent while it's down), and again when it's back. The
+cloud server emails you (`ALERT_TO`) when something needs a look – the autopilot stopped, a campaign
 paused, Google blocked a search, the laptop silent for 24 hours … – and a summary every morning at 08:00
 ([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)). The master sheet's first
 tab, **Status**, says the same at a glance – red rows need a look, and an old *Updated* time means the cloud

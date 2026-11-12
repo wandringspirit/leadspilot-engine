@@ -111,7 +111,8 @@ site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not 
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 SEARCHER = settings.ROLE == "searcher"          # read once: ROLE takes effect after a restart
-searcher = RemoteSearcher(settings, manager, drive=drive.client)
+searcher = RemoteSearcher(settings, manager, drive=drive.client,     # it emails you when the cloud is down
+                          email_me=outreach.email_me if settings.OUTREACH_AUTOSEND else None)
 remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the search computer last asked
 
 

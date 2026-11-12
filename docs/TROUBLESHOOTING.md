@@ -114,6 +114,7 @@ The laptop (`ROLE=searcher`) says what's wrong in `GET /api/remote` and once in 
 | The laptop logs *"the cloud server didn't take …"* | the search was cancelled there or given up on before the result arrived | nothing – it was searched again |
 | The cloud's Google Drive stays disconnected after connecting on the laptop | the laptop's panel isn't running or can't reach the cloud, or one of them is older than 1.19.5 | start the laptop's panel; its log says *Google Drive sign-in (…) handed to the cloud server*; update both |
 | The cloud panel's *Connect Google Drive* says *connect Google Drive in the laptop's panel* | Google only sends the sign-in back to `127.0.0.1` | connect on the laptop: it hands the sign-in over within a minute |
+| Email *Cloud server not reachable* | the server, its panel or its tunnel is down (or Oracle stopped the server) | `ssh leadspilot-cloud`, `systemctl status leadspilot cloudflared`; in the Oracle console start the instance if it's stopped |
 | Settings / Stop / Restart answer `403` in the cloud panel | its name isn't in `TRUSTED_HOSTS`, or the panel trusts forwarded headers (before 1.19.4) | add it (only a name behind Cloudflare Access); update the server (`git push cloud main`) |
 
 ## Where to look

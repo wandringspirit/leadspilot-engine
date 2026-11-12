@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.22.0 – 2026-11-12
+
+### Added
+- **The laptop watches the cloud server**: when it can't reach it for 30 minutes it emails you (*Cloud server
+  not reachable*, with what to check), once, and *Cloud server reachable again* when it can. With the cloud
+  server's *Laptop not searching* alert, each computer watches the other.
+
 ## 1.21.0 – 2026-11-12
 
 ### Added

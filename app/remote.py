@@ -15,6 +15,10 @@ not the sign-in): the sender can't connect Drive itself (Google only sends a sig
 a sign-in made here is handed to it, and one Google ended there is forgotten here too - this panel then
 asks to connect again.
 
+It also watches the cloud server: when it can't be reached for ``DOWN_ALERT_S`` it emails you (``email_me``,
+OutreachManager.email_me - ALERT_TO), once, and again when it's back. The cloud server watches this computer
+the other way round (app/outreach/alerts.py: *Laptop not searching*).
+
 The searches it still has to report are kept in ``data/remote.json``, so a result that couldn't be sent
 (no internet) is sent later, and a search the panel's restart interrupted is reported as interrupted - the
 sender searches that place again.
@@ -27,6 +31,7 @@ import logging
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Awaitable, Callable
 
 import httpx
 
@@ -41,6 +46,7 @@ log = logging.getLogger(__name__)
 IDLE_S = 60             # how often it asks for a search while it has none
 BUSY_S = 30             # how often it reports a running search
 ERROR_S = 120           # after the sender couldn't be reached
+DOWN_ALERT_S = 30 * 60  # it couldn't be reached this long: you get an email
 
 
 class RemoteError(Exception):
@@ -49,9 +55,15 @@ class RemoteError(Exception):
 
 class RemoteSearcher:
     def __init__(self, cfg: Settings, jobs: JobManager, *, drive: DriveClient | None = None,
-                 transport: httpx.AsyncBaseTransport | None = None) -> None:
+                 email_me: Callable[[str, str], Awaitable[bool]] | None = None,
+                 transport: httpx.AsyncBaseTransport | None = None,
+                 clock: Callable[[], datetime] | None = None) -> None:
         self.cfg = cfg
         self.jobs = jobs
+        self.email_me = email_me                   # None: no emails about the cloud server being down
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.down_since: datetime | None = None    # when the cloud server stopped answering
+        self._down_emailed = False
         self.drive = drive                         # this computer's Google Drive sign-in (None: not handed over)
         self._transport = transport
         self._task: asyncio.Task | None = None
@@ -139,10 +151,37 @@ class RemoteSearcher:
             if str(exc) != self._reported_error:          # once, not every two minutes
                 log.warning("Search computer: %s", exc)
                 self._reported_error = str(exc)
+            await self._down(str(exc))
             return ERROR_S
         self._reported_error = ""
-        self.last_contact = datetime.now(timezone.utc)
+        self.last_contact = self.clock()
+        await self._up()
         return wait
+
+    async def _down(self, problem: str) -> None:
+        now = self.clock()
+        self.down_since = self.down_since or now
+        if self._down_emailed or self.email_me is None or (now - self.down_since).total_seconds() < DOWN_ALERT_S:
+            return
+        since = self.down_since.astimezone().strftime("%a %d %b, %H:%M")
+        body = (f"The laptop hasn't reached the cloud server ({self.cfg.CLOUD_URL}) since {since}: {problem}.\n\n"
+                "While it's down nothing is emailed - campaigns, follow-ups and reply checks wait - and the master "
+                "sheet isn't updated. Searches wait too.\n\n"
+                "Check: is the server running? `ssh leadspilot-cloud`, then `systemctl status leadspilot cloudflared` "
+                "(docs/CLOUD.md, docs/TROUBLESHOOTING.md › Cloud server). If the laptop's own internet is down, "
+                "this email only goes out once it's back.\n\nYou get another email when it answers again.")
+        if await self.email_me("Cloud server not reachable", body):
+            self._down_emailed = True
+
+    async def _up(self) -> None:
+        if self.down_since is None:
+            return
+        since, self.down_since = self.down_since, None
+        if self._down_emailed and self.email_me is not None:
+            self._down_emailed = False
+            await self.email_me("Cloud server reachable again",
+                                f"The laptop reaches the cloud server again (it couldn't since "
+                                f"{since.astimezone().strftime('%a %d %b, %H:%M')}). Sending and searches carry on.")
 
     async def _sync_drive(self, client: httpx.AsyncClient) -> None:
         """Hand the cloud server this computer's Google Drive sign-in when it hasn't got it; forget ours when

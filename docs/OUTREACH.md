@@ -234,6 +234,8 @@ So the panel doesn't need watching, it emails you (`ALERT_TO`, else the From add
 - **A daily summary** at 08:00 (the computer's time): yesterday's emails – first emails and follow-ups – and
   what came back, the campaigns, the next email, the autopilot, the laptop's last check-in, Google Drive and
   the last day's problems.
+- **Cloud server not reachable**: sent by the laptop (`ROLE=searcher`) when it can't reach the cloud server
+  for 30 minutes, and *Cloud server reachable again* when it can ([CLOUD.md §6](CLOUD.md#6-not-watching-the-panels)).
 - **Google Drive disconnected** has its own email ([DRIVE.md](DRIVE.md)); **replies** too (§5).
 
 What's still to be sent is kept in `data/alerts.json`: a restart loses nothing and doesn't send the day's

@@ -355,3 +355,40 @@ def test_the_search_computer_leaves_the_master_sheet_to_the_sender(monkeypatch):
     with TestClient(main_module.app):
         pass
     assert started == [True]
+
+
+def test_the_search_computer_emails_you_when_the_cloud_server_is_down(tmp_path):
+    from datetime import timedelta as td
+    from app.remote import DOWN_ALERT_S
+    sent: list[str] = []
+
+    async def email_me(subject, body):
+        sent.append(subject)
+        return True
+
+    now = [NOW]
+    cfg = Settings(_env_file=None, DATA_DIR=tmp_path, ROLE="searcher", SEARCHER_TOKEN=TOKEN,
+                   CLOUD_URL="https://panel.example.com")
+    down = httpx.MockTransport(lambda request: httpx.Response(502, text="Bad gateway"))
+    laptop = RemoteSearcher(cfg, JobManager(cfg), email_me=email_me, transport=down, clock=lambda: now[0])
+
+    async def scenario():
+        await laptop.step()
+        now[0] += td(seconds=DOWN_ALERT_S - 60)
+        await laptop.step()
+        assert sent == []                                       # not yet
+        now[0] += td(seconds=60)
+        await laptop.step()
+        await laptop.step()
+        assert sent == ["Cloud server not reachable"]           # once
+        laptop._transport = httpx.MockTransport(lambda request: httpx.Response(204))
+        await laptop.step()
+        assert sent == ["Cloud server not reachable", "Cloud server reachable again"]
+        assert laptop.down_since is None
+        laptop._transport = down                                # a short hiccup: no email
+        await laptop.step()
+        laptop._transport = httpx.MockTransport(lambda request: httpx.Response(204))
+        await laptop.step()
+        assert len(sent) == 2
+
+    asyncio.run(scenario())
