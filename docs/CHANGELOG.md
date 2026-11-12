@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.20.1 – 2026-11-12
+
+### Fixed
+- **The laptop wrote its old copy over the master sheet.** As the search computer (`ROLE=searcher`) it still
+  ran the Google Drive loop, so each time its panel started it saved its campaigns and activity log – a
+  snapshot from before the move – to the master sheet, until the cloud server saved it again. Only the
+  sender keeps the master sheet and the campaign results in Drive now; the laptop still uploads its
+  searches' CSV files.
+
 ## 1.20.0 – 2026-11-12
 
 ### Added

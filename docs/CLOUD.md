@@ -15,7 +15,8 @@ Leave `ROLE` on `all` (the default) to do everything on one computer, as before.
 | Reply and bounce checks, alerts | the cloud server | they stop follow-ups on time |
 | Preview websites, website visits, quote requests | the cloud server | they're built when a campaign starts |
 | The autopilot (which place is next, how many a day) | the cloud server | it decides what gets searched |
-| Google Drive uploads | both, if connected | each one uploads what it makes |
+| Google Drive: the master sheet, campaign results | the cloud server | the laptop's campaigns are an old copy |
+| Google Drive: a search's CSV file | both, if connected | the same file: the later one replaces it |
 
 Nothing is ever sent from the laptop while it is a searcher, so the two can never email the same
 business twice.

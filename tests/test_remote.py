@@ -339,3 +339,19 @@ def test_the_sender_takes_only_a_matching_new_drive_sign_in(cloud, tmp_path, mon
     response = client.post("/api/drive/connect", headers={"host": "panel.example.com"})
     assert response.status_code == 400 and "laptop" in response.json()["detail"]
 
+
+
+def test_the_search_computer_leaves_the_master_sheet_to_the_sender(monkeypatch):
+    """Its campaigns are an old copy: syncing them would write over the cloud server's master sheet."""
+    started: list[bool] = []
+    monkeypatch.setattr(main_module, "SEARCHER", True)
+    monkeypatch.setattr(main_module.settings, "DRIVE_AUTO_UPLOAD", True)
+    monkeypatch.setattr(main_module.searcher, "start_loop", lambda: None)
+    monkeypatch.setattr(main_module.drive, "start_loop", lambda *a, **k: started.append(True))
+    with TestClient(main_module.app):
+        pass
+    assert started == []
+    monkeypatch.setattr(main_module, "SEARCHER", False)
+    with TestClient(main_module.app):
+        pass
+    assert started == [True]

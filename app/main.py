@@ -75,8 +75,8 @@ async def lifespan(_: FastAPI):
     if settings.ROLE == "sender":
         log.info("ROLE=sender: searches wait for the search computer%s",
                  "" if settings.SEARCHER_TOKEN else " - but SEARCHER_TOKEN is empty, so none can ask for them")
-    if settings.DRIVE_AUTO_UPLOAD:
-        drive.start_loop(outreach, master=_master_tables)
+    if settings.DRIVE_AUTO_UPLOAD and not SEARCHER:   # the search computer's campaigns are an old copy: the
+        drive.start_loop(outreach, master=_master_tables)   # cloud server keeps the master sheet
     yield
     await manager.shutdown()                    # first, while Playwright still answers (see JobManager.shutdown)
     await searcher.stop_loop()
@@ -752,7 +752,7 @@ async def _apply_settings(names: set[str]) -> None:
         else:
             await outreach.stop_loop()
             await alerts.stop_loop()
-    if "DRIVE_AUTO_UPLOAD" in names:
+    if "DRIVE_AUTO_UPLOAD" in names and not SEARCHER:
         if settings.DRIVE_AUTO_UPLOAD:
             drive.start_loop(outreach, master=_master_tables)
         else:
