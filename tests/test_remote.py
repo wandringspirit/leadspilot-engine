@@ -11,8 +11,11 @@ from fastapi.testclient import TestClient
 import app.jobs as jobs_module
 import app.main as main_module
 from app.config import Settings
+from app.drive.client import DriveClient, sign_in_id
+from app.drive.sync import DriveSync
 from app.jobs import JobManager
 from app.models import Job, JobStatus, PlaceRow, Progress
+from app.outreach.activity import ActivityLog
 from app.outreach import autopilot as autopilot_module
 from app.remote import RemoteSearcher
 
@@ -273,3 +276,66 @@ def test_the_search_computer_says_what_is_wrong(tmp_path):
     searcher = RemoteSearcher(cfg, JobManager(cfg), transport=httpx.MockTransport(lambda r: httpx.Response(401)))
     asyncio.run(searcher.step())
     assert "SEARCHER_TOKEN" in searcher.state
+
+
+# --------------------------------------------------------------------------
+# Google Drive: the laptop hands its sign-in to the cloud server
+# --------------------------------------------------------------------------
+def test_the_search_computer_hands_its_drive_sign_in_to_the_sender(tmp_path, monkeypatch):
+    async def scenario():
+        cloud_jobs = sender_manager(tmp_path)
+        cloud_drive = DriveSync(cloud_jobs.cfg)
+        cloud_activity = ActivityLog(tmp_path / "cloud" / "activity.jsonl")
+        monkeypatch.setattr(main_module, "manager", cloud_jobs)
+        monkeypatch.setattr(main_module, "settings", cloud_jobs.cfg)
+        monkeypatch.setattr(main_module, "drive", cloud_drive)
+        monkeypatch.setattr(main_module, "activity", cloud_activity)
+
+        cfg = Settings(_env_file=None, DATA_DIR=tmp_path / "laptop", ROLE="searcher", SEARCHER_TOKEN=TOKEN,
+                       CLOUD_URL="https://panel.example.com")
+        cfg.jobs_dir.mkdir(parents=True, exist_ok=True)
+        laptop_drive = DriveClient(cfg)
+        laptop = RemoteSearcher(cfg, JobManager(cfg), drive=laptop_drive,
+                                transport=httpx.ASGITransport(app=main_module.app))
+
+        assert await laptop.step() == 60                       # neither is connected: nothing to hand over
+        assert not cloud_drive.connected
+
+        laptop_drive.use_sign_in("refresh-A", "me@gmail.com")  # connected on the laptop
+        await laptop.step()
+        assert cloud_drive.client.sign_in_id == sign_in_id("refresh-A") and cloud_drive.client.email == "me@gmail.com"
+        assert DriveClient(cloud_jobs.cfg).connected            # saved: also after a restart
+        assert [e for e in cloud_activity.entries() if e["what"] == "Google Drive connected"]
+        await laptop.step()                                     # the same sign-in: not handed over again
+        assert len([e for e in cloud_activity.entries() if e["what"] == "Google Drive connected"]) == 1
+
+        cloud_drive.client._lose(notify=False)                  # Google ended it (found by the cloud server)
+        await laptop.step()
+        assert not laptop_drive.connected and laptop_drive.lost_at   # the laptop's panel asks to connect again
+        assert not cloud_drive.connected                        # the dead sign-in isn't handed back
+
+        laptop_drive.use_sign_in("refresh-B", "me@gmail.com")  # connected again on the laptop
+        await laptop.step()
+        assert cloud_drive.client.sign_in_id == sign_in_id("refresh-B") and not cloud_drive.client.lost_at
+
+    asyncio.run(scenario())
+
+
+def test_the_sender_takes_only_a_matching_new_drive_sign_in(cloud, tmp_path, monkeypatch):
+    client, manager = cloud
+    cloud_drive = DriveSync(manager.cfg)
+    monkeypatch.setattr(main_module, "drive", cloud_drive)
+    monkeypatch.setattr(main_module, "activity", ActivityLog(tmp_path / "cloud" / "activity.jsonl"))
+    auth = {"Authorization": f"Bearer {TOKEN}"}
+    assert client.post("/api/remote/drive", json={"id": "x"}).status_code == 401
+    assert client.post("/api/remote/drive", headers=auth, json={"id": "x"}).json() == {"id": "", "lost": ""}
+    wrong = {"id": "0123456789abcdef", "refresh_token": "refresh-A", "email": "me@gmail.com"}
+    assert client.post("/api/remote/drive", headers=auth, json=wrong).status_code == 400
+    dead = {"id": sign_in_id("refresh-A"), "refresh_token": "refresh-A", "email": "me@gmail.com"}
+    cloud_drive.client.use_sign_in("refresh-A", "me@gmail.com")
+    cloud_drive.client._lose(notify=False)
+    answer = client.post("/api/remote/drive", headers=auth, json=dead).json()
+    assert answer == {"id": "", "lost": sign_in_id("refresh-A")} and not cloud_drive.connected
+    response = client.post("/api/drive/connect", headers={"host": "panel.example.com"})
+    assert response.status_code == 400 and "laptop" in response.json()["detail"]
+

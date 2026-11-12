@@ -94,6 +94,10 @@ The crawler talks to the Drive REST API with **your own OAuth client** (type *De
    or press *Disconnect*). You also get an email about it (*[Leads Pilot] Google Drive disconnected*, to `ALERT_TO` – else the
    campaigns' From address) and the activity log says *Google Drive disconnected* – until you connect again,
    nothing is uploaded.
+5. **Cloud server** (`ROLE=sender`): it can't connect by itself (step 2 needs `127.0.0.1`). The laptop
+   (`ROLE=searcher`) hands it the sign-in made there, and forgets its own when the cloud server found that
+   Google ended it – connect in the laptop's panel ([CLOUD.md](CLOUD.md#4-the-cloud-server)). Only the cloud
+   server emails you about it.
 
 The scope is **full Drive access** (`https://www.googleapis.com/auth/drive`). The narrower
 *"files this app created"* scope can't write into folders you made or read lead files you put

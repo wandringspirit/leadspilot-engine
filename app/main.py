@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from app import __version__, settings_editor
 from app.config import settings
 from app.control import browse_url, control, keep_awake
-from app.drive.client import LOST_BODY, LOST_SUBJECT, DriveError
+from app.drive.client import LOST_BODY, LOST_BODY_CLOUD, LOST_SUBJECT, DriveError, sign_in_id
 from app.drive.sync import DriveSync, folder_name
 from app.export.csv_export import column_headers, job_filename, rows_to_csv_bytes
 from app.jobs import ACTIVE_STATES, JobManager
@@ -107,7 +107,7 @@ site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not 
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
 SEARCHER = settings.ROLE == "searcher"          # read once: ROLE takes effect after a restart
-searcher = RemoteSearcher(settings, manager)
+searcher = RemoteSearcher(settings, manager, drive=drive.client)
 remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the search computer last asked
 
 
@@ -136,9 +136,15 @@ _alerts: set = set()                              # the alert tasks still runnin
 
 
 def _drive_lost() -> None:
-    """Google ended the Drive sign-in: say so in the activity log and email you (once - it's forgotten now)."""
-    activity.add("Google Drive disconnected", "Google ended the sign-in - connect it again in the Outreach tab")
-    task = asyncio.get_running_loop().create_task(outreach.email_me(LOST_SUBJECT, LOST_BODY))
+    """Google ended the Drive sign-in: say so in the activity log and email you (once - it's forgotten now).
+    The search computer doesn't: the cloud server finds out too and emails you (docs/CLOUD.md)."""
+    if SEARCHER:
+        return
+    cloud = settings.ROLE == "sender"
+    activity.add("Google Drive disconnected", "Google ended the sign-in - connect it again "
+                 + ("in the laptop's panel (it hands it to the cloud server)" if cloud else "in the Outreach tab"))
+    task = asyncio.get_running_loop().create_task(outreach.email_me(LOST_SUBJECT,
+                                                                    LOST_BODY_CLOUD if cloud else LOST_BODY))
     _alerts.add(task)
     task.add_done_callback(_alerts.discard)
 
@@ -318,6 +324,12 @@ class RemoteProgress(BaseModel):
     rows: int = 0
 
 
+class RemoteDrive(BaseModel):
+    id: str = ""                      # which Google Drive sign-in the search computer has ('' = none)
+    refresh_token: str = ""           # the sign-in itself - only when this server hasn't got it
+    email: str = ""
+
+
 @app.get("/api/remote")
 async def remote_status() -> dict:
     """Who searches: this computer (all), a search computer (sender), or this one for the cloud (searcher)."""
@@ -362,6 +374,26 @@ async def remote_result(job_id: str, result: Job, request: Request) -> JobSummar
         return manager.remote_result(result).summary()
     except (LookupError, ValueError) as exc:
         raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/remote/drive")
+async def remote_drive(req: RemoteDrive, request: Request) -> dict:
+    """The search computer's Google Drive sign-in: this server can't sign in itself (Google only sends a sign-in
+    back to 127.0.0.1), so the search computer hands over the one made there. Answers which sign-in this server
+    has (``id``) and which one Google ended here (``lost``) - the search computer then forgets it too."""
+    _search_computer(request)
+    client = drive.client
+    if req.refresh_token:
+        if sign_in_id(req.refresh_token) != req.id:
+            raise HTTPException(400, "the sign-in doesn't match its id")
+        if req.id not in (client.sign_in_id, client.lost_id):     # new - not the one Google ended
+            previous = client.email
+            client.use_sign_in(req.refresh_token, req.email)
+            if previous and previous != req.email:
+                drive.forget_folders()
+            activity.add("Google Drive connected",
+                         f"{req.email or 'your Google account'} - the sign-in came from the laptop")
+    return {"id": client.sign_in_id, "lost": client.lost_id}
 
 
 # ----------------------------------------------------------------------
@@ -565,6 +597,9 @@ async def drive_status() -> dict:
 @app.post("/api/drive/connect")
 async def drive_connect(request: Request) -> dict:
     """The Google consent page to open; Google then sends the browser back to this server."""
+    if request.url.hostname not in ("127.0.0.1", "localhost", "::1", "[::1]") and settings.ROLE == "sender":
+        raise HTTPException(400, "connect Google Drive in the laptop's panel (http://127.0.0.1:8000) - it hands "
+                                 "the sign-in to this server within a minute")
     if request.url.hostname not in ("127.0.0.1", "localhost", "::1", "[::1]"):
         raise HTTPException(400, f"open the panel at http://127.0.0.1:{request.url.port or settings.PORT} to connect "
                                  "Google Drive - Google only sends the sign-in back to this computer")

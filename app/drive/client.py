@@ -66,6 +66,20 @@ LOST_BODY = (
     "Open the panel › Outreach › Setup › Connect Google Drive (the red banner at the top has the button too).\n\n"
     "If this happens every 7 days, your Google Cloud OAuth app is still in Testing: publish it "
     "(docs/PLAYBOOK.md step 2.4), then connect again.")
+#: the same on the cloud server (ROLE=sender): it can't connect Drive itself, the laptop hands it the sign-in
+LOST_BODY_CLOUD = (
+    "Google ended Leads Pilot's sign-in to your Google Drive (it expired or was revoked), so the master sheet, "
+    "search files and campaign results aren't updated until you connect it again. Sending carries on.\n\n"
+    "The cloud server can't connect Drive by itself. On the laptop, open its panel (http://127.0.0.1:8000) › "
+    "Outreach › Setup › Connect Google Drive (the red banner at the top has the button too). The laptop hands "
+    "the new sign-in to the cloud server within a minute.\n\n"
+    "If this happens every 7 days, your Google Cloud OAuth app is still in Testing: publish it "
+    "(docs/PLAYBOOK.md step 2.4), then connect again.")
+
+
+def sign_in_id(refresh_token: str) -> str:
+    """A short id of a sign-in, safe to send around: it says which sign-in, it can't be used as one."""
+    return hashlib.sha256(refresh_token.encode()).hexdigest()[:16] if refresh_token else ""
 
 
 class DriveAuthError(DriveError):
@@ -105,7 +119,8 @@ class DriveClient:
         self._clock = clock
         self._pending: dict[str, tuple[str, str, float]] = {}   # state -> (code verifier, redirect uri, when)
         self.token: Token | None = self._load()
-        self.lost_at: str = self._load_lost()      # when Google ended the sign-in ('' = it didn't) - the panel's banner
+        # when Google ended the sign-in ('' = it didn't) - the panel's banner - and which one it was
+        self.lost_at, self.lost_id = self._load_lost()
 
     # ------------------------------------------------------------------
     # Sign-in
@@ -121,6 +136,27 @@ class DriveClient:
     @property
     def email(self) -> str:
         return self.token.email if self.token else ""
+
+    @property
+    def sign_in_id(self) -> str:
+        """Which sign-in this is (``sign_in_id()``); '' when not connected."""
+        return sign_in_id(self.token.refresh_token) if self.connected and self.token else ""
+
+    def use_sign_in(self, refresh_token: str, email: str) -> None:
+        """A sign-in made on another computer: the search computer hands its own to the cloud server, which
+        can't sign in itself (Google only sends a sign-in back to 127.0.0.1) - docs/CLOUD.md."""
+        self.token = Token(refresh_token=refresh_token, email=email)
+        self._save()
+        self._set_lost("")
+        log.info("Google Drive connected (%s) - the sign-in came from the search computer",
+                 email or "account without an email")
+
+    def lost_elsewhere(self) -> None:
+        """The cloud server found that Google ended this same sign-in: forget it here too, so this panel asks
+        to connect again (its banner) - without emailing you, the cloud server does that."""
+        if self.connected:
+            log.warning("Google Drive: the cloud server found that Google ended the sign-in - connect it again here")
+            self._lose(notify=False)
 
     def auth_url(self, redirect_uri: str) -> str:
         """Google's consent page; it sends the browser back to ``redirect_uri`` with a code."""
@@ -168,19 +204,33 @@ class DriveClient:
         log.info("Google Drive connected (%s)", self.token.email or "account without an email")
         return self.token.email
 
-    def _load_lost(self) -> str:
+    def _load_lost(self) -> tuple[str, str]:
         try:
-            return str(json.loads(self.lost_file.read_text(encoding="utf-8")).get("at", ""))
+            data = json.loads(self.lost_file.read_text(encoding="utf-8"))
+            return str(data.get("at", "")), str(data.get("id", ""))
         except (OSError, ValueError, AttributeError):
-            return ""
+            return "", ""
 
-    def _set_lost(self, at: str) -> None:
-        self.lost_at = at
+    def _set_lost(self, at: str, lost_id: str = "") -> None:
+        self.lost_at, self.lost_id = at, lost_id if at else ""
         with suppress(OSError):
             if at:
-                self.lost_file.write_text(json.dumps({"at": at}), encoding="utf-8")
+                self.lost_file.write_text(json.dumps({"at": at, "id": self.lost_id}), encoding="utf-8")
             else:
                 self.lost_file.unlink(missing_ok=True)
+
+    def _lose(self, *, notify: bool = True) -> None:
+        """Google ended the sign-in: forget it, remember when and which (the banner), and tell main.py."""
+        lost_id = self.sign_in_id
+        self.token = None
+        with suppress(OSError):
+            self.token_file.unlink(missing_ok=True)
+        self._set_lost(datetime.now(timezone.utc).isoformat(timespec="seconds"), lost_id)
+        if notify and self.on_lost is not None:
+            try:
+                self.on_lost()
+            except Exception:  # noqa: BLE001 - telling you must not break the Drive call's error
+                log.exception("Google Drive: could not report the lost sign-in")
 
     async def disconnect(self) -> None:
         """Forget the sign-in, and tell Google to revoke it (best effort)."""
@@ -220,16 +270,8 @@ class DriveClient:
             error = data.get("error", "")
             if error == "invalid_grant":
                 if form.get("grant_type") == "refresh_token":
-                    self.token = None
-                    with suppress(OSError):
-                        self.token_file.unlink(missing_ok=True)
                     log.warning("Google Drive: Google ended the sign-in (expired or revoked) - connect it again")
-                    self._set_lost(datetime.now(timezone.utc).isoformat(timespec="seconds"))
-                    if self.on_lost is not None:
-                        try:
-                            self.on_lost()
-                        except Exception:  # noqa: BLE001 - telling you must not break the Drive call's error
-                            log.exception("Google Drive: could not report the lost sign-in")
+                    self._lose()
                 raise DriveAuthError("Google refused the sign-in (it expired or was revoked) - connect Google Drive "
                                      "again")
             raise DriveError(f"Google refused the sign-in: {error} {data.get('error_description', '')}".strip())

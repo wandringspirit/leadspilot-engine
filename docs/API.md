@@ -24,6 +24,7 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | POST | `/api/remote/next` | the search computer takes the oldest waiting search (`ROLE=sender`) |
 | POST | `/api/remote/jobs/{job_id}/progress` | the search computer's progress; answers whether to stop |
 | POST | `/api/remote/jobs/{job_id}/result` | the search computer's finished search |
+| POST | `/api/remote/drive` | the search computer's Google Drive sign-in: which one it has, handed over when new |
 | GET | `/api/activity` | what happened, newest first |
 | GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv`; also `daily.csv` |
 | GET | `/api/master/daily` | day by day: emails sent (first emails, follow-ups) and what came back |
@@ -450,6 +451,13 @@ they need `ROLE=sender`, a `SEARCHER_TOKEN` and the header `Authorization: Beare
   [DATA_MODEL.md](DATA_MODEL.md)) → the job summary; the finished-job hook runs (the autopilot makes the
   campaign). `409` when the search isn't wanted any more (cancelled, given up on, already sent) or hasn't
   finished, `400` when the id doesn't match the address.
+
+- `POST /api/remote/drive` `{"id": "<sign-in id>"}` → `{"id": "<the sender's>", "lost": "<the one Google
+  ended there>"}` – every round of the search computer. The id is the first 16 hex digits of the refresh
+  token's SHA-256 (`app.drive.client.sign_in_id`), never the sign-in itself. When the ids differ, the search
+  computer sends `{"id", "refresh_token", "email"}` and the sender saves it (`data/google_drive.json`) – unless
+  it is the one Google ended there (`lost`; the search computer then forgets its own copy). `400` when the
+  token doesn't match the id. Old senders answer `404`: no hand-over.
 
 On the sender, `POST /api/scrape` makes such a waiting search too, and cancelling one marks it cancelled at
 once (the search computer stops at its next report).

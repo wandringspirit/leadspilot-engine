@@ -18,6 +18,11 @@ os.environ["PREVIEW_SITES"] = "false"      # no websites built or uploaded to Cl
 # ... and app.main's objects never see the real data/: the autopilot there (switched on) would start real
 # Google Maps searches, and its campaigns, activity log and Drive sign-in are the real ones
 os.environ["DATA_DIR"] = tempfile.mkdtemp(prefix="leadspilot-tests-")
+# ... and app.main is neither the cloud server nor its search computer: with this computer's ROLE=searcher it
+# would ask the real cloud panel for its searches (and take one) - docs/CLOUD.md
+os.environ["ROLE"] = "all"
+for _name in ("CLOUD_URL", "SEARCHER_TOKEN", "CLOUD_ACCESS_ID", "CLOUD_ACCESS_SECRET", "TRUSTED_HOSTS"):
+    os.environ[_name] = ""
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:

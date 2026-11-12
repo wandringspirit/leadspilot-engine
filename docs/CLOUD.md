@@ -128,9 +128,14 @@ flowchart LR
   connects from the server itself, and Access has already checked who you are. Never list a name there
   that has no login in front of it.
 - **Google Drive.** Google only sends its sign-in back to `127.0.0.1`, so the cloud panel can't connect
-  Drive itself: the sign-in (`data/google_drive.json`) is copied from the laptop. If Google ends it (you get
-  the *Google Drive disconnected* email), connect on the laptop and copy the file again – or publish the
-  Google app so it doesn't end every 7 days ([PLAYBOOK.md](PLAYBOOK.md) step 2).
+  Drive itself: **the laptop hands it its sign-in** (since 1.19.5). Every round the laptop tells the cloud
+  which sign-in it has (an id, `POST /api/remote/drive`); when the cloud hasn't got it, the laptop sends it
+  and the cloud saves it in `data/google_drive.json` (activity log: *Google Drive connected – the sign-in
+  came from the laptop*). When Google ends it, the **cloud** emails you (*[Leads Pilot] Google Drive
+  disconnected*, saying to connect on the laptop) and the laptop forgets its copy too, so its panel shows the
+  red *Connect Google Drive* banner. Connect in the **laptop's** panel (`http://127.0.0.1:8000` › Outreach);
+  within a minute the cloud has it. The cloud panel's own *Connect* button says so. Publish the Google app so
+  it doesn't end every 7 days ([PLAYBOOK.md](PLAYBOOK.md) step 2).
 - **Updates.** The laptop's git has a second remote, `cloud` (`leadspilot-cloud:leadspilot.git`, a bare
   repository on the server). `git push cloud main` after pushing to GitHub: the repository's
   `post-receive` hook checks the code out into `~/leadspilot-engine`, installs changed requirements, runs

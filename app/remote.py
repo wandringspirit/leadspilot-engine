@@ -10,6 +10,11 @@ computer asks for it. This loop:
    the search was cancelled there or given up on (this computer slept for ``REMOTE_SILENCE_S``);
 4. sends the finished search back (``.../result``): the sender makes the campaign from it.
 
+Every round it also tells the sender which Google Drive sign-in it has (``POST /api/remote/drive``, an id,
+not the sign-in): the sender can't connect Drive itself (Google only sends a sign-in back to 127.0.0.1), so
+a sign-in made here is handed to it, and one Google ended there is forgotten here too - this panel then
+asks to connect again.
+
 The searches it still has to report are kept in ``data/remote.json``, so a result that couldn't be sent
 (no internet) is sent later, and a search the panel's restart interrupted is reported as interrupted - the
 sender searches that place again.
@@ -27,6 +32,7 @@ import httpx
 
 from app import __version__
 from app.config import Settings
+from app.drive.client import DriveClient
 from app.filters import SearchFilters
 from app.jobs import ACTIVE_STATES, JobManager
 
@@ -42,9 +48,11 @@ class RemoteError(Exception):
 
 
 class RemoteSearcher:
-    def __init__(self, cfg: Settings, jobs: JobManager, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(self, cfg: Settings, jobs: JobManager, *, drive: DriveClient | None = None,
+                 transport: httpx.AsyncBaseTransport | None = None) -> None:
         self.cfg = cfg
         self.jobs = jobs
+        self.drive = drive                         # this computer's Google Drive sign-in (None: not handed over)
         self._transport = transport
         self._task: asyncio.Task | None = None
         self.pending: list[str] = self._load()     # the sender's searches this computer still has to report
@@ -136,7 +144,26 @@ class RemoteSearcher:
         self.last_contact = datetime.now(timezone.utc)
         return wait
 
+    async def _sync_drive(self, client: httpx.AsyncClient) -> None:
+        """Hand the cloud server this computer's Google Drive sign-in when it hasn't got it; forget ours when
+        the cloud server found that Google ended it."""
+        if self.drive is None:
+            return
+        mine = self.drive.sign_in_id
+        answer = await self._post(client, "/api/remote/drive", {"id": mine}, accept=(404,))
+        if "_status" in answer:                            # an older cloud panel: no hand-over
+            return
+        if mine and answer.get("lost") == mine:
+            self.drive.lost_elsewhere()
+        elif mine and answer.get("id") != mine and self.drive.token is not None:
+            token = self.drive.token
+            await self._post(client, "/api/remote/drive",
+                             {"id": mine, "refresh_token": token.refresh_token, "email": token.email})
+            log.info("Search computer: Google Drive sign-in (%s) handed to the cloud server",
+                     token.email or "account without an email")
+
     async def _step(self, client: httpx.AsyncClient) -> float:
+        await self._sync_drive(client)
         busy = False
         for job_id in list(self.pending):
             job = self.jobs.get(job_id)

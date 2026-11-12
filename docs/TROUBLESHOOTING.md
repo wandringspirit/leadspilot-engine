@@ -112,6 +112,8 @@ The laptop (`ROLE=searcher`) says what's wrong in `GET /api/remote` and once in 
 | Searches stay *Waiting for the search computer* | the laptop is off, asleep, or its panel isn't `ROLE=searcher` | open the laptop; its panel starts with Windows |
 | A search ends *"The search computer stopped reporting"* | the laptop slept or went offline mid-search for 20 minutes | nothing: the autopilot searches the place again (three failures in a row: it moves on) |
 | The laptop logs *"the cloud server didn't take …"* | the search was cancelled there or given up on before the result arrived | nothing – it was searched again |
+| The cloud's Google Drive stays disconnected after connecting on the laptop | the laptop's panel isn't running or can't reach the cloud, or one of them is older than 1.19.5 | start the laptop's panel; its log says *Google Drive sign-in (…) handed to the cloud server*; update both |
+| The cloud panel's *Connect Google Drive* says *connect Google Drive in the laptop's panel* | Google only sends the sign-in back to `127.0.0.1` | connect on the laptop: it hands the sign-in over within a minute |
 | Settings / Stop / Restart answer `403` in the cloud panel | its name isn't in `TRUSTED_HOSTS`, or the panel trusts forwarded headers (before 1.19.4) | add it (only a name behind Cloudflare Access); update the server (`git push cloud main`) |
 
 ## Where to look

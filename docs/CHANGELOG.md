@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.19.5 – 2026-11-12
+
+### Added
+- **The laptop hands its Google Drive sign-in to the cloud server** (`POST /api/remote/drive`): the cloud
+  can't connect Drive itself (Google only sends the sign-in back to `127.0.0.1`). Connect in the laptop's
+  panel; within a minute the cloud has it. When Google ends the sign-in, the cloud emails you how to connect
+  again and the laptop's panel shows its *Connect Google Drive* banner; the laptop doesn't email too, and
+  a sign-in Google ended is never handed back.
+
+### Fixed
+- The tests read this computer's `ROLE` / `CLOUD_URL` from `.env`: on the laptop (`ROLE=searcher`) a test
+  run started the searcher loop against the real cloud panel. `tests/conftest.py` now clears them.
+
 ## 1.19.4 – 2026-11-11
 
 ### Fixed
