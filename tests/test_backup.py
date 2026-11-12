@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import io
 import zipfile
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from app.config import Settings
 from app.drive.backup import KEEP, Backup, make_zip
@@ -44,7 +44,8 @@ class FakeSync:
     """Drive: a Backups folder holding files by name."""
 
     def __init__(self):
-        self.stored: dict[str, bytes] = {f"leadspilot-backup-2026-10-{d:02}.zip": b"old" for d in range(1, 10)}
+        days = [date(2026, 10, 1) + timedelta(days=i) for i in range(KEEP + 5)]     # more than are kept
+        self.stored: dict[str, bytes] = {f"leadspilot-backup-{d.isoformat()}.zip": b"old" for d in days}
         self.trashed: list[str] = []
         self.fail = False
         self.client = self
@@ -76,7 +77,8 @@ def test_once_a_day_after_three_keeping_the_newest_seven(tmp_path):
     clock.at = datetime(2026, 11, 12, 3, 5).astimezone()
     assert asyncio.run(backup.run_if_due())
     assert "leadspilot-backup-2026-11-12.zip" in sync.stored and len(sync.stored) == KEEP
-    assert sorted(sync.trashed) == [f"leadspilot-backup-2026-10-0{d}.zip" for d in (1, 2, 3)]   # the oldest: trash
+    oldest = [f"leadspilot-backup-{(date(2026, 10, 1) + timedelta(days=i)).isoformat()}.zip" for i in range(6)]
+    assert sorted(sync.trashed) == oldest                               # the oldest go to the trash
     status = backup.status()
     assert status["name"] == "leadspilot-backup-2026-11-12.zip" and status["size"] > 0 and not status["error"]
     clock.at += timedelta(hours=5)

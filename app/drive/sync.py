@@ -13,7 +13,7 @@ DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL,
   Plumber/
     …
   Backups/
-    leadspilot-backup-2026-11-12.zip   the panel's own data, once a day, the newest 7 - app/drive/backup.py
+    leadspilot-backup-2026-11-12.zip   the panel's own data, once a day, the newest 30 - app/drive/backup.py
 ```
 
 A search's CSV is the extended export (the default columns first, then the

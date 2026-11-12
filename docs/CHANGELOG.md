@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.23.1 – 2026-11-12
+
+### Changed
+- The daily backups in Google Drive are kept for **30 days** instead of 7 (each is about 150 KB).
+
 ## 1.23.0 – 2026-11-12
 
 ### Added

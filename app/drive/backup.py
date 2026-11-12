@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 FOLDER = "Backups"
 PREFIX = "leadspilot-backup-"
-KEEP = 7
+KEEP = 30                       # a month - each is only ~150 KB
 BACKUP_HOUR = 3                 # 03:00, the computer's time - nothing is sent then
 RETRY = timedelta(minutes=30)   # after a failed backup
 FILES = ("contacted.json", "business_types.json", "autopilot.json", "activity.jsonl", "alerts.json",

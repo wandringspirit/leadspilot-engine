@@ -208,7 +208,7 @@ Every kind of data, and where it is:
 | Code, docs, the server's setup files | copy | **edited here** | – | – | – | copy |
 
 **Bold**: the one in use. *Copy*: kept up to date. *Old copy*: the laptop's `data/`, frozen at the move
-(12 Nov 2026, 11:53). *Daily backup*: `Backups/leadspilot-backup-YYYY-MM-DD.zip`, the newest 7.
+(12 Nov 2026, 11:53). *Daily backup*: `Backups/leadspilot-backup-YYYY-MM-DD.zip`, the newest 30 (a month).
 
 GitHub has the code, the docs and the cloud server's own files (`deploy/cloud/`). On purpose it doesn't
 have anything secret or personal – the repository is public:
@@ -217,7 +217,7 @@ have anything secret or personal – the repository is public:
 | --- | --- | --- |
 | The laptop's `.env` (mailbox password, Google OAuth client, `SITES_VISITS_KEY`, `SEARCHER_TOKEN`, `CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) | the laptop's project folder | **yes – in your password manager** (the server's `.env` has all of it except the Access token) |
 | The SSH key for the server (`~/.ssh/leadspilot_oracle` and the `leadspilot-cloud` entry in `~/.ssh/config`) | the laptop's `C:\Users\<you>\.ssh` | **yes – in your password manager** (the private key file) |
-| Campaigns, the contacted list, business types, the autopilot, the activity log, the searches (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | **done by itself:** every day after 03:00 a zip in Google Drive › `Backups/` (`leadspilot-backup-YYYY-MM-DD.zip`, the newest 7; `app/drive/backup.py`); the master sheet's Status tab shows the last one |
+| Campaigns, the contacted list, business types, the autopilot, the activity log, the searches (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | **done by itself:** every day after 03:00 a zip in Google Drive › `Backups/` (`leadspilot-backup-YYYY-MM-DD.zip`, the newest 30; `app/drive/backup.py`); the master sheet's Status tab shows the last one |
 | The Google Drive sign-in (`data/google_drive.json`) | both computers | no – connect again on a new laptop |
 | The Cloudflare login for the preview websites (`data/wrangler`) | the cloud server (it uploads them) and the laptop | no – `python sites/deploy.py --login` on a laptop (it opens the browser), then copy its `data/wrangler` to the server |
 | Accounts: Oracle Cloud, Cloudflare (Zero Trust, the domain, the Worker), Google Cloud (OAuth app), Google Workspace (the mailbox) | online | your logins |

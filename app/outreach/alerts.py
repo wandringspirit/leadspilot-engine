@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Awaitable, Callable
 
 from app.config import Settings
+from app.drive.backup import KEEP as KEEP_BACKUPS
 from app.outreach.master import DAILY_COLUMNS, daily_table
 
 log = logging.getLogger(__name__)
@@ -256,7 +257,7 @@ class Alerts:
             last = _parse(backup.get("at") or "")
             stale = last is None or now - last > timedelta(hours=48)
             text = (f"{_local(last)} – {backup.get('name')} ({max(1, backup.get('size', 0) // 1024)} KB) in Google "
-                    f"Drive › Backups, the newest 7 kept" if last else "none yet - the first one is made after 03:00")
+                    f"Drive › Backups, the newest {KEEP_BACKUPS} kept" if last else "none yet - the first one is made after 03:00")
             if backup.get("error"):
                 text += f" – the last try failed: {backup['error']}"
             rows.append(["Backup", (f"{WARN} " if stale and last else "") + text])

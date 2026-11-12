@@ -7,7 +7,7 @@ The crawler keeps its files in your Google Drive, one folder per business type:
 - **Campaign results:** each campaign's results.
 - **The master sheet:** every campaign on one page, and everything that happened ([AUTOPILOT.md](AUTOPILOT.md#3-the-master-sheet)).
 - **Backups:** `Backups/leadspilot-backup-YYYY-MM-DD.zip`, the panel's own data once a day after 03:00 – the campaigns,
-  the contacted list, business types, the autopilot, the activity log, the searches; never the sign-ins. The newest 7
+  the contacted list, business types, the autopilot, the activity log, the searches; never the sign-ins. The newest 30
   are kept, older ones go to the trash. Made where the master sheet is kept (the cloud server) – [CLOUD.md §8](CLOUD.md#8-what-is-where--and-what-isnt-on-github).
 
 Setting it up step by step: [PLAYBOOK.md §2](PLAYBOOK.md#2-google-drive).
