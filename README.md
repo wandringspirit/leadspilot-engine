@@ -299,7 +299,7 @@ data/                  runtime data: jobs/, exports/ (git-ignored)
 | [docs/OUTREACH.md](docs/OUTREACH.md) | email campaigns: business types, templates, who gets emailed, when, replies and bounces |
 | [docs/AUTOPILOT.md](docs/AUTOPILOT.md) | the autopilot (searches and campaigns by themselves) and the master sheet |
 | [docs/SITES.md](docs/SITES.md) | preview websites: how each business's site is made, who gets one, how long it stays online |
-| [docs/CLOUD.md](docs/CLOUD.md) | the cloud server: sending from there while this computer only searches |
+| [docs/CLOUD.md](docs/CLOUD.md) | the cloud server: sending from there while this computer only searches; setting up a new laptop or server (§9, §10) |
 | [docs/DRIVE.md](docs/DRIVE.md) | Google Drive: folders per business type, uploads, lead files, signing in |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | components, data flow, job state machine, design decisions (with diagrams) |
 | [docs/SCRAPING.md](docs/SCRAPING.md) | how the Google Maps scraping works, selectors, record index map, anti-bot notes |

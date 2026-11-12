@@ -1,0 +1,16 @@
+[Unit]
+Description=Memory ballast: keeps memory use above Oracle's 20% idle line (Always Free)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/lib/memory-ballast.py
+Environment=BALLAST_MB=1300
+DynamicUser=yes
+LimitMEMLOCK=1400M
+OOMScoreAdjust=1000
+Nice=19
+Restart=always
+RestartSec=600
+
+[Install]
+WantedBy=multi-user.target

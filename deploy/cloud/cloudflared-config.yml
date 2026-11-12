@@ -1,0 +1,8 @@
+# Cloudflare Tunnel for the Leads Pilot panel (docs/CLOUD.md)
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+ingress:
+  # behind Cloudflare Access (app "Leads Pilot panel", policy "Me") - docs/CLOUD.md
+  - hostname: panel.leadspilot.co
+    service: http://127.0.0.1:8000
+  - service: http_status:404

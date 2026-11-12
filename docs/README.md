@@ -7,7 +7,7 @@
 | [OUTREACH.md](OUTREACH.md) | know how the email campaigns work: business types, templates, who gets emailed, when, replies, bounces |
 | [AUTOPILOT.md](AUTOPILOT.md) | let the tool find businesses and start campaigns by itself, and read the master sheet in Google Drive |
 | [SITES.md](SITES.md) | know how each business's preview website is made, who gets one, how long it stays online and how it is uploaded |
-| [CLOUD.md](CLOUD.md) | send from a cloud server that's always on while this computer only searches – roles, the hand-off, the server, moving over |
+| [CLOUD.md](CLOUD.md) | send from a cloud server that's always on while this computer only searches – roles, the hand-off, the server, moving over, what isn't on GitHub, a new laptop or server |
 | [DRIVE.md](DRIVE.md) | know where files go in Google Drive, what a lead file needs, how the sign-in works |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | understand the components, data flow, job state machine and the reasoning behind the design |
 | [SCRAPING.md](SCRAPING.md) | know exactly how Google Maps is scraped, where each field comes from, the record index map, anti-bot notes and how to repair a layout change |

@@ -186,3 +186,98 @@ server isn't running ([AUTOPILOT.md §3](AUTOPILOT.md#3-the-master-sheet)).
   reached the cloud.
 
 The laptop's log says the same, once per problem – see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#cloud-server).
+
+## 8. What is where – and what isn't on GitHub
+
+GitHub has the code, the docs and the cloud server's own files (`deploy/cloud/`). On purpose it doesn't
+have anything secret or personal – the repository is public:
+
+| What | Where it lives | Keep a copy |
+| --- | --- | --- |
+| The laptop's `.env` (mailbox password, Google OAuth client, `SITES_VISITS_KEY`, `SEARCHER_TOKEN`, `CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) | the laptop's project folder | **yes – in your password manager** (the server's `.env` has all of it except the Access token) |
+| The SSH key for the server (`~/.ssh/leadspilot_oracle` and the `leadspilot-cloud` entry in `~/.ssh/config`) | the laptop's `C:\Users\<you>\.ssh` | **yes – in your password manager** (the private key file) |
+| Campaigns, the contacted list, business types, the autopilot, the activity log (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | the master sheet in Google Drive has the campaigns and the activity log |
+| The Google Drive sign-in (`data/google_drive.json`) | both computers | no – connect again on a new laptop |
+| The Cloudflare login for the preview websites (`data/wrangler`) | the cloud server (it uploads them) and the laptop | no – `python sites/deploy.py --login` on a laptop (it opens the browser), then copy its `data/wrangler` to the server |
+| Accounts: Oracle Cloud, Cloudflare (Zero Trust, the domain, the Worker), Google Cloud (OAuth app), Google Workspace (the mailbox) | online | your logins |
+
+## 9. A new laptop (the search computer)
+
+The laptop only searches, so a new one needs no campaign data – the cloud server has it all. About 30
+minutes:
+
+1. **Install** Git, [Python 3.11+](https://www.python.org/downloads/) (tick *Add python.exe to PATH*), and
+   clone the code: `git clone https://github.com/wandringspirit/leadspilot-engine.git C:\Projects\leadspilot-engine`.
+2. **The SSH key.** Copy `leadspilot_oracle` (and `.pub`) from your password manager / the old laptop into
+   `C:\Users\<you>\.ssh\`, and add to `C:\Users\<you>\.ssh\config`:
+
+   ```
+   Host leadspilot-cloud
+       HostName <the server's public IP – Oracle console › Compute › Instances>
+       User ubuntu
+       IdentityFile ~/.ssh/leadspilot_oracle
+       IdentitiesOnly yes
+   ```
+
+   `ssh leadspilot-cloud` must log in. *Lost the key?* Make a new one (`ssh-keygen -t ed25519 -f
+   ~/.ssh/leadspilot_oracle`) and put its `.pub` line into the server's `~/.ssh/authorized_keys` from the
+   Oracle console (*the instance › Cloud Shell connection* or *Console connection*).
+3. **`.env`.** Best: the copy from your password manager. Else start from the server's –
+   `scp leadspilot-cloud:leadspilot-engine/.env .env` – and change it for the laptop: delete the lines
+   `HOST`, `PORT`, `KEEP_AWAKE`, `TRUSTED_HOSTS`, and set
+
+   ```
+   ROLE=searcher
+   CLOUD_URL=https://panel.leadspilot.co
+   CLOUD_ACCESS_ID=…
+   CLOUD_ACCESS_SECRET=…
+   ```
+
+   (`SEARCHER_TOKEN` is already in it.) The Access token's secret is only shown when it is made: if you
+   don't have it, make a new one – Cloudflare Zero Trust › *Access › Service credentials › Service Tokens ›
+   Create* (non-expiring), add it to the *Laptop* policy of the *Leads Pilot panel* application, and delete
+   the old token.
+4. **Start it once:** double-click `start.bat` – it installs everything (a few minutes) and opens the
+   panel. Then `start.bat --autostart` (or `python start.py --autostart`) so it starts with Windows.
+5. **Google Drive:** the panel at `http://127.0.0.1:8000` › Outreach › *Connect Google Drive*. Within a
+   minute the laptop hands the sign-in to the cloud server (§4).
+6. **Updates from this laptop:** `git remote add cloud leadspilot-cloud:leadspilot.git` – then
+   `git push origin main` and `git push cloud main` deploy as before (§4).
+7. **Check:** `http://127.0.0.1:8000/api/remote` says *waiting for a search* (or *searching …*), and the
+   master sheet's Status tab shows the laptop's last check-in within a few minutes.
+8. **The old laptop:** stop its panel and `start.bat --no-autostart`, so only one computer searches. If it
+   was lost, delete its Access service token (step 3) and remove its key from the server's
+   `~/.ssh/authorized_keys`.
+
+## 10. A new cloud server
+
+If Oracle reclaims the server, or you move to another one: an Ubuntu 24.04 machine (ARM or x86), about
+1 GB of memory for the panel. `deploy/cloud/` has its files.
+
+1. **The machine:** Oracle *Always Free* `VM.Standard.A1.Flex` (1 OCPU, 6 GB) in your home region, your
+   `leadspilot_oracle.pub` as its SSH key; update the IP in the laptop's `~/.ssh/config`. On it:
+   `sudo timedatectl set-timezone Asia/Kolkata`, a 2 GB swap file, `sudo apt install python3-venv git` and
+   Node.js 20+ (for wrangler). Unattended upgrades are on in Ubuntu's image.
+2. **The code:** `git init --bare ~/leadspilot.git`, copy `deploy/cloud/post-receive` to
+   `~/leadspilot.git/hooks/post-receive` (`chmod +x`), `mkdir ~/leadspilot-engine`, then from the laptop
+   `git push cloud main`. On the server: `cd ~/leadspilot-engine && python3 -m venv venv &&
+   venv/bin/pip install -r requirements.txt`, and `cd sites/worker && npm ci`.
+3. **The panel as a service:** `sudo cp deploy/cloud/leadspilot.service /etc/systemd/system/ && sudo
+   systemctl enable --now leadspilot`.
+4. **Data and settings:** copy the old server's `data/` and `.env` (or, if it's gone, the laptop's `.env`
+   with the changes of §5 step 3 – `ROLE=sender`, a new `SEARCHER_TOKEN` also put in the laptop's `.env`,
+   `TRUSTED_HOSTS`, `KEEP_AWAKE=false`; the campaigns then start from the laptop's old copy, and the
+   contacted list from the master sheet is what was emailed). `chmod 600 .env`. The Cloudflare login for
+   the preview websites is `data/wrangler`: if it didn't come with `data/`, run `python sites/deploy.py
+   --login` on the laptop (it needs a browser) and copy the laptop's `data/wrangler` to the server.
+5. **The tunnel:** install `cloudflared` (Cloudflare's apt repository), `cloudflared tunnel login`,
+   `cloudflared tunnel create leadspilot-panel` (or reuse the existing tunnel's credentials file),
+   `cloudflared tunnel route dns leadspilot-panel panel.leadspilot.co`, copy
+   `deploy/cloud/cloudflared-config.yml` to `/etc/cloudflared/config.yml` with the tunnel's id, then
+   `sudo cloudflared service install`. The Access application and its policies stay as they are.
+6. **Idle reclamation** (until the account is *Pay As You Go*, §4): `sudo cp deploy/cloud/memory-ballast.py
+   /usr/local/lib/ && sudo cp deploy/cloud/memory-ballast.service /etc/systemd/system/ && sudo systemctl
+   enable --now memory-ballast`.
+7. **Check:** `sudo systemctl status leadspilot cloudflared`, the laptop's `/api/remote`, and the master
+   sheet's Status tab.
+

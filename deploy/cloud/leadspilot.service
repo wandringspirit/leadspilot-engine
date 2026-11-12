@@ -1,0 +1,16 @@
+[Unit]
+Description=Leads Pilot Engine panel (docs/CLOUD.md)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/leadspilot-engine
+Environment=LEAD_CRAWLER_LAUNCHER=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/ubuntu/leadspilot-engine/venv/bin/python run.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

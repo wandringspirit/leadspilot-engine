@@ -1,0 +1,17 @@
+#!/bin/sh
+# A push to this repository (git push cloud main, from the laptop) puts the code in ~/leadspilot-engine,
+# installs changed requirements and restarts the panel. docs/CLOUD.md
+set -e
+APP="$HOME/leadspilot-engine"
+GIT_WORK_TREE="$APP" git --git-dir="$HOME/leadspilot.git" checkout -f main
+cd "$APP"
+if [ -x venv/bin/pip ]; then
+  venv/bin/pip install -q -r requirements.txt
+fi
+if [ -f sites/worker/package-lock.json ] && command -v npm >/dev/null; then
+  (cd sites/worker && npm ci --silent --no-audit --no-fund)
+fi
+if systemctl is-enabled --quiet leadspilot 2>/dev/null; then
+  sudo systemctl restart leadspilot && echo "leadspilot restarted"
+fi
+echo "deployed $(git --git-dir="$HOME/leadspilot.git" rev-parse --short main)"
