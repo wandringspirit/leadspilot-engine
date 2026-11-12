@@ -29,6 +29,7 @@ from app.jobs import ACTIVE_STATES, JobManager
 from app.logbuffer import LEVELS, LOG_FORMAT, install as install_log_buffer, install_file as install_log_file, log_buffer
 from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, Progress, ScrapeRequest
 from app.outreach.activity import ActivityLog
+from app.outreach.alerts import Alerts
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.domains import domain_problem
 from app.outreach.manager import OutreachError, OutreachManager
@@ -69,6 +70,8 @@ async def lifespan(_: FastAPI):
             visits.start_loop(outreach.record_visits)
         if site_requests is not None:
             site_requests.start_loop()
+        if settings.OUTREACH_AUTOSEND:          # emails go out on their own only then - alerts too
+            alerts.start_loop()
     if settings.ROLE == "sender":
         log.info("ROLE=sender: searches wait for the search computer%s",
                  "" if settings.SEARCHER_TOKEN else " - but SEARCHER_TOKEN is empty, so none can ask for them")
@@ -82,6 +85,7 @@ async def lifespan(_: FastAPI):
     if visits is not None:
         await visits.stop_loop()
     await autopilot.stop_loop()
+    await alerts.stop_loop()
     await outreach.stop_loop()
     await drive.stop_loop()
     if sites is not None:
@@ -109,6 +113,17 @@ drive = DriveSync(settings)
 SEARCHER = settings.ROLE == "searcher"          # read once: ROLE takes effect after a restart
 searcher = RemoteSearcher(settings, manager, drive=drive.client)
 remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the search computer last asked
+
+
+def _alert_status() -> dict:
+    """What the daily summary reports (app/outreach/alerts.py)."""
+    return {"campaigns": outreach.list_campaigns(), "outreach": outreach.status(), "autopilot": autopilot.status(),
+            "drive": drive.status(), "remote": _remote_info()}
+
+
+alerts = Alerts(settings, outreach.email_me, _alert_status, last_contact=lambda: remote_contact["at"])
+if not SEARCHER:                                    # the cloud server tells you; a search computer has nothing to say
+    activity.listeners.append(alerts.note)
 
 
 def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
@@ -333,6 +348,10 @@ class RemoteDrive(BaseModel):
 @app.get("/api/remote")
 async def remote_status() -> dict:
     """Who searches: this computer (all), a search computer (sender), or this one for the cloud (searcher)."""
+    return _remote_info()
+
+
+def _remote_info() -> dict:
     if SEARCHER:
         return searcher.status()
     if settings.ROLE == "sender":
@@ -729,8 +748,10 @@ async def _apply_settings(names: set[str]) -> None:
     if "OUTREACH_AUTOSEND" in names and not SEARCHER:   # a search computer never sends
         if settings.OUTREACH_AUTOSEND:
             outreach.start_loop()
+            alerts.start_loop()
         else:
             await outreach.stop_loop()
+            await alerts.stop_loop()
     if "DRIVE_AUTO_UPLOAD" in names:
         if settings.DRIVE_AUTO_UPLOAD:
             drive.start_loop(outreach, master=_master_tables)

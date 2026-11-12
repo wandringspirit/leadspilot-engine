@@ -163,7 +163,8 @@ or deleted.
 - **Which emails:** those since the first email to a watched business. Only their headers are
   read, plus the start of a bounce's text and of a reply (*Re: ...*).
 - **Alerts:** every reply also sends you an email, *[Leads Pilot] Reply from {business}*, with what
-  they wrote above the quoted email. So outside the send window it can take up to an hour. A later
+  they wrote above the quoted email – to `ALERT_TO` (since 1.20.0), else the From address. Answer the
+  business from the sending mailbox. So outside the send window it can take up to an hour. A later
   reply is added to the business in the campaign and to the Activity tab, and its status stays
   `replied`. Bounces of your own answers aren't tracked.
 
@@ -220,10 +221,28 @@ Other countries have stricter rules (Canada's CASL, the EU / UK's GDPR and PECR)
 before emailing businesses there. Keep the volume low (`OUTREACH_DAILY_LIMIT`), send from a
 separate warmed-up domain, and let people say no. This is not legal advice.
 
-## 8. Settings
+## 8. Emails to you about the panel (`app/outreach/alerts.py`)
+
+So the panel doesn't need watching, it emails you (`ALERT_TO`, else the From address) – only while
+`OUTREACH_AUTOSEND` is on, and never from the laptop when it is the search computer:
+
+- **Problems**, within a minute: the autopilot stopped (also its bounce stop: 2 of the last 20 businesses
+  emailed bounced, which pauses the running campaigns), Google blocked a search, a campaign paused – not by
+  you –, an email refused, a campaign not made or not started; on the cloud server also *Laptop not
+  searching* when the laptop hasn't asked for a search for 24 hours (once per silence). Several are sent
+  together, at most one email every 30 minutes, each kind with what to do about it.
+- **A daily summary** at 08:00 (the computer's time): yesterday's emails – first emails and follow-ups – and
+  what came back, the campaigns, the next email, the autopilot, the laptop's last check-in, Google Drive and
+  the last day's problems.
+- **Google Drive disconnected** has its own email ([DRIVE.md](DRIVE.md)); **replies** too (§5).
+
+What's still to be sent is kept in `data/alerts.json`: a restart loses nothing and doesn't send the day's
+summary twice. A problem email that can't go out (the mailbox is the problem) is tried again later.
+
+## 9. Settings
 
 `SMTP_HOST`, `SMTP_PORT`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_FOLDER`, `MAIL_USERNAME`,
-`MAIL_PASSWORD`, `SENDER_EMAIL`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`,
+`MAIL_PASSWORD`, `SENDER_EMAIL`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
 `OUTREACH_AUTOSEND`, `OUTREACH_TIMEZONE`, `OUTREACH_DAYS`, `OUTREACH_HOURS`,
 `OUTREACH_DAILY_LIMIT`, `OUTREACH_MIN_GAP_S`, `OUTREACH_MAX_GAP_S`, `OUTREACH_CHECK_MINUTES`,
 `OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`. What each one does and its default:

@@ -23,6 +23,7 @@ class ActivityLog:
         self._lock = threading.Lock()
         self._entries: list[dict] = []
         self.changed_at: datetime | None = None
+        self.listeners: list[Callable[[dict], None]] = []    # told about each new entry (app/outreach/alerts.py)
         if path.is_file():
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 if not line.strip():
@@ -45,6 +46,11 @@ class ActivityLog:
                     fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             except OSError as exc:  # pragma: no cover - the log must never stop the work
                 log.warning("could not write %s: %s", self.path, exc)
+        for listener in self.listeners:
+            try:
+                listener(entry)
+            except Exception:  # noqa: BLE001 - the log must never stop the work
+                log.exception("activity log: a listener failed")
         return entry
 
     def entries(self, limit: int | None = None) -> list[dict]:

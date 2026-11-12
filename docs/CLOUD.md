@@ -166,7 +166,14 @@ server's panel (`sudo systemctl stop leadspilot`), copy its `data/` back to the 
 the contacted list changed there), then on the laptop remove `ROLE` (or set `ROLE=all`) and start its
 panel – never let both send.
 
-## 6. What the panels show
+## 6. Not watching the panels
+
+The cloud server emails you (`ALERT_TO`) when something needs a look – the autopilot stopped, a campaign
+paused, Google blocked a search, the laptop silent for 24 hours … – and a summary every morning at 08:00
+([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)). The master sheet in Google
+Drive has everything else.
+
+## 7. What the panels show
 
 `GET /api/remote` ([API.md](API.md#searching-on-another-computer)):
 

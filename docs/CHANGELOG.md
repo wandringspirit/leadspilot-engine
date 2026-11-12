@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.20.0 – 2026-11-12
+
+### Added
+- **Emails to you about problems** (`app/outreach/alerts.py`, [OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)):
+  the autopilot stopped (also on too many bounces), Google blocked a search, a campaign paused (not by you),
+  an email refused, a campaign not made or not started, and on the cloud server the laptop silent for 24
+  hours – sent together, at most every 30 minutes, each with what to do.
+- **A daily summary email** at 08:00: yesterday's emails and what came back, campaigns, the next email, the
+  autopilot, the laptop, Google Drive, the last day's problems.
+- `ActivityLog.listeners`: told about each new entry.
+
+### Changed
+- **Reply alerts** (*[Leads Pilot] Reply from …*) go to `ALERT_TO` when it's set, like the other emails to you.
+
 ## 1.19.5 – 2026-11-12
 
 ### Added

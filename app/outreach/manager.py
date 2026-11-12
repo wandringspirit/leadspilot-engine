@@ -986,6 +986,10 @@ class OutreachManager:
         self.last_check.update(ok_at=now, error="", emails=len(messages), replies=replies, bounces=bounces)
         await self._send_alerts()
 
+    def alert_to(self) -> str:
+        """Where emails to you go: ALERT_TO (comma-separated), else the From address."""
+        return ", ".join(a.strip() for a in self.cfg.ALERT_TO.split(",") if a.strip()) or sender_address(self.cfg)
+
     async def email_me(self, subject: str, body: str) -> bool:
         """A note to yourself (e.g. Google Drive disconnected), to ALERT_TO - else the From address. False: it
         couldn't go out."""
@@ -993,8 +997,8 @@ class OutreachManager:
             log.warning("Couldn't email you %r: the mailbox settings aren't complete", subject)
             return False
         me = sender_address(self.cfg)
-        to = ", ".join(a.strip() for a in self.cfg.ALERT_TO.split(",") if a.strip()) or me
-        message = build_message(sender=sender_header(self.cfg), to=to, subject=f"[Leads Pilot] {subject}", body=body,
+        message = build_message(sender=sender_header(self.cfg), to=self.alert_to(), subject=f"[Leads Pilot] {subject}",
+                                body=body,
                                 message_id=new_message_id(me))
         try:
             await self.mailbox.send(message)
@@ -1013,7 +1017,7 @@ class OutreachManager:
                     if inbound.alert_text is None:
                         continue
                     website = self.sites.url(lead.site) if self.sites is not None and lead.site else ""
-                    message = build_message(sender=sender_header(self.cfg), to=me,
+                    message = build_message(sender=sender_header(self.cfg), to=self.alert_to(),
                                             subject=" ".join(f"[Leads Pilot] Reply from {lead.business}".split()),
                                             body=_alert_body(campaign, lead, inbound, website),
                                             message_id=new_message_id(me))
