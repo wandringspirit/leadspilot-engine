@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.23.0 – 2026-11-12
+
+### Added
+- **A daily backup in Google Drive** (`app/drive/backup.py`): after 03:00 the campaigns, the contacted list,
+  business types, the autopilot, the activity log and the searches go into `Backups/leadspilot-backup-YYYY-MM-DD.zip`;
+  the newest 7 are kept, older ones go to Drive's trash. Never the sign-ins or the preview websites. A *Backup* row
+  in the master sheet's Status tab and the daily summary; restoring is in [CLOUD.md §10](CLOUD.md#10-a-new-cloud-server).
+
 ## 1.22.0 – 2026-11-12
 
 ### Added

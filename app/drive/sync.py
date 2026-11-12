@@ -12,6 +12,8 @@ DRIVE_FOLDER/                      (a folder of My Drive, a shared folder's URL,
       Roofer · Houston.csv         each campaign's results, updated while it runs
   Plumber/
     …
+  Backups/
+    leadspilot-backup-2026-11-12.zip   the panel's own data, once a day, the newest 7 - app/drive/backup.py
 ```
 
 A search's CSV is the extended export (the default columns first, then the
@@ -30,6 +32,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Callable
 
 from app.config import Settings
+from app.drive.backup import Backup
 from app.drive.client import SHEET_TYPE, DriveClient, DriveError, folder_id_from
 from app.drive.sheets import NAME as SHEET_NAME, MasterSheet, SheetsOff
 from app.export.csv_export import job_filename, rows_to_csv_bytes, safe_filename
@@ -72,6 +75,7 @@ class DriveSync:
         self._sheets_off_at: datetime | None = None
         self._master_hash = ""
         self._master_at: datetime | None = None
+        self.backup = Backup(cfg, self)        # once a day, in the loop (app/drive/backup.py)
 
     @property
     def connected(self) -> bool:
@@ -95,6 +99,7 @@ class DriveSync:
                               "link": file.get("link", ""), "at": file.get("at")}
                        for part, file in self.master.items()},
             "sheets_off": self.sheets_off,
+            "backup": self.backup.status(),
         }
 
     # ------------------------------------------------------------------
@@ -256,6 +261,7 @@ class DriveSync:
                 await self.sync_campaigns(outreach)
                 if master is not None:
                     await self.sync_master(master())
+                    await self.backup.run_if_due()      # only where the master sheet is kept: the cloud server
                 self.last_error = ""
             except DriveError as exc:
                 self.last_error = str(exc)
@@ -266,10 +272,11 @@ class DriveSync:
     # ------------------------------------------------------------------
     # helpers
     # ------------------------------------------------------------------
-    async def _upload(self, folders: tuple[str, ...], name: str, content: bytes, file_id: str) -> dict:
+    async def _upload(self, folders: tuple[str, ...], name: str, content: bytes, file_id: str, *,
+                      mime: str = "text/csv") -> dict:
         async def once() -> dict:
             folder = await self.folder(*folders)
-            return await self.client.upload(folder["id"], name, content, file_id=file_id)
+            return await self.client.upload(folder["id"], name, content, mime=mime, file_id=file_id)
         return await self._call(once)
 
     async def _call(self, function, *args):

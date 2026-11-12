@@ -251,6 +251,16 @@ class Alerts:
             rows.append(["Google Drive", f"{WARN} DISCONNECTED" + (f" since {_local(lost)}" if lost else "")
                          + (" – connect it in the laptop's panel" if sender else " – connect it in the Outreach tab")])
 
+        backup = drive.get("backup") or {}
+        if drive.get("connected") and "backup" in drive:
+            last = _parse(backup.get("at") or "")
+            stale = last is None or now - last > timedelta(hours=48)
+            text = (f"{_local(last)} – {backup.get('name')} ({max(1, backup.get('size', 0) // 1024)} KB) in Google "
+                    f"Drive › Backups, the newest 7 kept" if last else "none yet - the first one is made after 03:00")
+            if backup.get("error"):
+                text += f" – the last try failed: {backup['error']}"
+            rows.append(["Backup", (f"{WARN} " if stale and last else "") + text])
+
         recent = self._recent(now)
         whats = list(dict.fromkeys(p.get("what", "") for p in recent))
         rows.append(["Problems (last day)", "none" if not recent else
@@ -263,7 +273,8 @@ class Alerts:
         yesterday = (local - timedelta(days=1)).strftime("%a %d %b")
         lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", "",
                  f"Yesterday ({yesterday}): {rows['Yesterday']}", ""]
-        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Campaigns", "Autopilot", "Laptop", "Google Drive")
+        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Campaigns", "Autopilot", "Laptop", "Google Drive",
+                                                          "Backup")
                   if label in rows]
         recent = self._recent(now)
         lines += ["", f"Problems in the last day: {len(recent) or 'none'}"]

@@ -196,7 +196,7 @@ have anything secret or personal – the repository is public:
 | --- | --- | --- |
 | The laptop's `.env` (mailbox password, Google OAuth client, `SITES_VISITS_KEY`, `SEARCHER_TOKEN`, `CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) | the laptop's project folder | **yes – in your password manager** (the server's `.env` has all of it except the Access token) |
 | The SSH key for the server (`~/.ssh/leadspilot_oracle` and the `leadspilot-cloud` entry in `~/.ssh/config`) | the laptop's `C:\Users\<you>\.ssh` | **yes – in your password manager** (the private key file) |
-| Campaigns, the contacted list, business types, the autopilot, the activity log (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | the master sheet in Google Drive has the campaigns and the activity log |
+| Campaigns, the contacted list, business types, the autopilot, the activity log, the searches (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | **done by itself:** every day after 03:00 a zip in Google Drive › `Backups/` (`leadspilot-backup-YYYY-MM-DD.zip`, the newest 7; `app/drive/backup.py`); the master sheet's Status tab shows the last one |
 | The Google Drive sign-in (`data/google_drive.json`) | both computers | no – connect again on a new laptop |
 | The Cloudflare login for the preview websites (`data/wrangler`) | the cloud server (it uploads them) and the laptop | no – `python sites/deploy.py --login` on a laptop (it opens the browser), then copy its `data/wrangler` to the server |
 | Accounts: Oracle Cloud, Cloudflare (Zero Trust, the domain, the Worker), Google Cloud (OAuth app), Google Workspace (the mailbox) | online | your logins |
@@ -264,12 +264,15 @@ If Oracle reclaims the server, or you move to another one: an Ubuntu 24.04 machi
    venv/bin/pip install -r requirements.txt`, and `cd sites/worker && npm ci`.
 3. **The panel as a service:** `sudo cp deploy/cloud/leadspilot.service /etc/systemd/system/ && sudo
    systemctl enable --now leadspilot`.
-4. **Data and settings:** copy the old server's `data/` and `.env` (or, if it's gone, the laptop's `.env`
-   with the changes of §5 step 3 – `ROLE=sender`, a new `SEARCHER_TOKEN` also put in the laptop's `.env`,
-   `TRUSTED_HOSTS`, `KEEP_AWAKE=false`; the campaigns then start from the laptop's old copy, and the
-   contacted list from the master sheet is what was emailed). `chmod 600 .env`. The Cloudflare login for
-   the preview websites is `data/wrangler`: if it didn't come with `data/`, run `python sites/deploy.py
-   --login` on the laptop (it needs a browser) and copy the laptop's `data/wrangler` to the server.
+4. **Data and settings:** copy the old server's `data/` and `.env`, then `chmod 600 .env`. If the server is
+   gone:
+   - **data:** unzip the newest backup from Google Drive › `Backups/` into `~/leadspilot-engine/data/` before
+     the panel's first start;
+   - **`.env`:** take the laptop's with the changes of §5 step 3 – `ROLE=sender`, a new `SEARCHER_TOKEN`
+     (put it in the laptop's `.env` too), `TRUSTED_HOSTS`, `KEEP_AWAKE=false`;
+   - **Google Drive:** connect it on the laptop – it hands the sign-in over;
+   - **the preview websites' Cloudflare login** (`data/wrangler`): run `python sites/deploy.py --login` on the
+     laptop (it needs a browser) and copy the laptop's `data/wrangler` to the server.
 5. **The tunnel:** install `cloudflared` (Cloudflare's apt repository), `cloudflared tunnel login`,
    `cloudflared tunnel create leadspilot-panel` (or reuse the existing tunnel's credentials file),
    `cloudflared tunnel route dns leadspilot-panel panel.leadspilot.co`, copy

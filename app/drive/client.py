@@ -371,6 +371,11 @@ class DriveClient:
                                       content=body, headers={"Content-Type": f"multipart/related; boundary={boundary}"})
         return response.json()
 
+    async def trash(self, file_id: str) -> None:
+        """Move a file to Drive's trash (it empties itself after 30 days)."""
+        await self.request("PATCH", f"{API}/files/{file_id}", params={"supportsAllDrives": "true"},
+                           json={"trashed": True})
+
     async def download(self, file: dict) -> bytes:
         """A file's content; a Google Sheet comes as CSV (its first sheet)."""
         if file.get("mimeType") == SHEET_TYPE:
