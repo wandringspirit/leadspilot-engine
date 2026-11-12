@@ -189,6 +189,27 @@ The laptop's log says the same, once per problem – see [TROUBLESHOOTING.md](TR
 
 ## 8. What is where – and what isn't on GitHub
 
+Every kind of data, and where it is:
+
+| Data | Cloud server | Laptop | Google Drive | Cloudflare | Mailbox | GitHub |
+| --- | --- | --- | --- | --- | --- | --- |
+| Campaigns (who, which email is next, what came back) | **live** | old copy | daily backup; results files + master sheet | – | – | – |
+| Contacted list (nobody is emailed twice) | **live** | old copy | daily backup | – | – | – |
+| Business types and their email texts | **live** | old copy | daily backup | – | – | – |
+| Autopilot: places, progress, buffer | **live** | old copy | daily backup | – | – | – |
+| Activity log | **live** | old copy | daily backup; master sheet | – | – | – |
+| Search results | copy | **made here** | daily backup; a CSV per search | – | – | – |
+| Preview websites | **source** | old copy | – | **online** | – | – |
+| Website visits, quote requests | – | – | – | **visits database** | quotes (forwarded) | – |
+| Emails sent, replies, bounces | reads them | – | – | – | **all of them** | – |
+| Settings and passwords (`.env`) – keep in a password manager | its own | its own | – | – | – | never |
+| Google Drive sign-in | from the laptop | **made here** | – | – | – | never |
+| SSH key to the server – keep in a password manager | the lock (public key) | **the key** | – | – | – | never |
+| Code, docs, the server's setup files | copy | **edited here** | – | – | – | copy |
+
+**Bold**: the one in use. *Copy*: kept up to date. *Old copy*: the laptop's `data/`, frozen at the move
+(12 Nov 2026, 11:53). *Daily backup*: `Backups/leadspilot-backup-YYYY-MM-DD.zip`, the newest 7.
+
 GitHub has the code, the docs and the cloud server's own files (`deploy/cloud/`). On purpose it doesn't
 have anything secret or personal – the repository is public:
 
