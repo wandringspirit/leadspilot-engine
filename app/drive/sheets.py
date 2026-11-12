@@ -1,4 +1,4 @@
-"""The master sheet as a Google Sheet: a Campaigns tab and an Activity tab, coloured (docs/AUTOPILOT.md).
+"""The master sheet as a Google Sheet: a Status tab, a Campaigns tab and an Activity tab, coloured (docs/AUTOPILOT.md).
 
 Made once in ``DRIVE_FOLDER`` ("Leads Pilot - Master sheet"), formatted once - a purple header row that
 stays at the top, filter buttons, column widths, rows coloured by status (Campaigns) or by what happened
@@ -16,8 +16,8 @@ from app.outreach.master import COUNT_COLUMNS
 
 SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 NAME = "Leads Pilot - Master sheet"
-FORMAT_VERSION = 3                     # raise it to format existing sheets again
-CAMPAIGNS, ACTIVITY = 0, 1             # sheet ids
+FORMAT_VERSION = 4                     # raise it to format existing sheets again
+CAMPAIGNS, ACTIVITY, STATUS = 0, 1, 2  # sheet ids - Status is shown first
 
 HEADER = {"red": 0.29, "green": 0.11, "blue": 0.43}         # deep purple
 WHITE = {"red": 1, "green": 1, "blue": 1}
@@ -46,6 +46,10 @@ ACTIVITY_COLOURS = [
 ]
 CAMPAIGN_WIDTHS = [240, 105, 170, 125, 125] + [88] * len(COUNT_COLUMNS) + [125, 300]
 ACTIVITY_WIDTHS = [125, 140, 210, 230, 240, 460]
+STATUS_WIDTHS = [160, 900]
+#: Status rows whose value needs a look (app/outreach/alerts.py WARN)
+STATUS_WARN = "^\u26a0"
+TITLES = {"status": "Status", "campaigns": "Campaigns", "activity": "Activity"}
 
 
 class SheetsOff(DriveError):
@@ -97,10 +101,10 @@ class MasterSheet:
         return sheet_id
 
     async def _values(self, sheet_id: str, tables: dict) -> None:
+        parts = [part for part in TITLES if part in tables]
         await self._call("POST", f"{SHEETS_API}/{sheet_id}/values:batchClear",
-                         {"ranges": ["Campaigns!A1:Z", "Activity!A1:Z"]})
-        data = [{"range": f"{title}!A1", "values": [header, *rows]}
-                for title, (header, rows) in (("Campaigns", tables["campaigns"]), ("Activity", tables["activity"]))]
+                         {"ranges": [f"{TITLES[part]}!A1:Z" for part in parts]})
+        data = [{"range": f"{TITLES[part]}!A1", "values": [tables[part][0], *tables[part][1]]} for part in parts]
         await self._call("POST", f"{SHEETS_API}/{sheet_id}/values:batchUpdate",
                          {"valueInputOption": "RAW", "data": data})
 
@@ -109,8 +113,7 @@ class MasterSheet:
                                     params={"fields": "sheets(properties(sheetId,title),conditionalFormats)"})
         sheets = {s["properties"]["sheetId"]: s for s in response.get("sheets", [])}
         requests: list[dict] = []
-        first = next(iter(sheets), CAMPAIGNS)
-        if first != CAMPAIGNS or CAMPAIGNS not in sheets:      # a fresh spreadsheet's only tab is id 0
+        if CAMPAIGNS not in sheets or set(sheets) - {CAMPAIGNS, ACTIVITY, STATUS}:   # a fresh one's only tab is id 0
             raise DriveError("the master sheet doesn't look like one this panel made", 409)
         requests.append(_properties(CAMPAIGNS, "Campaigns", HEADER, frozen_columns=1))
         if ACTIVITY in sheets:
@@ -119,7 +122,14 @@ class MasterSheet:
             requests.append({"addSheet": {"properties": {"sheetId": ACTIVITY, "title": "Activity",
                                                          "gridProperties": {"frozenRowCount": 1}}}})
             sheets[ACTIVITY] = {}
-        for sid in (CAMPAIGNS, ACTIVITY):                     # formatting again: the old colour rules go
+        if STATUS in sheets:
+            requests.append(_properties(STATUS, "Status", HEADER))
+        else:
+            requests.append({"addSheet": {"properties": {"sheetId": STATUS, "title": "Status",
+                                                         "gridProperties": {"frozenRowCount": 1}}}})
+            sheets[STATUS] = {}
+        requests.append({"updateSheetProperties": {"properties": {"sheetId": STATUS, "index": 0}, "fields": "index"}})
+        for sid in (CAMPAIGNS, ACTIVITY, STATUS):             # formatting again: the old colour rules go
             for _ in sheets[sid].get("conditionalFormats", []):
                 requests.append({"deleteConditionalFormatRule": {"sheetId": sid, "index": 0}})
         for sid, widths in ((CAMPAIGNS, CAMPAIGN_WIDTHS), (ACTIVITY, ACTIVITY_WIDTHS)):
@@ -144,6 +154,19 @@ class MasterSheet:
                      for pattern, colour in CAMPAIGN_COLOURS]
         requests += [_colour_rule(ACTIVITY, 1, len(ACTIVITY_WIDTHS), "B", pattern, colour)
                      for pattern, colour in ACTIVITY_COLOURS]
+        requests.append(_header(STATUS))                      # Status: two wide columns, wrapped, red when needed
+        requests += [{"updateDimensionProperties": {
+            "range": {"sheetId": STATUS, "dimension": "COLUMNS", "startIndex": i, "endIndex": i + 1},
+            "properties": {"pixelSize": width}, "fields": "pixelSize"}} for i, width in enumerate(STATUS_WIDTHS)]
+        requests.append({"repeatCell": {
+            "range": {"sheetId": STATUS, "startRowIndex": 1},
+            "cell": {"userEnteredFormat": {"verticalAlignment": "MIDDLE", "wrapStrategy": "WRAP",
+                                           "textFormat": {"fontSize": 11}}},
+            "fields": "userEnteredFormat(verticalAlignment,wrapStrategy,textFormat.fontSize)"}})
+        requests.append({"repeatCell": {
+            "range": {"sheetId": STATUS, "startRowIndex": 1, "startColumnIndex": 0, "endColumnIndex": 1},
+            "cell": {"userEnteredFormat": {"textFormat": {"bold": True}}}, "fields": "userEnteredFormat.textFormat.bold"}})
+        requests.append(_colour_rule(STATUS, 1, len(STATUS_WIDTHS), "B", STATUS_WARN, RED))
         await self._call("POST", f"{SHEETS_API}/{sheet_id}:batchUpdate", {"requests": requests})
 
     async def _call(self, method: str, url: str, body: dict | None, **kwargs) -> dict:

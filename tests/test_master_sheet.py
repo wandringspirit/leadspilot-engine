@@ -6,7 +6,8 @@ from app.drive.client import DriveError
 from app.drive.sync import MASTER_FILES, DriveSync
 from tests.test_outreach import make_settings
 
-TABLES = {"campaigns": (["Campaign", "Status"], [["All campaigns (1)", ""], ["Roofer · Katy, TX", "running"]]),
+TABLES = {"status": (["What", "Now"], [["Sending", "on"], ["Autopilot", "⚠ STOPPED - bounces"]]),
+          "campaigns": (["Campaign", "Status"], [["All campaigns (1)", ""], ["Roofer · Katy, TX", "running"]]),
           "activity": (["When", "What"], [["2026-10-16 18:30", "Email sent"]])}
 
 
@@ -54,7 +55,13 @@ async def test_the_master_sheet_is_a_coloured_google_sheet(tmp_path):
     kinds = [next(iter(r)) for r in formatting["requests"]]
     assert {"addSheet", "updateSheetProperties", "repeatCell", "setBasicFilter", "addConditionalFormatRule"} <= set(kinds)
     values = next(body for method, url, body in client.calls if url.endswith("values:batchUpdate"))
-    assert values["data"][0]["range"] == "Campaigns!A1" and values["data"][0]["values"][2] == ["Roofer · Katy, TX", "running"]
+    written = {d["range"]: d["values"] for d in values["data"]}
+    assert written["Campaigns!A1"][2] == ["Roofer · Katy, TX", "running"]
+    assert written["Status!A1"][0] == ["What", "Now"] and written["Status!A1"][2][1].startswith("⚠")
+    tabs = [r["addSheet"]["properties"] for r in formatting["requests"] if "addSheet" in r]
+    assert [t["title"] for t in tabs] == ["Activity", "Status"]
+    assert {"sheetId": 2, "index": 0} in [r["updateSheetProperties"]["properties"] for r in formatting["requests"]
+                                          if "updateSheetProperties" in r]           # Status is the first tab
     assert not client.uploads
     # unchanged: nothing written; formatted only once, even after a restart
     assert not await drive.sync_master(TABLES)

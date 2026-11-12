@@ -46,7 +46,8 @@ log = logging.getLogger(__name__)
 OUTREACH_FOLDER = "Outreach"
 RESULTS_EVERY = timedelta(minutes=5)     # campaign results are uploaded at most this often
 LOOP_S = 60
-MASTER_FILES = {"campaigns": "Leads Pilot - campaigns.csv", "activity": "Leads Pilot - activity.csv"}
+MASTER_FILES = {"status": "Leads Pilot - status.csv", "campaigns": "Leads Pilot - campaigns.csv",
+                "activity": "Leads Pilot - activity.csv"}
 SHEETS_RETRY = timedelta(minutes=10)     # the Sheets API was off: try it again after this
 LEAD_FILE_TYPES = ("text/csv", "text/comma-separated-values", "application/vnd.ms-excel", SHEET_TYPE)
 

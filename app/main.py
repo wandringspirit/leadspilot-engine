@@ -127,8 +127,10 @@ if not SEARCHER:                                    # the cloud server tells you
 
 
 def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
-    """The master sheet's two tables (app/outreach/master.py)."""
-    return {"campaigns": campaigns_table(outreach.list_campaigns()), "activity": activity_table(activity.entries())}
+    """The master sheet's tables: how things stand (app/outreach/alerts.py), the campaigns and the activity log
+    (app/outreach/master.py)."""
+    return {"status": (["What", "Now"], alerts.status_rows(datetime.now(timezone.utc))),
+            "campaigns": campaigns_table(outreach.list_campaigns()), "activity": activity_table(activity.entries())}
 
 
 async def _job_finished(job: Job) -> None:
@@ -475,11 +477,11 @@ async def master_daily() -> dict:
 
 @app.get("/api/master/{part}.csv")
 async def master_csv(part: str) -> Response:
-    """The master sheet as CSV: ``campaigns`` (a row per campaign) or ``activity`` (the activity log), and
-    ``daily`` (a row per day)."""
+    """The master sheet as CSV: ``status`` (how things stand), ``campaigns`` (a row per campaign) or
+    ``activity`` (the activity log), and ``daily`` (a row per day)."""
     tables = {**_master_tables(), "daily": daily_table(outreach.list_campaigns())}
     if part not in tables:
-        raise HTTPException(404, "the master sheet has campaigns.csv, activity.csv and daily.csv")
+        raise HTTPException(404, "the master sheet has status.csv, campaigns.csv, activity.csv and daily.csv")
     return Response(content=to_csv(tables[part]), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="leads-pilot-{part}.csv"'})
 

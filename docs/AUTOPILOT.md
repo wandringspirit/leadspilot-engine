@@ -94,11 +94,13 @@ The Outreach tab shows the newest, and `GET /api/activity` returns them.
 ## 3. The master sheet
 
 **Leads Pilot - Master sheet** is a Google Sheet in `DRIVE_FOLDER` (`app/drive/sheets.py`). It is
-updated within about 5 minutes of a change while Drive is connected and `DRIVE_AUTO_UPLOAD` is on. Both
-tabs can also be downloaded as CSV from the Outreach tab.
+updated within about 5 minutes of a change while Drive is connected and `DRIVE_AUTO_UPLOAD` is on – by
+the cloud server when there is one, never by the laptop searching for it ([CLOUD.md](CLOUD.md)). The
+Campaigns and Activity tabs can also be downloaded as CSV from the Outreach tab.
 
 | Tab | What's in it |
 | --- | --- |
+| **Status** (first) | how things stand, a row each: *Updated* (when it was written – an old time means the panel isn't running), *Sending* (the next email, today's count), *Today* and *Yesterday* (emails sent, replies, websites opened, bounces, unsubscribes), *Campaigns*, *Autopilot*, *Laptop* (its last check-in, on the cloud server), *Google Drive*, *Problems (last day)*. A row that needs a look starts with ⚠ and is red. The same as the daily summary email ([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)) |
 | **Campaigns** | an **All campaigns** row, then a row per campaign: Status, Created, Started, Businesses, Emailed, Waiting, In sequence, Replied, No reply, Bounced, Unsubscribed, Bad address, Skipped, Left out, Opened website, Tapped, Emails sent, Last email, and a link to its results file. Rows are green while running, yellow when paused, blue when finished |
 | **Activity** | the activity log, newest first: When, What, Campaign, Business, Email, Detail. Replies are green, emails sent blue, bounces / refusals / pauses / stops red, campaigns made or started yellow, searches lilac, website visits and taps teal, test copies grey |
 
@@ -110,7 +112,7 @@ made.
 
 It needs the **Google Sheets API** switched on in the Google Cloud project of `GOOGLE_CLIENT_ID`
 (*APIs & Services › Library › Google Sheets API › Enable*). Until it is on, the master sheet is saved
-as two CSV files, `Leads Pilot - campaigns.csv` and `Leads Pilot - activity.csv`, and the Outreach
+as CSV files, `Leads Pilot - status.csv`, `Leads Pilot - campaigns.csv` and `Leads Pilot - activity.csv`, and the Outreach
 tab says so. The panel tries the Sheets API again every 10 minutes and switches over by itself.
 
 Each campaign's own results file, with one row per business, stays in `<business type>/Outreach/`
@@ -119,4 +121,5 @@ Each campaign's own results file, with one row per business, stays in `<business
 ## 4. API
 
 `GET /api/autopilot`, `PATCH /api/autopilot`, `GET /api/activity`,
-`GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` ([API.md](API.md#autopilot)).
+`GET /api/master/status.csv`, `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv`
+([API.md](API.md#autopilot)).

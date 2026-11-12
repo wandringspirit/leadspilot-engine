@@ -6,6 +6,7 @@
   ``SILENCE_H`` hours. Collected and sent together: at most one email every ``GAP_S``.
 * **A daily summary** at ``SUMMARY_HOUR`` (the computer's time): yesterday's emails and what came back, the
   campaigns, the next email, the autopilot, the laptop, Google Drive and the last day's problems.
+* The same as rows (``status_rows``) for the master sheet's **Status** tab (app/drive/sheets.py).
 
 They go to ``ALERT_TO`` (else the From address) through ``OutreachManager.email_me``. Google Drive
 disconnecting has its own email (main.py). What is still to be sent is kept in ``data/alerts.json``, so a
@@ -50,6 +51,11 @@ ADVICE = {
 }
 
 EmailMe = Callable[[str, str], Awaitable[bool]]
+WARN = "\u26a0"         # a value that needs a look (the Status tab colours its row red)
+
+
+def _n(count: int, word: str, plural: str = "") -> str:
+    return f"{count} {word if count == 1 else plural or word + 's'}"
 
 
 def _local(moment: datetime) -> str:
@@ -173,67 +179,94 @@ class Alerts:
     # ------------------------------------------------------------------
     # The daily summary
     # ------------------------------------------------------------------
-    def summary_text(self, now: datetime) -> str:
-        info = self.status()
-        local = now.astimezone()
-        yesterday = (local - timedelta(days=1)).date()
-        lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", ""]
+    def _recent(self, now: datetime) -> list[dict]:
+        day_ago = now - timedelta(days=1)
+        return [p for p in self.recent if (_parse(p.get("at", "")) or now) >= day_ago]
 
-        _, rows = daily_table(info["campaigns"], today=local.date())
+    @staticmethod
+    def _day(campaigns: list, day) -> str:
+        _, rows = daily_table(campaigns, today=day)
         counts = dict.fromkeys(DAILY_COLUMNS[1:], 0)
         for row in rows:
-            if row[0] == yesterday.isoformat():
+            if row[0] == day.isoformat():
                 counts = dict(zip(DAILY_COLUMNS[1:], row[1:]))
         sent = counts["First emails"] + counts["Follow-ups"]
-        lines += [f"Yesterday ({yesterday.strftime('%a %d %b')})",
-                  f"  Emails sent: {sent} ({counts['First emails']} first emails, {counts['Follow-ups']} follow-ups)",
-                  f"  Replies: {counts['Replies']} · Websites opened: {counts['Websites opened']} · "
-                  f"Bounces: {counts['Bounces']} · Unsubscribes: {counts['Unsubscribes']}", ""]
+        return (f"{_n(sent, 'email')} sent ({counts['First emails']} first, {counts['Follow-ups']} follow-ups) · "
+                f"{_n(counts['Replies'], 'reply', 'replies')} · {_n(counts['Websites opened'], 'website')} opened · "
+                f"{_n(counts['Bounces'], 'bounce')} · {_n(counts['Unsubscribes'], 'unsubscribe')}")
+
+    def status_rows(self, now: datetime) -> list[list[str]]:
+        """How things stand, a [what, now] row each - the master sheet's Status tab and the daily summary. A
+        value that needs a look starts with WARN."""
+        info = self.status()
+        local = now.astimezone()
+        sender = self.cfg.ROLE == "sender"
+        rows = [["Updated", f"{_local(now)} – written every few minutes while the "
+                            f"{'cloud server' if sender else 'panel'} runs; an old time here means it isn't running"]]
 
         outreach = info["outreach"]
-        campaigns = info["campaigns"]
-        running = sum(c.status.value == "running" for c in campaigns)
-        lines.append(f"Campaigns: {running} running, {len(campaigns)} in all · businesses emailed so far: "
-                     f"{outreach.get('contacted', 0)}")
         if outreach.get("problems"):
-            lines.append("Mailbox: NOT READY – " + "; ".join(outreach["problems"]))
+            sending = f"{WARN} NOT READY – " + "; ".join(outreach["problems"])
         elif not outreach.get("autosend"):
-            lines.append("Sending: OFF (OUTREACH_AUTOSEND=false) – nothing is sent")
+            sending = f"{WARN} OFF – OUTREACH_AUTOSEND is false, nothing is sent"
         else:
             nxt = _parse(outreach.get("next_send_at") or "")
-            lines.append(f"Next email: {_local(nxt) if nxt else 'none planned'} "
-                         f"({outreach.get('daily_limit')} a day, {outreach.get('sent_today', 0)} sent today)")
+            sending = (f"on – next email {_local(nxt) if nxt else 'not planned'} · "
+                       f"{outreach.get('sent_today', 0)} of {outreach.get('daily_limit')} sent today")
+        rows.append(["Sending", sending])
+        campaigns = info["campaigns"]
+        rows.append(["Today", self._day(campaigns, local.date())])
+        rows.append(["Yesterday", self._day(campaigns, (local - timedelta(days=1)).date())])
+        running = sum(c.status.value == "running" for c in campaigns)
+        rows.append(["Campaigns", f"{running} running, {len(campaigns)} in all · "
+                                  f"{_n(outreach.get('contacted', 0), 'business', 'businesses')} emailed so far"])
 
         auto = info["autopilot"]
         if auto.get("stopped"):
-            lines.append(f"Autopilot: STOPPED – {auto['stopped']}")
+            autopilot = f"{WARN} STOPPED – {auto['stopped']}"
         elif not auto.get("enabled"):
-            lines.append("Autopilot: off")
+            autopilot = "off"
         else:
-            doing = f"searching {auto['searching']}" if auto.get("searching") else f"next search: {auto.get('next') or '–'}"
-            lines.append(f"Autopilot: on – {auto.get('waiting', 0)} business(es) waiting for a first email; "
-                         f"{doing} ({auto.get('searches_today', 0)} of {auto.get('searches_per_day', 0)} searches today)")
+            doing = f"searching {auto['searching']}" if auto.get("searching") else f"next search {auto.get('next') or '–'}"
+            autopilot = (f"on – {_n(auto.get('waiting', 0), 'business', 'businesses')} waiting for a first email · "
+                         f"{doing} · {auto.get('searches_today', 0)} of {auto.get('searches_per_day', 0)} searches today")
+        rows.append(["Autopilot", autopilot])
 
         remote = info.get("remote") or {}
         if remote.get("role") == "sender":
             contact = _parse(remote.get("last_contact") or "")
+            quiet = now - (contact or self.started_at) >= timedelta(hours=SILENCE_H)
             if contact is None:
-                lines.append("Laptop: hasn't asked for a search since the cloud panel started")
+                laptop = f"hasn't asked for a search since the cloud panel started ({_local(self.started_at)})"
             else:
-                state = f"searching {', '.join(remote['searching'])}" if remote.get("searching") else "waiting for a search"
-                lines.append(f"Laptop: last asked {_local(contact)} – {state}")
+                doing = f"searching {', '.join(remote['searching'])}" if remote.get("searching") else "waiting for a search"
+                laptop = f"last asked {_local(contact)} – {doing}"
+            rows.append(["Laptop", (f"{WARN} " if quiet else "") + laptop + (" – is it on?" if quiet else "")])
 
         drive = info["drive"]
         if drive.get("connected"):
-            lines.append(f"Google Drive: connected ({drive.get('email') or 'your account'})")
+            rows.append(["Google Drive", f"connected ({drive.get('email') or 'your account'})"])
         elif drive.get("configured"):
             lost = _parse(drive.get("lost_at") or "")
-            lines.append("Google Drive: DISCONNECTED" + (f" since {_local(lost)}" if lost else "")
-                         + (" – connect it in the laptop's panel" if self.cfg.ROLE == "sender" else ""))
+            rows.append(["Google Drive", f"{WARN} DISCONNECTED" + (f" since {_local(lost)}" if lost else "")
+                         + (" – connect it in the laptop's panel" if sender else " – connect it in the Outreach tab")])
 
-        day_ago = now - timedelta(days=1)
-        recent = [p for p in self.recent if (_parse(p.get("at", "")) or now) >= day_ago]
-        lines += ["", "Problems in the last day: " + ("none" if not recent else str(len(recent)))]
+        recent = self._recent(now)
+        whats = list(dict.fromkeys(p.get("what", "") for p in recent))
+        rows.append(["Problems (last day)", "none" if not recent else
+                     f"{WARN} {len(recent)} – " + ", ".join(whats) + " – the Activity tab has them (red rows)"])
+        return rows
+
+    def summary_text(self, now: datetime) -> str:
+        local = now.astimezone()
+        rows = dict(self.status_rows(now))
+        yesterday = (local - timedelta(days=1)).strftime("%a %d %b")
+        lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", "",
+                 f"Yesterday ({yesterday}): {rows['Yesterday']}", ""]
+        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Campaigns", "Autopilot", "Laptop", "Google Drive")
+                  if label in rows]
+        recent = self._recent(now)
+        lines += ["", f"Problems in the last day: {len(recent) or 'none'}"]
         if recent:
             lines.append(self.problems_text(recent))
         return "\n".join(lines)

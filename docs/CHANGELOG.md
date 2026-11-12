@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.21.0 – 2026-11-12
+
+### Added
+- **A Status tab, first in the master sheet**: when it was written (an old time means the panel isn't
+  running), sending and the next email, today's and yesterday's emails and what came back, campaigns, the
+  autopilot, the laptop's last check-in, Google Drive, the last day's problems. Rows that need a look start
+  with ⚠ and are red. Also `GET /api/master/status.csv`, and `Leads Pilot - status.csv` while the Sheets API is
+  off. The daily summary email is built from the same rows.
+
 ## 1.20.1 – 2026-11-12
 
 ### Fixed

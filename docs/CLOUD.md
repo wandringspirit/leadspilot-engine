@@ -171,8 +171,9 @@ panel – never let both send.
 
 The cloud server emails you (`ALERT_TO`) when something needs a look – the autopilot stopped, a campaign
 paused, Google blocked a search, the laptop silent for 24 hours … – and a summary every morning at 08:00
-([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)). The master sheet in Google
-Drive has everything else.
+([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)). The master sheet's first
+tab, **Status**, says the same at a glance – red rows need a look, and an old *Updated* time means the cloud
+server isn't running ([AUTOPILOT.md §3](AUTOPILOT.md#3-the-master-sheet)).
 
 ## 7. What the panels show
 

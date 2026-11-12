@@ -26,7 +26,7 @@ JSON unless noted. Interactive OpenAPI docs are served at `/docs` (Swagger UI) a
 | POST | `/api/remote/jobs/{job_id}/result` | the search computer's finished search |
 | POST | `/api/remote/drive` | the search computer's Google Drive sign-in: which one it has, handed over when new |
 | GET | `/api/activity` | what happened, newest first |
-| GET | `/api/master/{part}.csv` | the master sheet: `campaigns.csv` or `activity.csv`; also `daily.csv` |
+| GET | `/api/master/{part}.csv` | the master sheet: `status.csv`, `campaigns.csv` or `activity.csv`; also `daily.csv` |
 | GET | `/api/master/daily` | day by day: emails sent (first emails, follow-ups) and what came back |
 | GET / POST | `/api/business-types` | list / add business types |
 | GET / PATCH / DELETE | `/api/business-types/{type_id}` | one business type: read, change, delete |
@@ -423,7 +423,8 @@ Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.
   count afresh; `400` without a business type, `404` unknown business type.
 - `GET /api/activity?limit=100` → `[{"at", "what", "detail", "campaign", "business", "email"}]`,
   newest first.
-- `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master sheet's files.
+- `GET /api/master/status.csv`, `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv` → the master
+  sheet's files (*Status*: `What`, `Now` – how things stand).
 - `GET /api/master/daily` → `{"columns": ["Day", "First emails", "Follow-ups", "Replies", "Websites opened",
   "Bounces", "Unsubscribes"], "rows": [["2026-11-09", 3, 7, 0, 1, 0, 0], …]}` - a row per day of the computer's
   own calendar, oldest first, from the first day anything happened through today (days without anything

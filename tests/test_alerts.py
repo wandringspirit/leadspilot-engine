@@ -109,8 +109,9 @@ def test_the_daily_summary_goes_out_once_a_morning(tmp_path):
     asyncio.run(alerts.step())
     subject, body = inbox.sent[0]
     assert subject.startswith("Daily summary")
-    assert "Emails sent: 1 (1 first emails, 0 follow-ups)" in body
-    assert "Campaigns: 1 running, 1 in all" in body and "emailed so far: 49" in body
+    assert "Yesterday (Wed 11 Nov): 1 email sent (1 first, 0 follow-ups) · 0 replies" in body
+    assert "Campaigns: 1 running, 1 in all · 49 businesses emailed so far" in body
+    assert "Sending: on – next email" in body
     assert "Autopilot: on" in body and "Plano, TX" in body and "Laptop: last asked" in body
     assert "Google Drive: connected" in body and "Problems in the last day: none" in body
     clock.at += timedelta(hours=3)
@@ -128,7 +129,10 @@ def test_the_summary_says_what_is_wrong(tmp_path):
                         outreach={"problems": ["MAIL_PASSWORD is empty"]},
                         remote={"role": "sender", "last_contact": None})
     body = alerts.summary_text(local(9))
-    assert "Autopilot: STOPPED – Google blocked a search" in body
-    assert "Google Drive: DISCONNECTED since" in body and "laptop's panel" in body
-    assert "Mailbox: NOT READY – MAIL_PASSWORD is empty" in body
+    assert "Autopilot: ⚠ STOPPED – Google blocked a search" in body
+    assert "Google Drive: ⚠ DISCONNECTED since" in body and "laptop's panel" in body
+    assert "Sending: ⚠ NOT READY – MAIL_PASSWORD is empty" in body
+    rows = dict(alerts.status_rows(local(9)))
+    assert list(rows)[0] == "Updated" and rows["Problems (last day)"] == "none"
+    assert rows["Today"].startswith("0 emails sent") and not rows["Laptop"].startswith("⚠")   # just started
     assert "hasn't asked for a search since the cloud panel started" in body
