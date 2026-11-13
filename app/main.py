@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -114,7 +115,37 @@ drive = DriveSync(settings)
 SEARCHER = settings.ROLE == "searcher"          # read once: ROLE takes effect after a restart
 searcher = RemoteSearcher(settings, manager, drive=drive.client,     # it emails you when the cloud is down
                           email_me=outreach.email_me if settings.OUTREACH_AUTOSEND else None)
-remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the search computer last asked
+CONTACT_FILE = settings.DATA_DIR / "remote_contact.json"   # kept through restarts (a deploy restarts the server)
+CONTACT_SAVE_S = 300                            # written at most every 5 minutes: it asks every minute
+
+
+def _load_contact() -> dict:
+    """ROLE=sender: when the search computer last asked - from before a restart too, so the Status tab's
+    Laptop row and the "Laptop not searching" email count from its real last visit."""
+    contact: dict = {"at": None, "version": "", "saved": None}
+    try:
+        data = json.loads(CONTACT_FILE.read_text(encoding="utf-8"))
+        contact["at"] = datetime.fromisoformat(data["at"])
+        contact["version"] = str(data.get("version") or "")
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return contact
+
+
+def _save_contact() -> None:
+    now = remote_contact["at"]
+    if remote_contact["saved"] and (now - remote_contact["saved"]).total_seconds() < CONTACT_SAVE_S:
+        return
+    try:
+        CONTACT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        CONTACT_FILE.write_text(json.dumps({"at": now.isoformat(), "version": remote_contact["version"]}),
+                                encoding="utf-8")
+        remote_contact["saved"] = now
+    except OSError as exc:  # pragma: no cover
+        log.warning("could not write %s: %s", CONTACT_FILE, exc)
+
+
+remote_contact: dict = _load_contact()
 
 
 def _alert_status() -> dict:
@@ -740,6 +771,7 @@ def _search_computer(request: Request, version: str = "") -> None:
     remote_contact["at"] = datetime.now(timezone.utc)
     if version:
         remote_contact["version"] = version
+    _save_contact()
 
 
 def _server_info() -> dict:

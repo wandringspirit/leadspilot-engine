@@ -5,5 +5,6 @@
 *.ico binary
 # cmd.exe reads batch files with Windows line endings
 *.bat text eol=crlf
+*.vbs text eol=crlf
 # the cloud server's files (Linux): a shell hook, systemd units
 deploy/cloud/* text eol=lf

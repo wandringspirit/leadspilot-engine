@@ -259,7 +259,8 @@ minutes:
    Create* (non-expiring), add it to the *Laptop* policy of the *Leads Pilot panel* application, and delete
    the old token.
 4. **Start it once:** double-click `start.bat` – it installs everything (a few minutes) and opens the
-   panel. Then `start.bat --autostart` (or `python start.py --autostart`) so it starts with Windows.
+   panel. Then `start.bat --autostart` (or `python start.py --autostart`) so it starts with Windows – with
+   no window, so it can't be closed by mistake (stop it with *⏻ Stop* in the panel at `127.0.0.1:8000`).
 5. **Google Drive:** the panel at `http://127.0.0.1:8000` › Outreach › *Connect Google Drive*. Within a
    minute the laptop hands the sign-in to the cloud server (§4).
 6. **Updates from this laptop:** `git remote add cloud leadspilot-cloud:leadspilot.git` – then

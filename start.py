@@ -11,7 +11,8 @@ button starts it again.
                     [--autostart | --no-autostart] [--weekday-start | --no-weekday-start]
 
 --shortcut puts a shortcut to start.bat on the Windows desktop. --autostart puts one in the Windows Startup
-folder, so the panel starts (minimised, no browser) when you sign in; --no-autostart removes it.
+folder, so the panel starts when you sign in - with no window (start-hidden.vbs), so there is nothing to close
+by mistake, and no browser; --no-autostart removes it.
 --weekday-start adds a Windows Task Scheduler task that starts the panel at 18:00 (local time) Monday to
 Friday unless it is already running - or as soon as the computer is awake after that - so a closed window
 doesn't cost a day of emails; --no-weekday-start removes it. Only the standard library is used until the
@@ -446,22 +447,25 @@ def _ps(value: object) -> str:                       # a PowerShell '...' string
 def make_shortcut(*, startup: bool = False) -> int:
     """A desktop shortcut to start.bat, with the panel's icon. Through cmd.exe, so it can be pinned to the
     taskbar too (right-click > Pin to taskbar). ``startup``: the same shortcut in the Windows Startup folder
-    instead, so the panel starts when you sign in to Windows - minimised and without opening the browser."""
+    instead, so the panel starts when you sign in to Windows - with no window (start-hidden.vbs: nothing to
+    close by mistake; Stop in the panel stops it) and without opening the browser."""
     where = "Startup" if startup else "Desktop"
     if not WINDOWS:
         print("Shortcuts are made on Windows. Elsewhere start the panel with: python3 start.py")
         return 1
-    arguments = '/c ""' + str(ROOT / "start.bat") + '"' + (" --no-browser" if startup else "") + '"'
+    if startup:
+        program, arguments = "wscript.exe", '"' + str(ROOT / "start-hidden.vbs") + '" --no-browser'
+    else:
+        program, arguments = "cmd.exe", '/c ""' + str(ROOT / "start.bat") + '""'
     script = "\n".join([
         "$shell = New-Object -ComObject WScript.Shell",
         f"$path = Join-Path ([Environment]::GetFolderPath('{where}')) " + _ps(NAME + ".lnk"),
         "$link = $shell.CreateShortcut($path)",
-        "$link.TargetPath = Join-Path $env:SystemRoot 'System32\\cmd.exe'",
+        "$link.TargetPath = Join-Path $env:SystemRoot " + _ps("System32\\" + program),
         "$link.Arguments = " + _ps(arguments),
         "$link.WorkingDirectory = " + _ps(ROOT),
         "$link.IconLocation = " + _ps(f"{ICON},0"),
         "$link.Description = " + _ps(f"Start the {NAME} panel"),
-        "$link.WindowStyle = 7" if startup else "",     # minimised
         "$link.Save()",
         "Write-Output $path",
     ])
@@ -482,13 +486,13 @@ def make_shortcut(*, startup: bool = False) -> int:
 def add_weekday_start() -> int:
     """A Task Scheduler task: start.bat --no-browser at TASK_AT, Monday to Friday. When the panel is already
     running start.bat just says so and closes; when the computer was asleep or off at TASK_AT it runs as soon
-    as it can. No time limit - the task is the panel while it runs."""
+    as it can, with no window (start-hidden.vbs). No time limit - the task is the panel while it runs."""
     if not WINDOWS:
         print("The weekday start uses the Windows Task Scheduler.")
         return 1
-    arguments = '/c ""' + str(ROOT / "start.bat") + '" --no-browser"'
+    arguments = '"' + str(ROOT / "start-hidden.vbs") + '" --no-browser'
     script = "\n".join([
-        "$action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\\cmd.exe') -Argument "
+        "$action = New-ScheduledTaskAction -Execute (Join-Path $env:SystemRoot 'System32\\wscript.exe') -Argument "
         + _ps(arguments) + " -WorkingDirectory " + _ps(ROOT),
         "$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Monday,Tuesday,Wednesday,Thursday,Friday -At "
         + _ps(TASK_AT),

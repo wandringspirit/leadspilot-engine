@@ -66,8 +66,10 @@ A search that didn't finish (the panel was closed during it) is searched again. 
 The autopilot, the emails and the follow-ups run inside the panel, so they only happen while the
 panel runs on this computer:
 
-- `start.bat --autostart` starts the panel when you sign in to Windows, minimised and without
-  opening the browser (`--no-autostart` undoes it).
+- `start.bat --autostart` starts the panel when you sign in to Windows, with **no window** and without
+  opening the browser (`--no-autostart` undoes it). Since 1.24.1 it runs through `start-hidden.vbs`: a
+  minimised window got closed by mistake, which stopped the panel. Its log is `data/logs/panel.log`; to stop
+  it, use *⏻ Stop* in the panel.
 - `start.bat --weekday-start` adds a Windows Task Scheduler task that starts the panel at 18:00
   (the computer's time) Monday to Friday unless it is already running, or as soon as the computer is
   awake after that. A closed window then costs at most a few hours, not a day of emails

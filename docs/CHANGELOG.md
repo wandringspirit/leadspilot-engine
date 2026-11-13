@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.24.1 – 2026-11-13
+
+### Changed
+- **The panel starts with Windows with no window** (`start-hidden.vbs`): `start.bat --autostart` and
+  `--weekday-start` run it hidden instead of minimised. The minimised window was closed by mistake twice in two
+  days, which stopped the laptop's searches for up to 19 hours. Stop it with *⏻ Stop* in the panel; its log is
+  `data/logs/panel.log`. Run `start.bat --autostart` (and `--weekday-start`, if used) once to switch.
+- The cloud server remembers when the laptop last asked for a search through a restart (`data/remote_contact.json`),
+  so the Status tab's *Laptop* row and the *Laptop not searching* email count from its real last visit, not from
+  the last deploy.
+
 ## 1.24.0 – 2026-11-13
 
 ### Added

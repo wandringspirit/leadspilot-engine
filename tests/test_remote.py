@@ -392,3 +392,24 @@ def test_the_search_computer_emails_you_when_the_cloud_server_is_down(tmp_path):
         assert len(sent) == 2
 
     asyncio.run(scenario())
+
+
+def test_the_laptops_last_visit_is_kept_through_a_restart(tmp_path, monkeypatch):
+    """A deploy restarts the cloud server: the Laptop row and the silence email count from the laptop's real
+    last visit, not from the restart."""
+    file = tmp_path / "remote_contact.json"
+    monkeypatch.setattr(main_module, "CONTACT_FILE", file)
+    first = datetime(2026, 11, 12, 22, 47, tzinfo=timezone.utc)
+    monkeypatch.setattr(main_module, "remote_contact", {"at": first, "version": "1.24.1", "saved": None})
+    main_module._save_contact()
+    assert main_module._load_contact() == {"at": first, "version": "1.24.1", "saved": None}
+
+    main_module.remote_contact["at"] = first + timedelta(minutes=1)      # asks again a minute later
+    main_module._save_contact()                                         # not written: at most every 5 minutes
+    assert main_module._load_contact()["at"] == first
+    main_module.remote_contact["at"] = first + timedelta(minutes=6)
+    main_module._save_contact()
+    assert main_module._load_contact()["at"] == first + timedelta(minutes=6)
+
+    file.write_text("not json", encoding="utf-8")
+    assert main_module._load_contact() == {"at": None, "version": "", "saved": None}

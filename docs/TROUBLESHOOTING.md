@@ -84,7 +84,7 @@
 
 | Symptom | Fix |
 | --- | --- |
-| *The panel isn't running* over the page, or the "API offline" badge | the panel was stopped or its window closed. Double-click the desktop shortcut (or `start.bat`); the page reconnects by itself. `data/logs/panel.log` says when and how it stopped; `start.bat --weekday-start` starts it on weekdays by itself. |
+| *The panel isn't running* over the page, or the "API offline" badge | the panel was stopped or its window closed (started with Windows – `--autostart` – it has no window). Double-click the desktop shortcut (or `start.bat`); the page reconnects by itself. `data/logs/panel.log` says when and how it stopped; `start.bat --weekday-start` starts it on weekdays by itself. |
 | Settings tab: *Can't load the settings: Not Found* | the panel running is older than the page – started before an update. Stop it (close its window, or Ctrl+C in it) and start it again with the desktop shortcut. |
 | Double-clicking the shortcut only opens the browser: *already running* | a panel runs already (its window may be minimised) – that is the one you get. To start fresh, stop it first (*⏻ Stop*). |
 | *Another program uses port 8000* in the start window | something else listens on the port. Close it, or press E and set another `PORT` (or `start.bat --port 8001` once). |
