@@ -59,7 +59,7 @@ async def test_the_master_sheet_is_a_coloured_google_sheet(tmp_path):
     assert written["Campaigns!A1"][2] == ["Roofer · Katy, TX", "running"]
     assert written["Status!A1"][0] == ["What", "Now"] and written["Status!A1"][2][1].startswith("⚠")
     tabs = [r["addSheet"]["properties"] for r in formatting["requests"] if "addSheet" in r]
-    assert [t["title"] for t in tabs] == ["Activity", "Status"]
+    assert [t["title"] for t in tabs] == ["Activity", "Status", "Calls"]
     assert {"sheetId": 2, "index": 0} in [r["updateSheetProperties"]["properties"] for r in formatting["requests"]
                                           if "updateSheetProperties" in r]           # Status is the first tab
     assert not client.uploads
@@ -75,7 +75,7 @@ async def test_without_the_sheets_api_it_is_csv_files_until_it_is_switched_on(tm
     client = FakeClient(sheets_on=False)
     drive = DriveSync(make_settings(tmp_path), client=client)
     assert await drive.sync_master(TABLES)
-    assert sorted(client.uploads) == sorted(MASTER_FILES.values())
+    assert sorted(client.uploads) == sorted(MASTER_FILES[part] for part in TABLES)
     assert "Sheets API is off" in drive.status()["sheets_off"] and drive.last_error == ""
     # switched on: the next try (after SHEETS_RETRY) makes the sheet, even with nothing changed
     client.sheets_on = True

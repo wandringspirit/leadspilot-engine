@@ -24,6 +24,7 @@ from typing import Awaitable, Callable
 
 from app.config import Settings
 from app.drive.backup import KEEP as KEEP_BACKUPS
+from app.outreach.calls import summary as calls_summary
 from app.outreach.master import DAILY_COLUMNS, daily_table
 
 log = logging.getLogger(__name__)
@@ -233,6 +234,9 @@ class Alerts:
         running = sum(c.status.value == "running" for c in campaigns)
         rows.append(["Campaigns", f"{running} running, {len(campaigns)} in all · "
                                   f"{_n(outreach.get('contacted', 0), 'business', 'businesses')} emailed so far"])
+        calls = calls_summary(campaigns, self.cfg, now)
+        if calls:
+            rows.append(["Calls", calls])
 
         auto = info["autopilot"]
         if auto.get("stopped"):
@@ -286,7 +290,7 @@ class Alerts:
         yesterday = (local - timedelta(days=1)).strftime("%a %d %b")
         lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", "",
                  f"Yesterday ({yesterday}): {rows['Yesterday']}", ""]
-        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Address check", "Campaigns", "Autopilot", "Laptop", "Google Drive",
+        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Address check", "Campaigns", "Calls", "Autopilot", "Laptop", "Google Drive",
                                                           "Backup")
                   if label in rows]
         recent = self._recent(now)

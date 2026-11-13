@@ -49,7 +49,8 @@ log = logging.getLogger(__name__)
 OUTREACH_FOLDER = "Outreach"
 RESULTS_EVERY = timedelta(minutes=5)     # campaign results are uploaded at most this often
 LOOP_S = 60
-MASTER_FILES = {"status": "Leads Pilot - status.csv", "campaigns": "Leads Pilot - campaigns.csv",
+MASTER_FILES = {"status": "Leads Pilot - status.csv", "calls": "Leads Pilot - calls.csv",
+                "campaigns": "Leads Pilot - campaigns.csv",
                 "activity": "Leads Pilot - activity.csv"}
 SHEETS_RETRY = timedelta(minutes=10)     # the Sheets API was off: try it again after this
 LEAD_FILE_TYPES = ("text/csv", "text/comma-separated-values", "application/vnd.ms-excel", SHEET_TYPE)
@@ -237,6 +238,17 @@ class DriveSync:
         log.info("Google Drive: master sheet saved (%s)", ", ".join(MASTER_FILES.values()))
         return True
 
+    async def read_calls(self, outreach: "OutreachManager") -> int:
+        """What you noted in the master sheet's Calls tab onto the leads (app/outreach/calls.py). A failed
+        read raises, so the sheet isn't written over what you typed."""
+        if self.sheets_off or not self.sheet.state.get("id"):
+            return 0
+        edits = await self._call(self.sheet.read_calls)
+        changed = await outreach.record_calls(edits)
+        if changed:
+            log.info("Google Drive: %d call note(s) read from the master sheet's Calls tab", changed)
+        return changed
+
     def start_loop(self, outreach: "OutreachManager",
                    master: "Callable[[], dict[str, tuple[list[str], list[list]]]] | None" = None) -> None:
         """Keep campaign results (and, with ``master`` - it makes the master sheet's files - the master
@@ -260,6 +272,7 @@ class DriveSync:
             try:
                 await self.sync_campaigns(outreach)
                 if master is not None:
+                    await self.read_calls(outreach)      # first: what you noted goes into the rows written next
                     await self.sync_master(master())
                     await self.backup.run_if_due()      # only where the master sheet is kept: the cloud server
                 self.last_error = ""

@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.25.0 – 2026-11-13
+
+### Added
+- **A Calls tab in the master sheet** (`app/outreach/calls.py`): the roofers to phone, in order – call-backs due,
+  then those who opened their website, tapped or replied, then the newest emailed, then no-answers – with their
+  phone, town, preview website and how far their emails got. You fill in **Outcome** (a dropdown), **Call back on**
+  (a date) and **Notes**; the panel reads them back before each write and keeps them on the lead
+  (`call_outcome`, `call_back`, `call_note`, `called_at`). Interested, Not interested and Signed up stop the lead's
+  automatic emails; every new outcome is a *Call* in the Activity tab. A *Calls* row in the Status tab and the
+  daily summary: how many to call, call-backs due, interested, and the best time to call (7–10am theirs).
+- The last email of a business type with a website design ends with a P.S. about the paid follow-up at the
+  founding price ($99 a month, no setup fee, leadspilot.co/#founding-offer) – as the Roofer emails and their open
+  campaigns have since 13 Nov.
+
 ## 1.24.1 – 2026-11-13
 
 ### Changed

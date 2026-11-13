@@ -48,6 +48,7 @@ from pydantic import TypeAdapter
 from app.config import Settings
 from app.models import Job, JobStatus, PlaceRow, split_places
 from app.outreach.activity import ActivityLog
+from app.outreach.calls import STOP_EMAILS
 from app.outreach.leads import leads_from_jobs
 from app.outreach.mailbox import (declined, MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
                                   build_message, classify, imap_problems, mailbox_problems, new_message_id,
@@ -776,6 +777,41 @@ class OutreachManager:
         self._after_send(now)
         if test_copy_addresses(self.cfg) and self.sent_today(now) == 1:
             await self._test_copy(campaign, lead, step, subject, body)
+
+    async def record_calls(self, edits: dict[str, dict]) -> int:
+        """What you noted in the master sheet's Calls tab ({lead id: {"outcome", "call_back", "note"}},
+        app/drive/sheets.py read_calls) onto the leads. A new outcome goes in the activity log; Interested, Not
+        interested and Signed up stop the lead's automatic emails. Returns how many leads changed."""
+        if not edits:
+            return 0
+        changed = 0
+        async with self._guard():
+            now = self.clock()
+            for campaign in self.campaigns.values():
+                touched = False
+                for lead in campaign.leads:
+                    edit = edits.get(lead.id)
+                    if edit is None:
+                        continue
+                    outcome = edit.get("outcome", "").strip()
+                    call_back, note = edit.get("call_back", "").strip(), edit.get("note", "").strip()
+                    if (outcome, call_back, note) == (lead.call_outcome, lead.call_back, lead.call_note):
+                        continue
+                    if outcome != lead.call_outcome:
+                        lead.called_at = now
+                        self._note("Call", outcome or "outcome cleared", campaign, lead)
+                        if outcome in STOP_EMAILS and lead.status in OPEN_STATUSES:
+                            lead.status, lead.next_due = LeadStatus.DONE, None
+                            lead.note = f"{outcome} on a call – no more emails"
+                            log.info("%s is %s on a call - no more emails to %s", lead.business, outcome.lower(),
+                                     lead.email)
+                    lead.call_outcome, lead.call_back, lead.call_note = outcome, call_back, note
+                    touched = True
+                    changed += 1
+                if touched:
+                    self._finish_if_done(campaign, now)
+                    self._save(campaign)
+        return changed
 
     def _next_variant(self) -> str:
         """A or B for a business about to get its first email: whichever fewer businesses have had so far

@@ -72,6 +72,11 @@ DEFAULT_STEPS: list[dict] = [
     },
 ]
 
+# The last site email's P.S.: the paid service, at the founding price on leadspilot.co (#founding-offer).
+FOUNDING_PS = ("\n\nP.S. Once quote requests start coming in through the site, I can also set up an instant reply "
+               "and follow-ups for each one, so no homeowner waits until you're off the roof. Founding price: "
+               "$99 a month, no setup fee. leadspilot.co/#founding-offer")
+
 # For businesses that get a preview website: the link in the first email. The website comes down a
 # couple of days after the last email (sites/deploy.py: ends_at) - which says so.
 SITE_STEPS: list[dict] = [
@@ -103,7 +108,7 @@ SITE_STEPS: list[dict] = [
             "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
             "just reply \"yes\".\n\n"
             "{Website}\n\n"
-            "{SenderName}[[\n{SenderCompany}]]"
+            "{SenderName}[[\n{SenderCompany}]]" + FOUNDING_PS
         ),
     },
 ]
@@ -139,7 +144,7 @@ SITE_STEPS_ASK_FIRST: list[dict] = [
             "Hi, the preview of {Business}'s website comes down tomorrow. If you'd like to keep it, "
             "just reply \"yes\".\n\n"
             "{Website}\n\n"
-            "{SenderName}[[\n{SenderCompany}]]"
+            "{SenderName}[[\n{SenderCompany}]]" + FOUNDING_PS
         ),
     },
 ]

@@ -102,19 +102,26 @@ Campaigns and Activity tabs can also be downloaded as CSV from the Outreach tab.
 
 | Tab | What's in it |
 | --- | --- |
-| **Status** (first) | how things stand, a row each: *Updated* (when it was written – an old time means the panel isn't running), *Sending* (the next email, today's count), *Today* and *Yesterday* (emails sent, replies, websites opened, bounces, unsubscribes), *Campaigns*, *Autopilot*, *Laptop* (its last check-in, on the cloud server), *Google Drive*, *Backup* (the last daily backup), *Problems (last day)*. A row that needs a look starts with ⚠ and is red. The same as the daily summary email ([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)) |
+| **Status** (first) | how things stand, a row each: *Updated* (when it was written – an old time means the panel isn't running), *Sending* (the next email, today's count), *Today* and *Yesterday* (emails sent, replies, websites opened, bounces, unsubscribes), *Campaigns*, *Calls* (how many to phone, call-backs due, interested, and the best time to call in your time), *Autopilot*, *Laptop* (its last check-in, on the cloud server), *Google Drive*, *Backup* (the last daily backup), *Problems (last day)*. A row that needs a look starts with ⚠ and is red. The same as the daily summary email ([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)) |
+| **Calls** (second) | the businesses to phone, in order – a row per business that was emailed and has a phone number (one per number; not those that unsubscribed): #, Business, Phone, Town, Website (its preview), Last email, Opened website, Emails, **Outcome**, **Call back on**, **Notes**, Campaign, Lead. The three orange columns are yours – see below. Numbered first: call-backs that are due, then businesses not called yet (those that opened their website, tapped or replied first, then the newest), then *No answer* / *Left voicemail*. Call-backs for later and finished calls come last, unnumbered. Rows are green for Interested / Signed up, yellow for Call back, blue for no answer, grey for Not interested / Wrong number |
 | **Campaigns** | an **All campaigns** row, then a row per campaign: Status, Created, Started, Businesses, Emailed, Waiting, In sequence, Replied, No reply, Bounced, Unsubscribed, Bad address, Skipped, Left out, Opened website, Tapped, Emails sent, Last email, and a link to its results file. Rows are green while running, yellow when paused, blue when finished |
-| **Activity** | the activity log, newest first: When, What, Campaign, Business, Email, Detail. Replies are green, emails sent blue, bounces / refusals / pauses / stops red, campaigns made or started yellow, searches lilac, website visits and taps teal, test copies grey |
+| **Activity** | the activity log, newest first: When, What, Campaign, Business, Email, Detail. Replies are green, emails sent blue, bounces / refusals / pauses / stops red, campaigns made or started yellow, searches lilac, website visits, taps and call outcomes teal, test copies grey |
 
 The panel makes it once and formats it once: a purple header row that stays at the top, filter
 buttons, column widths and the colour rules. After that it only writes the values. Don't type into
-it, because every update replaces the values; use a copy, or the filters, to work with it.
+it, because every update replaces the values; use a copy, or the filters, to work with it – except the
+Calls tab's **Outcome** (a dropdown: No answer, Left voicemail, Call back, Interested, Not interested, Wrong
+number, Signed up), **Call back on** (a date – double-click for a calendar) and **Notes**. The panel reads those
+back within a minute, before every write, and keeps them with the business (`app/outreach/calls.py`). A new
+outcome goes in the Activity tab (*Call*); **Interested**, **Not interested** and **Signed up** stop that
+business's automatic emails. Calls are made by you: US law treats AI and recorded voices on sales calls to
+mobile phones as robocalls, which need written consent first.
 `data/master_sheet.json` remembers which sheet it is. Delete the sheet in Drive and a new one is
 made.
 
 It needs the **Google Sheets API** switched on in the Google Cloud project of `GOOGLE_CLIENT_ID`
 (*APIs & Services › Library › Google Sheets API › Enable*). Until it is on, the master sheet is saved
-as CSV files, `Leads Pilot - status.csv`, `Leads Pilot - campaigns.csv` and `Leads Pilot - activity.csv`, and the Outreach
+as CSV files, `Leads Pilot - status.csv`, `Leads Pilot - calls.csv`, `Leads Pilot - campaigns.csv` and `Leads Pilot - activity.csv`, and the Outreach
 tab says so. The panel tries the Sheets API again every 10 minutes and switches over by itself.
 
 Each campaign's own results file, with one row per business, stays in `<business type>/Outreach/`

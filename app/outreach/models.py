@@ -77,6 +77,11 @@ class Lead(BaseModel):
     site_taps: list[str] = Field(default_factory=list)   # tapped: call / email / keep (each once)
     site_from: str = ""            # where the last visit came from, e.g. "Comcast Cable · Houston, US"
     variant: str = ""              # "A" / "B": which version of the emails it gets, when its campaign tests two
+    # the phone call, as you noted it in the master sheet's Calls tab (app/outreach/calls.py)
+    call_outcome: str = ""         # No answer / Left voicemail / Call back / Interested / Not interested ...
+    call_back: str = ""            # when to call back: an ISO date, or the text you typed
+    call_note: str = ""
+    called_at: datetime | None = None   # when the outcome last changed
 
 
 class LeftOut(BaseModel):

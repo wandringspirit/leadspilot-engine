@@ -34,6 +34,7 @@ from app.outreach.alerts import Alerts
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
 from app.outreach.verify import AddressCheck
 from app.outreach.manager import OutreachError, OutreachManager
+from app.outreach.calls import calls_table
 from app.outreach.master import activity_table, campaigns_table, daily_table, to_csv
 from app.outreach.site_requests import SiteRequests
 from app.outreach.sites import SiteService
@@ -163,6 +164,7 @@ def _master_tables() -> dict[str, tuple[list[str], list[list]]]:
     """The master sheet's tables: how things stand (app/outreach/alerts.py), the campaigns and the activity log
     (app/outreach/master.py)."""
     return {"status": (["What", "Now"], alerts.status_rows(datetime.now(timezone.utc))),
+            "calls": calls_table(outreach.list_campaigns(), settings),
             "campaigns": campaigns_table(outreach.list_campaigns()), "activity": activity_table(activity.entries())}
 
 
