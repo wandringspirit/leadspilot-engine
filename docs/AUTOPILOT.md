@@ -32,7 +32,7 @@ needed.
 | business type | Roofer | what it looks for, and the emails its campaigns use |
 | places | 20 Texas places | searched in this order; *next* is the next one |
 | `min_waiting` | 10 | search when fewer businesses than this wait for their first email (two days at 5 a day) |
-| `searches_per_day` | 2 | at most this many searches a day, one at a time |
+| `searches_per_day` | 10 | at most this many searches a day, one at a time |
 | `limit` | 60 | businesses wanted per search |
 
 With a cloud server (`ROLE=sender`, [CLOUD.md](CLOUD.md)) the autopilot runs there, and its searches

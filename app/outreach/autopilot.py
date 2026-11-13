@@ -84,7 +84,7 @@ class AutopilotState(BaseModel):
     places: list[str] = Field(default_factory=lambda: list(DEFAULT_PLACES))
     next_place: int = 0                  # index into places
     min_waiting: int = 10
-    searches_per_day: int = 2
+    searches_per_day: int = 10
     limit: int = 60                      # businesses wanted per search
     stopped: str = ""                    # why it stopped itself ('' = it didn't)
     on_since: datetime | None = None     # bounces before this don't count

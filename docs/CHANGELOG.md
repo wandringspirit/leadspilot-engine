@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.25.1 – 2026-11-13
+
+### Changed
+- **The autopilot searches up to 10 places a day** by default (was 2; the live panel was on 5): the campaigns were
+  running out of businesses to email. 10 is still the most the panel accepts.
+
 ## 1.25.0 – 2026-11-13
 
 ### Added
