@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     OUTREACH_MIN_REVIEWS: int = 10        # {Rating} / {Reviews} need at least this many reviews ...
     OUTREACH_MIN_RATING: float = 4.0      # ... and at least this rating
     OUTREACH_TEST_COPY_TO: str = ""       # your own addresses: a copy of each day's first email (which tab?)
+    EMAIL_VERIFY_KEY: str = ""            # Reoon API key: each address is checked before its first email,
+                                          # one that doesn't exist is skipped (app/outreach/verify.py)
     OUTREACH_UNSUBSCRIBE_HEADER: bool = False   # a List-Unsubscribe header (Gmail's unsubscribe link) on
                                           # campaign emails - off: one-to-one emails got filed as mailings
 

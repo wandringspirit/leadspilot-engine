@@ -198,6 +198,7 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |
 | `OUTREACH_TEST_COPY_TO` | *(empty)* | your own addresses, comma-separated: each day's first email also goes to them, word for word, so you can see which tab it lands in ([OUTREACH.md](OUTREACH.md#6-what-is-sent)) |
 | `ALERT_TO` | *(empty)* | where emails to you go – problems, the daily summary, replies, *Google Drive disconnected* ([OUTREACH.md §8](OUTREACH.md#8-emails-to-you-about-the-panel-appoutreachalertspy)) – comma-separated; empty: the From address |
+| `EMAIL_VERIFY_KEY` | *(empty)* | a [Reoon](https://www.reoon.com/email-verifier/) API key: each address is checked before its first email and one whose mailbox doesn't exist is skipped ([OUTREACH.md §3](OUTREACH.md#3-templates-appoutreachtemplatespy)); empty: only its domain is checked |
 | `OUTREACH_UNSUBSCRIBE_HEADER` | `false` | `true`: campaign emails carry a `List-Unsubscribe` header (Gmail's unsubscribe link); off, they read as one-to-one emails and the footer says to reply "no" |
 
 ### Preview websites ([SITES.md](SITES.md))

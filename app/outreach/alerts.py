@@ -215,6 +215,18 @@ class Alerts:
             sending = (f"on – next email {_local(nxt) if nxt else 'not planned'} · "
                        f"{outreach.get('sent_today', 0)} of {outreach.get('daily_limit')} sent today")
         rows.append(["Sending", sending])
+        verify = info.get("verify") or {}
+        if verify:
+            if not verify.get("on"):
+                check = "off – only the domain is checked (EMAIL_VERIFY_KEY isn't set)"
+            elif verify.get("error"):
+                at = _parse(verify.get("error_at") or "")
+                check = (f"{WARN} the verifier didn't answer{' at ' + _local(at) if at else ''}: {verify['error']} – "
+                         f"addresses are emailed unchecked until it does")
+            else:
+                check = (f"on – each address is checked with Reoon before its first email · "
+                         f"{verify.get('checked', 0)} checked, {verify.get('skipped', 0)} skipped since the panel started")
+            rows.append(["Address check", check])
         campaigns = info["campaigns"]
         rows.append(["Today", self._day(campaigns, local.date())])
         rows.append(["Yesterday", self._day(campaigns, (local - timedelta(days=1)).date())])
@@ -274,7 +286,7 @@ class Alerts:
         yesterday = (local - timedelta(days=1)).strftime("%a %d %b")
         lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", "",
                  f"Yesterday ({yesterday}): {rows['Yesterday']}", ""]
-        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Campaigns", "Autopilot", "Laptop", "Google Drive",
+        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Address check", "Campaigns", "Autopilot", "Laptop", "Google Drive",
                                                           "Backup")
                   if label in rows]
         recent = self._recent(now)

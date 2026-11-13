@@ -215,7 +215,7 @@ have anything secret or personal – the repository is public:
 
 | What | Where it lives | Keep a copy |
 | --- | --- | --- |
-| The laptop's `.env` (mailbox password, Google OAuth client, `SITES_VISITS_KEY`, `SEARCHER_TOKEN`, `CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) | the laptop's project folder | **yes – in your password manager** (the server's `.env` has all of it except the Access token) |
+| The laptop's `.env` (mailbox password, Google OAuth client, `SITES_VISITS_KEY`, `EMAIL_VERIFY_KEY`, `SEARCHER_TOKEN`, `CLOUD_ACCESS_ID` / `CLOUD_ACCESS_SECRET`) | the laptop's project folder | **yes – in your password manager** (the server's `.env` has all of it except the Access token) |
 | The SSH key for the server (`~/.ssh/leadspilot_oracle` and the `leadspilot-cloud` entry in `~/.ssh/config`) | the laptop's `C:\Users\<you>\.ssh` | **yes – in your password manager** (the private key file) |
 | Campaigns, the contacted list, business types, the autopilot, the activity log, the searches (`data/`) | **the cloud server** (`~/leadspilot-engine/data`); the laptop's `data/` is an old copy from the move | **done by itself:** every day after 03:00 a zip in Google Drive › `Backups/` (`leadspilot-backup-YYYY-MM-DD.zip`, the newest 30; `app/drive/backup.py`); the master sheet's Status tab shows the last one |
 | The Google Drive sign-in (`data/google_drive.json`) | both computers | no – connect again on a new laptop |

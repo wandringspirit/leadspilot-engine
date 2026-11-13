@@ -120,6 +120,10 @@ OPTIONS = (
     Option("OUTREACH_TEST_COPY_TO", "sending", "Test copy to",
            "Your own addresses, comma-separated: each day's first email also goes to them, word for word, so "
            "you can see which tab it lands in (Primary, Promotions, Spam)", "you@gmail.com, you@yahoo.com"),
+    Option("EMAIL_VERIFY_KEY", "sending", "Email verifier key (Reoon)",
+           "With it each address is checked before its first email, and one whose mailbox doesn't exist is "
+           "skipped instead of bouncing. Free at reoon.com: 20 checks a day (Email Verifier › API)",
+           secret=True),
     Option("OUTREACH_UNSUBSCRIBE_HEADER", "sending", "Gmail's unsubscribe link",
            "A List-Unsubscribe header on campaign emails. Off: they read as one-to-one emails – the footer "
            "says to reply \"no\""),

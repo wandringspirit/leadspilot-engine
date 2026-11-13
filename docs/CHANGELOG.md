@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.24.0 – 2026-11-13
+
+### Added
+- **The mailbox check** (`app/outreach/verify.py`): before a business's first email, after the domain check,
+  the panel asks Reoon's email verifier whether the mailbox exists, and skips the business when it doesn't (or is
+  shut down, full, a throwaway or a spam trap). 6 of the first 104 emails bounced (5.8 %; under 2 % is safe) – most
+  to mailboxes that don't exist, which the domain check can't see. Needs `EMAIL_VERIFY_KEY` (free: 20 checks a
+  day); without it only the domain is checked. When Reoon can't answer, the email goes out as before.
+- An *Address check* row in the master sheet's Status tab and the daily summary: on or off, how many addresses
+  were checked and skipped, and the verifier's last problem.
+
 ## 1.23.1 – 2026-11-12
 
 ### Changed

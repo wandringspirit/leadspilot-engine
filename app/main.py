@@ -31,7 +31,7 @@ from app.models import EnrichRequest, Job, JobStatus, JobSummary, LogsResponse, 
 from app.outreach.activity import ActivityLog
 from app.outreach.alerts import Alerts
 from app.outreach.autopilot import Autopilot, AutopilotUpdate
-from app.outreach.domains import domain_problem
+from app.outreach.verify import AddressCheck
 from app.outreach.manager import OutreachError, OutreachManager
 from app.outreach.master import activity_table, campaigns_table, daily_table, to_csv
 from app.outreach.site_requests import SiteRequests
@@ -106,7 +106,8 @@ manager = JobManager(settings)
 sites = SiteService(settings) if settings.PREVIEW_SITES else None
 activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
 visits = Visits(settings) if sites is not None else None
-outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=domain_problem)
+address_check = AddressCheck(settings)     # the DNS check, then Reoon when EMAIL_VERIFY_KEY is set
+outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=address_check)
 site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not None else None
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)
@@ -119,7 +120,7 @@ remote_contact: dict = {"at": None, "version": ""}   # ROLE=sender: when the sea
 def _alert_status() -> dict:
     """What the daily summary reports (app/outreach/alerts.py)."""
     return {"campaigns": outreach.list_campaigns(), "outreach": outreach.status(), "autopilot": autopilot.status(),
-            "drive": drive.status(), "remote": _remote_info()}
+            "drive": drive.status(), "remote": _remote_info(), "verify": address_check.status()}
 
 
 alerts = Alerts(settings, outreach.email_me, _alert_status, last_contact=lambda: remote_contact["at"])

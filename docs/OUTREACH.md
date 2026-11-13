@@ -100,8 +100,23 @@ link in the first email - it asks *Can I send you the link?* - and the link in t
 asks whether its address's domain can receive email at all. If the domain doesn't exist or has no mail
 server, the business is skipped (*Address skipped* in the activity log, status *refused*, never tried
 again), so it can't bounce. It uses Cloudflare's DNS over HTTPS, not the computer's DNS, which a home
-router can answer wrongly. When the lookup fails, the email goes out as usual. It can't see whether the
-mailbox itself exists, so an address like `admin@` on a working domain can still bounce.
+router can answer wrongly. When the lookup fails, the email goes out as usual.
+
+**The mailbox check** (`app/outreach/verify.py`, since 1.24.0). The domain check can't see whether the
+mailbox itself exists, and most bounces were mailboxes that don't (`…@gmail.com` too). With
+`EMAIL_VERIFY_KEY` set, the panel then asks [Reoon](https://www.reoon.com/email-verifier/) in its *power* mode,
+which asks the address's mail server – the panel can't do that itself, because Oracle Cloud and home internet
+both block port 25. Reoon's free account has 20 checks a day; one is used per first email, follow-ups
+aren't checked.
+
+| Reoon says | The panel |
+| --- | --- |
+| `invalid`, `disabled`, `disposable`, `spamtrap`, `inbox_full` | skips the business (*Address skipped: the mailbox doesn't exist (checked with Reoon)* …, never tried again) |
+| `safe`, `role_account` (info@ …), `catch_all` (the domain accepts any name – can't tell), `unknown` | emails it |
+| no answer – out of credits, a timeout, a wrong key | emails it, and the master sheet's Status tab (*Address check*) shows the problem until Reoon answers again |
+
+Setting it up: make a free account at reoon.com, copy the API key (*Email Verifier › API*), and put
+`EMAIL_VERIFY_KEY=…` in the `.env` of the computer that sends (the cloud server), then restart its panel.
 
 ## 4. When emails go out (`app/outreach/manager.py`, `schedule.py`)
 
@@ -247,7 +262,7 @@ summary twice. A problem email that can't go out (the mailbox is the problem) is
 `MAIL_PASSWORD`, `SENDER_EMAIL`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
 `OUTREACH_AUTOSEND`, `OUTREACH_TIMEZONE`, `OUTREACH_DAYS`, `OUTREACH_HOURS`,
 `OUTREACH_DAILY_LIMIT`, `OUTREACH_MIN_GAP_S`, `OUTREACH_MAX_GAP_S`, `OUTREACH_CHECK_MINUTES`,
-`OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`. What each one does and its default:
+`OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`, `EMAIL_VERIFY_KEY`. What each one does and its default:
 [DEVELOPMENT.md §4](DEVELOPMENT.md#4-configuration-reference).
 
 The routes (`/api/outreach`, `/api/campaigns…`, `/api/business-types…`) are in
