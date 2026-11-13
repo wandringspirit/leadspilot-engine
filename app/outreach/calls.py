@@ -34,7 +34,7 @@ CALL_COLUMNS = ["#", "Business", "Phone", "Town", "Website", "Last email", "Open
                 "Outcome", "Call back on", "Notes", "Campaign", "Lead"]
 #: the columns you fill in (the rest is overwritten)
 OUTCOME_COL, CALL_BACK_COL, NOTES_COL, LEAD_COL = 8, 9, 10, 12
-CALL_HOURS = (7, 10)       # a good time to call a roofer: before they're up on a roof, their time
+CALL_HOURS = (9, 11)       # when to call, their time: early, before the day on the roof - and not before 9am (Texas)
 SHEETS_EPOCH = date(1899, 12, 30)     # day 0 of a Google Sheets date
 
 Table = tuple[list[str], list[list]]

@@ -69,7 +69,7 @@ def test_the_status_row_says_how_many_and_when(tmp_path):
     campaign, _ = table(lead("A", "214-555-0001"), lead("B", "214-555-0002", call_outcome="Interested"), cfg=cfg)
     text = summary([campaign], cfg, NOW)
     assert text.startswith("1 to call (0 call-backs due) · 1 interested or signed up · best ")
-    assert "(7–10am theirs)" in text
+    assert "(9–11am theirs)" in text
     assert summary([], cfg, NOW) == ""
 
 
