@@ -152,4 +152,16 @@ def test_the_summary_says_what_is_wrong(tmp_path):
     rows = dict(alerts.status_rows(local(9)))
     assert list(rows)[0] == "Updated" and rows["Problems (last day)"] == "none"
     assert rows["Today"].startswith("0 emails sent") and not rows["Laptop"].startswith("⚠")   # just started
+    assert rows["Waiting to email"].startswith("⚠ 0 businesses waiting for a first email")    # red: none left
+    assert "waiting" not in rows["Autopilot"]
+
     assert "hasn't asked for a search since the cloud panel started" in body
+
+
+def test_the_waiting_row():
+    from app.outreach.alerts import waiting_text
+    auto = {"enabled": True, "stopped": "", "waiting": 18, "min_waiting": 100}
+    assert waiting_text(auto, 10) == ("18 businesses waiting for a first email – about 2 sending days at 10 a day · "
+                                      "the autopilot searches for more while there are fewer than 100")
+    assert waiting_text(auto | {"waiting": 0, "enabled": False}, 10) == \
+        "⚠ 0 businesses waiting for a first email – no first emails until a search finds more"

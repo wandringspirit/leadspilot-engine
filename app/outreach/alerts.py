@@ -65,6 +65,21 @@ EmailMe = Callable[[str, str], Awaitable[bool]]
 WARN = "\u26a0"         # a value that needs a look (the Status tab colours its row red)
 
 
+def waiting_text(auto: dict, daily_limit: int) -> str:
+    """The Status tab's *Waiting to email* row: the businesses found but not emailed yet - the stock of first
+    emails - and how long it lasts. Red below one day's emails."""
+    waiting = auto.get("waiting", 0)
+    text = f"{_n(waiting, 'business', 'businesses')} waiting for a first email"
+    if not waiting:
+        text += " – no first emails until a search finds more"
+    elif daily_limit:
+        days = -(-waiting // daily_limit)
+        text += f" – about {_n(days, 'sending day')} at {daily_limit} a day"
+    if auto.get("enabled") and not auto.get("stopped") and auto.get("min_waiting"):
+        text += f" · the autopilot searches for more while there are fewer than {auto['min_waiting']}"
+    return (f"{WARN} " if waiting < max(daily_limit, 1) else "") + text
+
+
 def silence_h(busy: bool) -> int:
     """Hours of silence before the laptop counts as not searching: shorter while a search needs it."""
     return BUSY_SILENCE_H if busy else SILENCE_H
@@ -253,19 +268,19 @@ class Alerts:
         running = sum(c.status.value == "running" for c in campaigns)
         rows.append(["Campaigns", f"{running} running, {len(campaigns)} in all · "
                                   f"{_n(outreach.get('contacted', 0), 'business', 'businesses')} emailed so far"])
+        auto = info["autopilot"]
+        rows.append(["Waiting to email", waiting_text(auto, outreach.get("daily_limit") or 0)])
         calls = calls_summary(campaigns, self.cfg, now)
         if calls:
             rows.append(["Calls", calls])
 
-        auto = info["autopilot"]
         if auto.get("stopped"):
             autopilot = f"{WARN} STOPPED – {auto['stopped']}"
         elif not auto.get("enabled"):
             autopilot = "off"
         else:
             doing = f"searching {auto['searching']}" if auto.get("searching") else f"next search {auto.get('next') or '–'}"
-            autopilot = (f"on – {_n(auto.get('waiting', 0), 'business', 'businesses')} waiting for a first email · "
-                         f"{doing} · {auto.get('searches_today', 0)} of {auto.get('searches_per_day', 0)} searches today")
+            autopilot = f"on – {doing} · {auto.get('searches_today', 0)} of {auto.get('searches_per_day', 0)} searches today"
         rows.append(["Autopilot", autopilot])
 
         remote = info.get("remote") or {}
@@ -310,7 +325,8 @@ class Alerts:
         yesterday = (local - timedelta(days=1)).strftime("%a %d %b")
         lines = [f"Leads Pilot – {local.strftime('%A %d %b %Y')}", "",
                  f"Yesterday ({yesterday}): {rows['Yesterday']}", ""]
-        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Address check", "Campaigns", "Calls", "Autopilot", "Laptop", "Google Drive",
+        lines += [f"{label}: {rows[label]}" for label in ("Sending", "Address check", "Campaigns", "Waiting to email", "Calls",
+                                                          "Autopilot", "Laptop", "Google Drive",
                                                           "Backup")
                   if label in rows]
         recent = self._recent(now)

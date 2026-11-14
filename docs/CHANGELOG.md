@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.26.2 – 2026-11-14
+
+### Changed
+- **A Waiting to email row** in the master sheet's Status tab and the daily summary: the businesses found but not
+  emailed yet – the stock of first emails – about how many sending days that lasts at the daily limit, and the
+  number the autopilot keeps it at. Red below one day's emails. The Autopilot row no longer repeats it.
+
 ## 1.26.1 – 2026-11-14
 
 ### Changed
