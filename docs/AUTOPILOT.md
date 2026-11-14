@@ -57,6 +57,15 @@ The autopilot switches itself off, says why, and writes it in the activity log w
   again; bounces from before that don't count. The campaigns it paused stay paused until you start
   them, and it won't search for more while they are.
 - **Google blocked a search** (its *unusual traffic* check). Wait a day, then switch it on again.
+- **3 searches in a row listed no businesses at all** (since it was switched on). A real place lists
+  hundreds of roofers even when none is new (Amarillo: 203), so this is Google quietly limiting the laptop
+  without showing its captcha. Nothing is paused; those places are first in line again. Wait a day, then
+  switch it on again. Its alert is *Searches empty*.
+
+A search whose **web check was refused** – DuckDuckGo and Bing, which look for websites Google Maps doesn't
+list, refused or couldn't be reached – is a *Web check refused* alert. Nothing stops for it, but the
+businesses after that were checked only by their email domain and social page, so a few may have a
+website after all.
 - every place on the list has been searched, or its business type was deleted.
 
 A search that didn't finish (the panel was closed during it) is searched again. So is one that failed with an error (say the browser didn't survive the laptop sleeping), until it has failed three times in a row: then the next place is searched. A search you cancelled isn't searched again. Each try counts toward the searches a day.

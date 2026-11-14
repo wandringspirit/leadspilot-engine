@@ -230,3 +230,46 @@ async def test_the_master_sheet_says_when_a_search_left_nobody_to_email(tmp_path
     campaign.left_out = []                               # a draft you are still setting up
     assert not campaign.nobody_to_email()
     assert list(csv.reader(io.StringIO(campaigns_csv([campaign]).decode("utf-8-sig"))))[2][2] == "draft"
+
+
+async def test_searches_that_list_nothing_stop_it_and_are_searched_again(tmp_path):
+    pilot, _, jobs, activity, clock = make_autopilot(tmp_path)
+    pilot.update(AutopilotUpdate(searches_per_day=10, places=["Katy, TX", "Pearland, TX", "Tomball, TX", "Waco, TX",
+                                                                  "Tyler, TX", "Bryan, TX"]))
+
+    async def search(listed: int):
+        await pilot.tick()
+        job = jobs.get(pilot.state.runs[-1].job_id)
+        job.status, job.finished_at, job.stats = JobStatus.COMPLETED, clock(), {"links_found": listed}
+        await pilot.job_finished(job)
+        clock.advance(minutes=1)
+
+    await search(0)                                     # Google Maps listed nothing: not normal, but once is no alarm
+    await search(250)                                   # a real place lists hundreds: the count starts again
+    await search(0)
+    await search(0)
+    assert not pilot.state.stopped and pilot.state.runs[-1].note == "Google Maps listed no businesses at all"
+    await search(0)                                     # three in a row: Google is quietly limiting the laptop
+    assert "3 searches in a row listed no businesses" in pilot.state.stopped
+    assert [e["what"] for e in activity.entries(2)] == ["Autopilot stopped", "Searches empty"]
+    assert pilot.status()["next"] == "Tomball, TX"      # the empty places are first in line again
+    pilot.update(AutopilotUpdate(enabled=True))         # switched on again: the earlier empties don't count
+    await search(0)
+    assert not pilot.state.stopped
+
+
+async def test_a_refused_web_check_is_a_problem_entry(tmp_path):
+    pilot, _, jobs, activity, _ = make_autopilot(tmp_path)
+    await pilot.tick()
+    job = jobs.get(pilot.state.runs[-1].job_id)
+    job.stats = {"links_found": 120, "web_searches": 4,
+                 "web_search_off": "the search engines refused more automated searches"}
+    await finish(pilot, jobs)
+    refused = [e for e in activity.entries() if e["what"] == "Web check refused"]
+    assert len(refused) == 1 and "refused more automated searches after 4 web search(es)" in refused[0]["detail"]
+    assert not pilot.state.stopped                      # nothing stops for it
+    # a search computer from before 1.26 only says it in the job's notice
+    old = Job(query="roofing in Waco, TX", limit=60, stats={"web_searches": 2}, status=JobStatus.COMPLETED,
+              notice="Web search stopped after 2 searches (the search engines could not be reached); the rest ...")
+    pilot._web_check(old)
+    assert "could not be reached after 2 web search(es)" in activity.entries()[0]["detail"]

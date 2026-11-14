@@ -1,7 +1,8 @@
 """Emails to you about the panel itself, so it doesn't need watching (docs/OUTREACH.md §9).
 
 * **Problems** as they happen: the activity log's problem events (``PROBLEMS``) - the autopilot stopped (it
-  also stops on too many bounces), Google blocked a search, a campaign paused (not by you), an email refused,
+  also stops on too many bounces), Google blocked a search, searches listing nothing (Google quietly limiting
+  the laptop), the web check refused, a campaign paused (not by you), an email refused,
   a campaign not made or not started - and, on the cloud server, the laptop not asking for searches for
   ``SILENCE_H`` hours. Collected and sent together: at most one email every ``GAP_S``.
 * **A daily summary** at ``SUMMARY_HOUR`` (the computer's time): yesterday's emails and what came back, the
@@ -29,8 +30,8 @@ from app.outreach.master import DAILY_COLUMNS, daily_table
 
 log = logging.getLogger(__name__)
 
-PROBLEMS = {"Autopilot stopped", "Search blocked", "Campaign paused", "Email refused", "Campaign not made",
-            "Campaign not started"}
+PROBLEMS = {"Autopilot stopped", "Search blocked", "Searches empty", "Web check refused", "Campaign paused",
+            "Email refused", "Campaign not made", "Campaign not started"}
 LAPTOP_SILENT = "Laptop not searching"
 GAP_S = 30 * 60          # at most one problem email this often
 LOOP_S = 60
@@ -44,6 +45,13 @@ ADVICE = {
     "Autopilot stopped": "The autopilot doesn't start again by itself: fix the cause, then switch it on in the "
                          "cloud panel (Outreach › Autopilot).",
     "Search blocked": "Google showed its 'unusual traffic' page to the laptop: wait a day before searching again.",
+    "Searches empty": "Google Maps showed the laptop no businesses at all, search after search - most likely Google "
+                      "quietly limiting it (no captcha). The autopilot stopped and those places are first in line "
+                      "again: wait a day, then switch it on in the cloud panel (Outreach › Autopilot).",
+    "Web check refused": "DuckDuckGo and Bing refused the laptop's searches for websites Google Maps doesn't list "
+                         "(or couldn't be reached), so some businesses were checked only by their email domain and "
+                         "social page - a few may have a website after all. Nothing stopped; it usually clears by "
+                         "the next search. If it comes with every search, the searches need spacing out.",
     "Campaign paused": "A paused campaign sends nothing until it is started again (Outreach › the campaign › Start).",
     "Email refused": "The mail server refused that address: nothing to do, the business isn't emailed again.",
     "Campaign not made": "The search's businesses are kept: make the campaign by hand, or let the next search go on.",

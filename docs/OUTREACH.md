@@ -242,7 +242,8 @@ So the panel doesn't need watching, it emails you (`ALERT_TO`, else the From add
 `OUTREACH_AUTOSEND` is on, and never from the laptop when it is the search computer:
 
 - **Problems**, within a minute: the autopilot stopped (also its bounce stop: 2 of the last 20 businesses
-  emailed bounced, which pauses the running campaigns), Google blocked a search, a campaign paused – not by
+  emailed bounced, which pauses the running campaigns), Google blocked a search, searches listing no businesses at all
+  (*Searches empty*: Google quietly limiting the laptop), the web check refused (*Web check refused*), a campaign paused – not by
   you –, an email refused, a campaign not made or not started; on the cloud server also *Laptop not
   searching* when the laptop hasn't asked for a search for 24 hours (once per silence). Several are sent
   together, at most one email every 30 minutes, each kind with what to do about it.

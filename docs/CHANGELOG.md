@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.26.0 – 2026-11-14
+
+### Added
+- **Searches empty**: 3 searches in a row (since the autopilot was switched on) that list no businesses at all
+  on Google Maps stop the autopilot, put those places first in line again and send a problem email. A real
+  place lists hundreds even when none is new, so this is Google quietly limiting the laptop without its captcha –
+  which until now only showed as "nothing found". Nothing is paused.
+- **Web check refused**: a problem email when DuckDuckGo and Bing refuse (or can't be reached for) the searches
+  for websites Google Maps doesn't list – the businesses after that were checked only by their email domain and
+  social page. Jobs' stats carry it as `web_search_off`; from an older search computer it is read from the
+  job's notice.
+- Both are red in the master sheet's Activity tab and listed in the daily summary.
+
 ## 1.25.1 – 2026-11-13
 
 ### Changed

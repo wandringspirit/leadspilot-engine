@@ -14,6 +14,12 @@ It holds back:
 * and it stops itself - pausing the running campaigns too - when ``BOUNCE_LIMIT`` of the last
   ``BOUNCE_WINDOW`` businesses emailed since it was switched on bounced, or Google blocked a
   search. Switching it on again starts the bounce count afresh.
+* It also stops - without pausing anything - when ``EMPTY_LIMIT`` searches in a row since it was switched on
+  listed no businesses at all: a real place lists hundreds, so that is Google quietly limiting the search
+  computer (no captcha). Those places are searched again first.
+
+A search whose web check (DuckDuckGo / Bing, for websites Google Maps doesn't list) was refused is a
+*Web check refused* entry: its businesses were checked only by their email domain and social page.
 
 Its settings and runs are ``data/autopilot.json``; what it did goes into the activity log.
 """
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +49,10 @@ log = logging.getLogger(__name__)
 TICK_S = 60
 BOUNCE_WINDOW = 20
 BOUNCE_LIMIT = 2
+#: searches in a row that list no businesses at all before it stops (Google quietly limiting the search)
+EMPTY_LIMIT = 3
+#: the web-check part of a job's notice (app/jobs.py PlaceFilter.notice), from a search computer before 1.26
+_WEB_NOTICE = re.compile(r"Web search (?:did not work|stopped after \d+ search(?:es)?) \(([^)]*)\)")
 RUNS_KEPT = 200
 #: a search that ended this way is searched again (e.g. the browser didn't survive the laptop sleeping) - until
 #: FAILS_BEFORE_SKIP of that place's searches in a row failed: then the next place. A cancelled search was
@@ -76,6 +87,7 @@ class AutopilotRun(BaseModel):
     emailing: int = 0                    # of them, in the campaign
     note: str = ""
     failed: bool = False                 # ended with an error (RETRIED): searched again once
+    empty: bool = False                  # Google Maps listed no businesses at all
 
 
 class AutopilotState(BaseModel):
@@ -318,6 +330,34 @@ class Autopilot:
         self.state.next_place = min(self.state.next_place, self.state.places.index(run.place))
         return True
 
+    def _empty_in_a_row(self) -> int:
+        """Finished searches since it was switched on that listed nothing, counted back from the last one."""
+        since, count = self.state.on_since, 0
+        for run in reversed(self.state.runs):
+            if run.finished_at is None or run.failed or (since is not None and run.started_at < since):
+                continue
+            if not run.empty:
+                break
+            count += 1
+        return count
+
+    def _searched_again(self, count: int) -> None:
+        """The last ``count`` empty searches' places come first in line again."""
+        places = [r.place for r in self.state.runs if r.empty][-count:]
+        spots = [self.state.places.index(p) for p in places if p in self.state.places]
+        if spots:
+            self.state.next_place = min(self.state.next_place, *spots)
+
+    def _web_check(self, job: Job) -> None:
+        """A *Web check refused* entry (a problem email) when the search's web searches were refused."""
+        why = job.stats.get("web_search_off", "")
+        if not why and (m := _WEB_NOTICE.search(job.notice or "")):
+            why = m.group(1)
+        if why:
+            self.activity.add("Web check refused",
+                              f"{job.query}: {why} after {job.stats.get('web_searches', 0)} web search(es) - the "
+                              "businesses after that were checked only by their email domain and social page")
+
     def _recent_bounces(self) -> int:
         since = self.state.on_since
         emailed = [lead for c in self.outreach.campaigns.values() for lead in c.leads
@@ -359,6 +399,18 @@ class Autopilot:
             self.activity.add("Search stopped", f"{job.query}: {run.note}")
             return
         self.activity.add("Search finished", f"{job.query}: {len(job.rows)} business(es) without a website found")
+        self._web_check(job)
+        if job.stats.get("links_found", -1) == 0:        # no stats (an older search computer): not counted
+            run.empty, run.note = True, "Google Maps listed no businesses at all"
+            empties = self._empty_in_a_row()
+            if empties >= EMPTY_LIMIT:
+                self._searched_again(empties)
+                self.activity.add("Searches empty", f"{empties} searches in a row listed no businesses at all "
+                                                    f"(the last: {job.query})")
+                self._stop(f"{empties} searches in a row listed no businesses at all - Google is probably limiting "
+                           "the laptop: wait a day, then switch it on again (those places are searched first)")
+            self._save()
+            return
         if not job.rows:
             run.note = "nothing found"
             self._save()

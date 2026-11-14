@@ -42,7 +42,8 @@ CAMPAIGN_COLOURS = [("^running", GREEN), ("^paused", YELLOW), ("^finished", BLUE
 ACTIVITY_COLOURS = [
     ("^(Reply)$", GREEN),
     ("^(Website opened|Tapped call|Tapped email|Asked to keep website|Ended website opened|Call)$", TEAL),
-    ("^(Bounce|Email refused|Autopilot stopped|Search blocked|Campaign paused|Campaign not started|"
+    ("^(Bounce|Email refused|Autopilot stopped|Search blocked|Searches empty|Web check refused|Campaign paused|"
+     "Campaign not started|"
      "Test copy not sent)$", RED),
     ("^(Email sent)$", BLUE),
     ("^(Campaign created|Campaign started|Campaign finished|Autopilot on)$", YELLOW),

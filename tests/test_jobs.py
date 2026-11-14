@@ -192,7 +192,7 @@ async def test_place_filter_skips_a_place_whose_email_domain_is_its_website():
     assert await f.accept(_row(1, website="", description="Email info@joesplumbing.com")) == ([], UNLISTED_WEBSITE)
     rows, reason = await f.accept(_row(2, website="", description="Email joe@gmail.com"))
     assert reason == "" and rows[0].email == "joe@gmail.com"
-    assert f.stats() == {"unlisted_websites": {"email domain": 1}, "web_searches": 0}
+    assert f.stats() == {"unlisted_websites": {"email domain": 1}, "web_searches": 0, "web_search_off": ""}
 
 
 async def test_place_filter_checks_only_places_that_match_without_a_website():

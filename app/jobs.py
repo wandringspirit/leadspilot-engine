@@ -512,9 +512,11 @@ class PlaceFilter:
         return ""
 
     def stats(self) -> dict:
-        """Job stats of the website checks: unlisted websites found (by check) and web searches run."""
+        """Job stats of the website checks: unlisted websites found (by check), web searches run and why web
+        search was switched off ('' = it wasn't)."""
         search = self.site_finder.search if self.site_finder is not None else None
-        return {"unlisted_websites": dict(self.sites_found), "web_searches": getattr(search, "searches", 0)}
+        return {"unlisted_websites": dict(self.sites_found), "web_searches": getattr(search, "searches", 0),
+                "web_search_off": getattr(search, "disabled", "")}
 
     def notice(self) -> str:
         """Says when web search was switched off during the job ('' otherwise)."""
