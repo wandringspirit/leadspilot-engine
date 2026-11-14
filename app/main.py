@@ -155,7 +155,8 @@ def _alert_status() -> dict:
             "drive": drive.status(), "remote": _remote_info(), "verify": address_check.status()}
 
 
-alerts = Alerts(settings, outreach.email_me, _alert_status, last_contact=lambda: remote_contact["at"])
+alerts = Alerts(settings, outreach.email_me, _alert_status, last_contact=lambda: remote_contact["at"],
+                searches_for_laptop=lambda: sum(j.remote and j.status in ACTIVE_STATES for j in manager.jobs.values()))
 if not SEARCHER:                                    # the cloud server tells you; a search computer has nothing to say
     activity.listeners.append(alerts.note)
 

@@ -245,7 +245,8 @@ So the panel doesn't need watching, it emails you (`ALERT_TO`, else the From add
   emailed bounced, which pauses the running campaigns), Google blocked a search, searches listing no businesses at all
   (*Searches empty*: Google quietly limiting the laptop), the web check refused (*Web check refused*), a campaign paused – not by
   you –, an email refused, a campaign not made or not started; on the cloud server also *Laptop not
-  searching* when the laptop hasn't asked for a search for 24 hours (once per silence). Several are sent
+  searching* when the laptop hasn't asked for a search for an hour while a search waits for it or runs on it,
+  or 24 hours otherwise (once per silence). Several are sent
   together, at most one email every 30 minutes, each kind with what to do about it.
 - **A daily summary** at 08:00 (the computer's time): yesterday's emails – first emails and follow-ups – and
   what came back, the campaigns, the next email, the autopilot, the laptop's last check-in, Google Drive and

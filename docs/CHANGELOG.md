@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.26.1 – 2026-11-14
+
+### Changed
+- **Laptop not searching** comes after an hour of silence while a search is waiting for the laptop or running on
+  it (`BUSY_SILENCE_H`), not after 24 hours. On 14 Nov the laptop's panel closed mid-search and nothing said so;
+  with a search always queued at 10 a day, an hour's silence means the panel isn't running. With nothing for it
+  to do, the laptop still has 24 hours. The Status tab's Laptop row turns red on the same rule.
+
 ## 1.26.0 – 2026-11-14
 
 ### Added

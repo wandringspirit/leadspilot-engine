@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 from app.config import Settings
 from app.outreach.activity import ActivityLog
-from app.outreach.alerts import GAP_S, LAPTOP_SILENT, SILENCE_H, SUMMARY_HOUR, Alerts
+from app.outreach.alerts import BUSY_SILENCE_H, GAP_S, LAPTOP_SILENT, SILENCE_H, SUMMARY_HOUR, Alerts
 
 
 class Clock:
@@ -54,6 +54,23 @@ def make(tmp_path, at: datetime, *, role: str = "sender", contact=None, **status
     clock, inbox = Clock(at), Inbox()
     alerts = Alerts(cfg, inbox, lambda: status(**status_overrides), last_contact=lambda: contact, clock=clock)
     return alerts, clock, inbox
+
+
+def test_the_laptop_going_quiet_during_a_search_is_reported_after_an_hour(tmp_path):
+    contact = local(9, day=10)
+    alerts, clock, inbox = make(tmp_path, contact + timedelta(minutes=50), contact=contact)
+    waiting = [1]
+    alerts.searches_for_laptop = lambda: waiting[0]
+    asyncio.run(alerts.step())
+    silent = lambda: [b for s, b in inbox.sent if s == LAPTOP_SILENT]  # noqa: E731
+    assert silent() == []                                               # 50 minutes: fine
+    clock.at = contact + timedelta(hours=BUSY_SILENCE_H, minutes=1)
+    waiting[0] = 0
+    asyncio.run(alerts.step())
+    assert silent() == []                                               # nothing for it to do: a day's grace
+    waiting[0] = 1
+    asyncio.run(alerts.step())
+    assert len(silent()) == 1 and "a search is waiting for it" in silent()[0]
 
 
 def test_problems_are_emailed_together_at_most_every_half_hour(tmp_path):

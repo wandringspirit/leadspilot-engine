@@ -4,7 +4,7 @@
   also stops on too many bounces), Google blocked a search, searches listing nothing (Google quietly limiting
   the laptop), the web check refused, a campaign paused (not by you), an email refused,
   a campaign not made or not started - and, on the cloud server, the laptop not asking for searches for
-  ``SILENCE_H`` hours. Collected and sent together: at most one email every ``GAP_S``.
+  ``SILENCE_H`` hours, or ``BUSY_SILENCE_H`` while a search is waiting for it or running on it. Collected and sent together: at most one email every ``GAP_S``.
 * **A daily summary** at ``SUMMARY_HOUR`` (the computer's time): yesterday's emails and what came back, the
   campaigns, the next email, the autopilot, the laptop, Google Drive and the last day's problems.
 * The same as rows (``status_rows``) for the master sheet's **Status** tab (app/drive/sheets.py).
@@ -36,6 +36,7 @@ LAPTOP_SILENT = "Laptop not searching"
 GAP_S = 30 * 60          # at most one problem email this often
 LOOP_S = 60
 SILENCE_H = 24           # ROLE=sender: the laptop hasn't asked for a search for this long
+BUSY_SILENCE_H = 1       # ... or this long while a search waits for it or runs on it (its panel closed mid-search)
 SUMMARY_HOUR = 8         # the daily summary goes out at 08:00 (the computer's time) ...
 RETRY_S = 30 * 60        # ... and again this long after it couldn't
 QUEUE_KEPT = 50
@@ -64,6 +65,11 @@ EmailMe = Callable[[str, str], Awaitable[bool]]
 WARN = "\u26a0"         # a value that needs a look (the Status tab colours its row red)
 
 
+def silence_h(busy: bool) -> int:
+    """Hours of silence before the laptop counts as not searching: shorter while a search needs it."""
+    return BUSY_SILENCE_H if busy else SILENCE_H
+
+
 def _n(count: int, word: str, plural: str = "") -> str:
     return f"{count} {word if count == 1 else plural or word + 's'}"
 
@@ -83,13 +89,16 @@ def _parse(text: str) -> datetime | None:
 class Alerts:
     def __init__(self, cfg: Settings, email_me: EmailMe, status: Callable[[], dict], *,
                  last_contact: Callable[[], datetime | None] | None = None,
+                 searches_for_laptop: Callable[[], int] | None = None,
                  clock: Callable[[], datetime] | None = None) -> None:
         """``status()``: what the summary reports - {"campaigns", "outreach", "autopilot", "drive", "remote"}
-        (main.py). ``last_contact()``: ROLE=sender - when the laptop last asked (None: not since the start)."""
+        (main.py). ``last_contact()``: ROLE=sender - when the laptop last asked (None: not since the start).
+        ``searches_for_laptop()``: ROLE=sender - the searches waiting for the laptop or running on it."""
         self.cfg = cfg
         self.email_me = email_me
         self.status = status
         self.last_contact = last_contact
+        self.searches_for_laptop = searches_for_laptop
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.started_at = self.clock()
         self._task: asyncio.Task | None = None
@@ -149,7 +158,8 @@ class Alerts:
             return
         contact = self.last_contact()
         since = contact or self.started_at
-        if now - since < timedelta(hours=SILENCE_H):
+        busy = bool(self.searches_for_laptop and self.searches_for_laptop())
+        if now - since < timedelta(hours=silence_h(busy)):
             if contact is not None and self.laptop_silent:
                 self.laptop_silent = False
                 self._save()
@@ -158,7 +168,8 @@ class Alerts:
             self.laptop_silent = True
             when = f"since {_local(contact)}" if contact else f"since the cloud panel started ({_local(since)})"
             self._add({"at": now.isoformat(timespec="seconds"), "what": LAPTOP_SILENT,
-                       "detail": f"the laptop hasn't asked the cloud server for a search {when}",
+                       "detail": f"the laptop hasn't asked the cloud server for a search {when}"
+                                 + (" - and a search is waiting for it" if busy else ""),
                        "campaign": "", "business": ""})
 
     @staticmethod
@@ -260,7 +271,8 @@ class Alerts:
         remote = info.get("remote") or {}
         if remote.get("role") == "sender":
             contact = _parse(remote.get("last_contact") or "")
-            quiet = now - (contact or self.started_at) >= timedelta(hours=SILENCE_H)
+            busy = bool(remote.get("waiting") or remote.get("searching"))
+            quiet = now - (contact or self.started_at) >= timedelta(hours=silence_h(busy))
             if contact is None:
                 laptop = f"hasn't asked for a search since the cloud panel started ({_local(self.started_at)})"
             else:
