@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.3 – 2026-11-17
+
+### Added
+- **The autopilot can take turns between business types** (Roofer, Plumber, Roofer …): *Places and limits* ›
+  *Takes turns with*. Each type works through the same places with its own next place and its own emails;
+  the searches-a-day limit is shared. The panel shows whose search is next and the places searched for each.
+
 ## 1.27.2 – 2026-11-17
 
 ### Changed

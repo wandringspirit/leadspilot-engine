@@ -273,3 +273,56 @@ async def test_a_refused_web_check_is_a_problem_entry(tmp_path):
               notice="Web search stopped after 2 searches (the search engines could not be reached); the rest ...")
     pilot._web_check(old)
     assert "could not be reached after 2 web search(es)" in activity.entries()[0]["detail"]
+
+
+async def test_two_business_types_take_turns_each_with_its_own_next_place(tmp_path):
+    pilot, outreach, jobs, _, clock = make_autopilot(tmp_path)
+    roofer = next(t for t in outreach.list_business_types() if t.name == "Roofer")
+    pilot.state.next_place = 1                          # the plumbers are further on: Pearland next
+    pilot.update(AutopilotUpdate(also_type_ids=[roofer.id], searches_per_day=10))
+    assert [t["next"] for t in pilot.status()["turns"]] == ["Pearland, TX", "Katy, TX"]
+    assert pilot.status()["up_next"] == {"business_type_name": "Plumber", "place": "Pearland, TX"}
+
+    async def search() -> str:
+        await pilot.tick()
+        run = pilot.state.runs[-1]
+        job = jobs.get(run.job_id)
+        job.status, job.finished_at = JobStatus.COMPLETED, clock()     # found nothing
+        await pilot.job_finished(job)
+        clock.advance(minutes=1)
+        return job.query
+
+    assert [await search() for _ in range(3)] == ["plumber in Pearland, TX", "roofing in Katy, TX",
+                                                  "roofing in Pearland, TX"]      # no place left for the plumbers
+    assert pilot.state.runs[1].business_type_id == roofer.id
+    assert pilot.status()["runs"][0]["business_type_name"] == "Roofer"
+    await pilot.tick()
+    assert "every place on the list has been searched" in pilot.state.stopped
+
+    # a new place: each business type searches it, and a lost search is searched again for its own type
+    pilot.update(AutopilotUpdate(places=["Katy, TX", "Pearland, TX", "Spring, TX"], enabled=True))
+    await pilot.tick()
+    lost = jobs.get(pilot.state.runs[-1].job_id)
+    assert lost.query == "plumber in Spring, TX"
+    lost.status = JobStatus.INTERRUPTED
+    clock.advance(minutes=1)
+    await pilot.tick()
+    assert jobs.get(pilot.state.runs[-1].job_id).query == "roofing in Spring, TX"
+    assert pilot.status()["up_next"] == {"business_type_name": "Plumber", "place": "Spring, TX"}
+
+    # taking turns with nobody again: the roofers' place isn't kept, the plumbers' is
+    pilot.update(AutopilotUpdate(also_type_ids=[]))
+    assert pilot.state.also == [] and [t["name"] for t in pilot.status()["turns"]] == ["Plumber"]
+    with pytest.raises(OutreachError):
+        pilot.update(AutopilotUpdate(also_type_ids=["bt_nope"]))
+
+
+def test_swapping_the_main_business_type_keeps_each_ones_next_place(tmp_path):
+    pilot, outreach, *_ = make_autopilot(tmp_path)
+    roofer = next(t for t in outreach.list_business_types() if t.name == "Roofer")
+    plumber_id = pilot.state.business_type_id
+    pilot.state.next_place = 1                          # the plumbers: Pearland next
+    pilot.update(AutopilotUpdate(also_type_ids=[roofer.id]))
+    pilot.update(AutopilotUpdate(business_type_id=roofer.id, also_type_ids=[plumber_id]))
+    assert [(t["name"], t["next"]) for t in pilot.status()["turns"]] == \
+        [("Roofer", "Katy, TX"), ("Plumber", "Pearland, TX")]

@@ -416,10 +416,14 @@ Finds businesses and starts their campaigns by itself ([AUTOPILOT.md](AUTOPILOT.
 - `GET /api/autopilot` → `{"enabled", "business_type_id", "business_type_name", "places": ["Katy, TX", …],
   "next_place", "next": "Sugar Land, TX", "min_waiting", "searches_per_day", "limit", "stopped": "",
   "on_since", "waiting": 4, "searches_today": 1, "searching": "", "searching_job_id": "",
-  "holding": "why it isn't searching now", "runs": [{"place", "job_id", "started_at", "finished_at",
-  "found", "campaign_id", "emailing", "note"}]}` – `runs` newest first.
-- `PATCH /api/autopilot` `{enabled?, business_type_id?, places?, next_place?, min_waiting?,
-  searches_per_day?, limit?}` → the status. Switching it on clears `stopped` and starts the bounce
+  "holding": "why it isn't searching now", "also": [{"business_type_id", "next_place"}], "turn",
+  "turns": [{"business_type_id", "name", "next_place", "next"}], "up_next": {"business_type_name", "place"},
+  "searching_for": "Plumber", "runs": [{"place", "job_id", "started_at", "finished_at", "found",
+  "campaign_id", "emailing", "note", "business_type_id", "business_type_name"}]}` – `runs` newest first;
+  `turns` is every business type it looks for, the main one first.
+- `PATCH /api/autopilot` `{enabled?, business_type_id?, also_type_ids?, places?, next_place?, min_waiting?,
+  searches_per_day?, limit?}` → the status. `also_type_ids` are the business types taking turns with the main
+  one (each keeps its own next place; a new one starts at the first place; `[]` = none). Switching it on clears `stopped` and starts the bounce
   count afresh; `400` without a business type, `404` unknown business type.
 - `GET /api/activity?limit=100` → `[{"at", "what", "detail", "campaign", "business", "email"}]`,
   newest first.

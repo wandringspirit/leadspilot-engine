@@ -1,6 +1,7 @@
 """Autopilot: finds businesses and starts their campaigns by itself (docs/AUTOPILOT.md).
 
-It works through a list of places for one business type. Every ``TICK_S`` it looks whether the
+It works through a list of places for one business type - or for several taking turns (``also``: Roofer,
+Plumber, Roofer …), each through the same places with its own *next place*. Every ``TICK_S`` it looks whether the
 running campaigns are about to run out of businesses to email - fewer than ``min_waiting`` waiting
 for their first email - and if so searches the next place on the list: the whole area, businesses
 without a website that have an email. When the search finishes it makes the campaign
@@ -87,13 +88,22 @@ class AutopilotRun(BaseModel):
     note: str = ""
     failed: bool = False                 # ended with an error (RETRIED): searched again once
     empty: bool = False                  # Google Maps listed no businesses at all
+    business_type_id: str = ""           # whose search ('' = before 1.27.3: the main business type's)
+
+
+class AutopilotTurn(BaseModel):
+    """Another business type taking turns with the main one, through the same places."""
+    business_type_id: str
+    next_place: int = 0                  # its own index into places
 
 
 class AutopilotState(BaseModel):
     enabled: bool = False
     business_type_id: str = ""
     places: list[str] = Field(default_factory=lambda: list(DEFAULT_PLACES))
-    next_place: int = 0                  # index into places
+    next_place: int = 0                  # index into places (the main business type's)
+    also: list[AutopilotTurn] = Field(default_factory=list)   # business types taking turns with the main one
+    turn: int = 0                        # whose search is next: 0 = business_type_id, 1 = also[0] …
     min_waiting: int = 10
     searches_per_day: int = 10
     limit: int = 60                      # businesses wanted per search
@@ -105,6 +115,8 @@ class AutopilotState(BaseModel):
 class AutopilotUpdate(BaseModel):
     enabled: bool | None = None
     business_type_id: str | None = Field(None, max_length=40)
+    also_type_ids: list[str] | None = Field(None, max_length=20,
+                                            description="Business types taking turns with the main one")
     places: list[str] | None = Field(None, max_length=500, description="Searched in this order, e.g. 'Katy, TX'")
     next_place: int | None = Field(None, ge=0, description="Index of the next place to search")
     min_waiting: int | None = Field(None, ge=1, le=500)
@@ -152,21 +164,39 @@ class Autopilot:
 
     def update(self, req: AutopilotUpdate) -> dict:
         state = self.state
+        # each business type's next place goes with it (e.g. the main one and one taking turns swap)
+        progress = {**{t.business_type_id: t.next_place for t in state.also},
+                    state.business_type_id: state.next_place}
         if req.business_type_id is not None:
             if req.business_type_id not in self.outreach.business_types:
                 raise OutreachError("business type not found", 404)
+            if req.business_type_id != state.business_type_id and req.business_type_id in progress:
+                state.next_place = progress[req.business_type_id]
             state.business_type_id = req.business_type_id
+        if req.also_type_ids is not None:
+            unknown = [t for t in req.also_type_ids if t not in self.outreach.business_types]
+            if unknown:
+                raise OutreachError("business type not found", 404)
+            state.also = [AutopilotTurn(business_type_id=t, next_place=progress.get(t, 0))
+                          for t in dict.fromkeys(req.also_type_ids)]
+        state.also = [t for t in state.also if t.business_type_id != state.business_type_id]
         if req.places is not None:
             places = [" ".join(p.split()) for p in req.places if p.strip()]
             if places != state.places:               # the next place stays next where it is still listed
-                upcoming = state.places[state.next_place] if state.next_place < len(state.places) else ""
-                state.next_place = places.index(upcoming) if upcoming in places else state.next_place
+                def kept_next(index: int) -> int:
+                    upcoming = state.places[index] if index < len(state.places) else ""
+                    return places.index(upcoming) if upcoming in places else index
+                state.next_place = kept_next(state.next_place)
+                for turn in state.also:
+                    turn.next_place = kept_next(turn.next_place)
                 state.places = places
         for field in ("next_place", "min_waiting", "searches_per_day", "limit"):
             value = getattr(req, field)
             if value is not None:
                 setattr(state, field, value)
         state.next_place = min(state.next_place, len(state.places))
+        for turn in state.also:
+            turn.next_place = min(turn.next_place, len(state.places))
         # a stopped autopilot is still ``enabled``, so switching it on has to count as a change
         if req.enabled is not None and (req.enabled != state.enabled or (req.enabled and state.stopped)):
             state.enabled = req.enabled
@@ -187,17 +217,73 @@ class Autopilot:
         state = self.state
         business_type = self.outreach.business_types.get(state.business_type_id)
         running = self._running_run()
+        name = self._name
+        up = self._up_next()
         return {
             **state.model_dump(mode="json", exclude={"runs"}),
             "business_type_name": business_type.name if business_type else "",
             "next": state.places[state.next_place] if state.next_place < len(state.places) else "",
+            # every business type it looks for, the main one first, with its own next place
+            "turns": [{"business_type_id": type_id, "name": name(type_id), "next_place": self._next_of(type_id),
+                       "next": state.places[i] if (i := self._next_of(type_id)) < len(state.places) else ""}
+                      for type_id in self._order()],
+            "up_next": {"business_type_name": name(up[0]), "place": state.places[up[1]]} if up else None,
             "waiting": self.waiting(),
             "searches_today": self.searches_today(self.clock()),
             "searching": running.place if running else "",
+            "searching_for": name(self._type_of(running)) if running else "",
             "searching_job_id": running.job_id if running else "",
             "holding": self.waiting_for,
-            "runs": [run.model_dump(mode="json") for run in reversed(state.runs[-30:])],
+            "runs": [{**run.model_dump(mode="json"), "business_type_name": name(self._type_of(run))}
+                     for run in reversed(state.runs[-30:])],
         }
+
+    # ------------------------------------------------------------------
+    # Taking turns: each business type has its own next place in the same list
+    # ------------------------------------------------------------------
+    def _order(self) -> list[str]:
+        """The business types it looks for, the main one first; a deleted one is skipped."""
+        state = self.state
+        return [state.business_type_id] + [t.business_type_id for t in state.also
+                                           if t.business_type_id in self.outreach.business_types
+                                           and t.business_type_id != state.business_type_id]
+
+    def _type_of(self, run: AutopilotRun) -> str:
+        return run.business_type_id or self.state.business_type_id
+
+    def _name(self, type_id: str) -> str:
+        business_type = self.outreach.business_types.get(type_id)
+        return business_type.name if business_type else ""
+
+    def _next_of(self, type_id: str) -> int:
+        state = self.state
+        if type_id == state.business_type_id:
+            return state.next_place
+        turn = next((t for t in state.also if t.business_type_id == type_id), None)
+        return turn.next_place if turn else len(state.places)
+
+    def _set_next(self, type_id: str, index: int) -> None:
+        state = self.state
+        if type_id == state.business_type_id:
+            state.next_place = index
+        for turn in state.also:
+            if turn.business_type_id == type_id and type_id != state.business_type_id:
+                turn.next_place = index
+
+    def _up_next(self) -> tuple[str, int] | None:
+        """Whose search is next and where: from ``turn`` on, the first business type with a place left."""
+        order = self._order()
+        for k in range(len(order)):
+            type_id = order[(self.state.turn + k) % len(order)]
+            if (index := self._next_of(type_id)) < len(self.state.places):
+                return type_id, index
+        return None
+
+    def _first_in_line(self, run: AutopilotRun) -> None:
+        """The run's place is its business type's next place again."""
+        if run.place in self.state.places:
+            type_id = self._type_of(run)
+            self._set_next(type_id, min(self._next_of(type_id), self.state.places.index(run.place)))
 
     def waiting(self) -> int:
         """Businesses of running campaigns still waiting for their first email."""
@@ -273,19 +359,22 @@ class Autopilot:
             return f"{waiting} businesses are waiting for their first email"
         if self.searches_today(now) >= state.searches_per_day:
             return f"{state.searches_per_day} search(es) today already"
-        business_type = self.outreach.business_types.get(state.business_type_id)
-        if business_type is None:
+        if self.outreach.business_types.get(state.business_type_id) is None:
             self._stop("its business type was deleted - pick one")
             return state.stopped
-        if state.next_place >= len(state.places):
+        up = self._up_next()
+        if up is None:
             self._stop("every place on the list has been searched - add more places")
             return state.stopped
-        place = state.places[state.next_place]
-        state.next_place += 1
+        type_id, index = up
+        order = self._order()
+        state.turn = (order.index(type_id) + 1) % len(order)       # the next business type's turn
+        self._set_next(type_id, index + 1)
+        business_type, place = self.outreach.business_types[type_id], state.places[index]
         job = self.jobs.create_scrape(build_query(business_type.search or business_type.name, place), state.limit,
                                       business=business_type.search or business_type.name, place=place,
                                       whole_area=True, filters=search_filters(), business_type_id=business_type.id)
-        state.runs.append(AutopilotRun(place=place, job_id=job.id, started_at=now))
+        state.runs.append(AutopilotRun(place=place, job_id=job.id, started_at=now, business_type_id=type_id))
         self._save()
         self.activity.add("Search started", f"{job.query} (whole area, no website, has an email)")
         log.info("Autopilot: searching %r (%d businesses waiting)", job.query, waiting)
@@ -304,8 +393,7 @@ class Autopilot:
                                                                      or job.remote):
                 continue                                 # finished; job_finished is on its way
             run.finished_at, run.note = now, "the search didn't finish (the panel stopped?) - it is searched again"
-            if run.place in self.state.places:
-                self.state.next_place = min(self.state.next_place, self.state.places.index(run.place))
+            self._first_in_line(run)
             changed = True
         if changed:
             self._save()
@@ -314,13 +402,14 @@ class Autopilot:
         """Put a failed search's place first in line again - unless FAILS_BEFORE_SKIP in a row have failed."""
         run.failed = True
         fails = 0
-        for earlier in reversed([r for r in self.state.runs if r.place == run.place]):
+        for earlier in reversed([r for r in self.state.runs
+                                 if r.place == run.place and self._type_of(r) == self._type_of(run)]):
             if not earlier.failed:
                 break
             fails += 1
         if fails >= FAILS_BEFORE_SKIP or run.place not in self.state.places:
             return False
-        self.state.next_place = min(self.state.next_place, self.state.places.index(run.place))
+        self._first_in_line(run)
         return True
 
     def _empty_in_a_row(self) -> int:
@@ -335,11 +424,9 @@ class Autopilot:
         return count
 
     def _searched_again(self, count: int) -> None:
-        """The last ``count`` empty searches' places come first in line again."""
-        places = [r.place for r in self.state.runs if r.empty][-count:]
-        spots = [self.state.places.index(p) for p in places if p in self.state.places]
-        if spots:
-            self.state.next_place = min(self.state.next_place, *spots)
+        """The last ``count`` empty searches' places come first in line again (for their business type)."""
+        for run in [r for r in self.state.runs if r.empty][-count:]:
+            self._first_in_line(run)
 
     def _web_check(self, job: Job) -> None:
         """A *Web check refused* entry (a problem email) when the search's web searches were refused."""

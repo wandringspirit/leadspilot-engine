@@ -283,9 +283,14 @@
             <label for="ap-per-day">Searches a day, at most
               <input id="ap-per-day" type="number" min="1" max="20"></label>
           </div>
+          <fieldset class="filters" id="ap-also">
+            <legend>Takes turns with</legend>
+            <p class="muted small-note" id="ap-also-note">Each one searches the same places, one after the other, with its own
+              next place and its own emails.</p>
+          </fieldset>
           <label for="ap-places">Places, searched in this order – one per line, e.g. <em>Katy, TX</em>
             <textarea id="ap-places" rows="8"></textarea></label>
-          <label for="ap-next">Next place to search
+          <label for="ap-next">Next place to search for it (the ones taking turns keep their own)
             <select id="ap-next"></select></label>
           <div class="row-start">
             <button class="btn primary" type="submit">Save</button>

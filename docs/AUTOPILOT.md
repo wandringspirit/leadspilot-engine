@@ -27,9 +27,18 @@ It searches only when the running campaigns are about to run out of businesses t
 websites aren't built weeks before anyone is emailed and Google Maps isn't searched more than
 needed.
 
+**Taking turns.** It can look for more than one business type: tick them under *Takes turns with*
+(`also`). The searches then alternate – Roofer in the next roofer place, Plumber in the next plumber
+place, Roofer … – each type working through the **same list of places** with its **own next place**
+(a type added later starts at the top of the list), and each place's campaign gets that type's emails
+and website. A type with no place left is skipped; when none has a place left the autopilot stops.
+The searches-a-day limit and *waiting for a first email* count all types together. A failed or lost
+search is searched again for its own type.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | business type | Roofer | what it looks for, and the emails its campaigns use |
+| `also` | none | business types taking turns with it, each with its own `next_place` |
 | places | 20 Texas places | searched in this order; *next* is the next one |
 | `min_waiting` | 10 | search when fewer businesses than this wait for their first email (two days at 5 a day) |
 | `searches_per_day` | 10 | at most this many searches a day (this computer's day – India), one at a time; up to 20 |
