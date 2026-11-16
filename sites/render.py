@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from markupsafe import Markup
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
@@ -208,6 +209,8 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
     trade = fill(pack, base)
     if trade.get("explorer", {}).get("crop"):
         trade["explorer"] = cropped(trade["explorer"])
+    if trade.get("explorer", {}).get("svg"):          # a drawing inlined in the page, so site.css can animate it
+        trade["explorer"]["svg"] = Markup((ROOT / trade["explorer"]["svg"]).read_text(encoding="utf-8"))
     return {
         **base,
         "trade": trade,

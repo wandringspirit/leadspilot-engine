@@ -73,8 +73,10 @@ DEFAULT_STEPS: list[dict] = [
 ]
 
 # The last site email's P.S.: the paid service, at the founding price on leadspilot.co (#founding-offer).
+# Any trade gets these emails, so the wording fits any trade; a type can say it its own way in the panel
+# (the Roofer's: "until you're off the roof", the Plumber's: "while you're under a sink").
 FOUNDING_PS = ("\n\nP.S. Once quote requests start coming in through the site, I can also set up an instant reply "
-               "and follow-ups for each one, so no homeowner waits until you're off the roof. Founding price: "
+               "and follow-ups for each one, so no customer waits while you're out on a job. Founding price: "
                "$99 a month, no setup fee. leadspilot.co/#founding-offer")
 
 # For businesses that get a preview website: the link in the first email. The website comes down a

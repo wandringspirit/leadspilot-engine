@@ -90,10 +90,64 @@
   }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
   $$("[data-reveal], [data-ring]").forEach((el) => seen.observe(el));
 
+  /* ---- drips (a pack's "hero_fx": "drips" - the plumber's): drops fall, speed up and ring out ---- */
+  const drips = (canvas, density) => {
+    const ctx = canvas.getContext("2d");
+    let drops = [], rings = [], running = false, w = 0, h = 0;
+    const drop = (d = {}) => Object.assign(d, {
+      x: 40 + Math.random() * Math.max(0, w - 80), y: -20 - Math.random() * h * 0.9, v: 0,
+      r: 3.4 + Math.random() * 3, floor: h * (0.5 + Math.random() * 0.42), a: 0.55 + Math.random() * 0.35,
+    });
+    const size = () => {
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      w = canvas.clientWidth; h = canvas.clientHeight;
+      canvas.width = w * dpr; canvas.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drops = Array.from({ length: Math.max(3, Math.round(Math.min(22, w / 80) * density)) }, () => drop());
+      rings = [];
+    };
+    const frame = () => {
+      if (!running) return;
+      ctx.clearRect(0, 0, w, h);
+      for (const d of drops) {
+        d.v = Math.min(d.v + 0.32, 22);
+        d.y += d.v;
+        if (d.y >= d.floor) { rings.push({ x: d.x, y: d.floor, r: d.r, a: Math.min(0.95, d.a + 0.2) }); drop(d); continue; }
+        if (d.y < -10) continue;
+        const tip = d.y - d.r * 2.2 * (1 + d.v * 0.11);       // a teardrop, longer the faster it falls
+        ctx.fillStyle = `rgba(200,228,255,${d.a})`;
+        ctx.beginPath();
+        ctx.moveTo(d.x, tip);
+        ctx.bezierCurveTo(d.x + d.r * 0.9, d.y - d.r, d.x + d.r, d.y, d.x, d.y + d.r);
+        ctx.bezierCurveTo(d.x - d.r, d.y, d.x - d.r * 0.9, d.y - d.r, d.x, tip);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${d.a})`;          // the glint
+        ctx.beginPath(); ctx.arc(d.x - d.r * 0.35, d.y - d.r * 0.2, d.r * 0.28, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.lineWidth = 1.6;
+      rings = rings.filter((g) => g.a > 0.02);
+      for (const g of rings) {
+        ctx.strokeStyle = `rgba(200,228,255,${g.a})`;
+        ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r, g.r * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
+        if (g.r > 14) { ctx.beginPath(); ctx.ellipse(g.x, g.y, g.r * 0.55, g.r * 0.165, 0, 0, Math.PI * 2); ctx.stroke(); }
+        g.r += 1.4; g.a *= 0.96;
+      }
+      requestAnimationFrame(frame);
+    };
+    size();
+    addEventListener("resize", size);
+    new IntersectionObserver(([e]) => {
+      const was = running;
+      running = e.isIntersecting;
+      if (running && !was) requestAnimationFrame(frame);
+    }).observe(canvas);
+  };
+
   /* ---- rain (hero and closing band) + lightning (hero) ---- */
   const rain = (canvas) => {
     const density = Number(canvas.dataset.rain || 1);
     if (!(density > 0) || calm) return;
+    if (canvas.dataset.fx === "drips") return drips(canvas, density);
     const ctx = canvas.getContext("2d");
     const flash = canvas.closest("[data-hero]") ? $("[data-flash]") : null;
     let drops = [];
@@ -269,9 +323,12 @@
     chips.forEach((c) => c.addEventListener("click", () => pick(c.dataset.chip)));
     need.addEventListener("change", sync);
     // a service card or "we'll check it for free" link elsewhere on the page picks it too
-    const SERVICE = { "storm-damage": "storm", "leak-detection": "leak", "roof-replacement": "replace", "roof-repair": "leak" };
-    $$("[data-pick]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.pick] || "check")));
-    $$("[data-service]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.service] || "check")));
+    // a pack can say which option each service picks (data-for: {"for": {slug: option}, "else": option})
+    const own = form.dataset.for ? JSON.parse(form.dataset.for) : null;
+    const SERVICE = own ? own.for : { "storm-damage": "storm", "leak-detection": "leak", "roof-replacement": "replace", "roof-repair": "leak" };
+    const OTHER = own ? own.else : "check";
+    $$("[data-pick]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.pick] || OTHER)));
+    $$("[data-service]").forEach((a) => a.addEventListener("click", () => pick(SERVICE[a.dataset.service] || OTHER)));
     const fields = $$("input[required], select[required]", form);
     fields.forEach((f) => f.addEventListener("input", () => { f.removeAttribute("aria-invalid"); err.hidden = true; }));
     const valid = () => {

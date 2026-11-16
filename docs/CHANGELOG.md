@@ -3,6 +3,21 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.1 – 2026-11-16
+
+### Added
+- **A website for plumbers** (`sites/trades/plumber.json`): the same bold design with plumber wording, photos,
+  services and FAQ. Water drops fall and ripple on the hero and the closing band (`"hero_fx": "drips"`), and the
+  "Plumbing check" is an animated drawing of a house cut open – water running through the cold, hot and drain
+  pipes, the shower on, a dripping tap, the water heater's flame – with six spots to tap
+  (`sites/assets/plumber/make_house.py`). New optional pack fields (icon, button and section wording, schema
+  type, an inlined drawing, the quote form's service map) default to the roofer's, whose page is unchanged.
+
+### Changed
+- The autopilot allows up to 20 searches a day (was 10), for more emails a day.
+- The website emails' P.S. reads right for any trade ("while you're out on a job"); business types already
+  saved keep their own wording.
+
 ## 1.27.0 – 2026-11-16
 
 ### Changed

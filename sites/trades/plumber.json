@@ -1,0 +1,422 @@
+{
+  "trade": "plumber",
+  "design": "bold",
+  "label": "Plumbing",
+  "noun": "plumber",
+  "schema_type": "Plumber",
+  "logo_icon": "wrench",
+  "hero_fx": "drips",
+  "nav_cta": "Book a visit",
+  "form_title": "Book a plumber",
+  "mbar_cta": "Get a quote",
+  "services_title": [
+    "Every pipe in the house,",
+    "handled."
+  ],
+  "process_title": [
+    "From the first call to",
+    "water running clean."
+  ],
+  "work_title": [
+    "Neat work.",
+    "Built to last."
+  ],
+  "symbols": {
+    "wrench": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z\"/>",
+    "flame": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z\"/>",
+    "pipe": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2 5v6M2 6h8a5 5 0 0 1 5 5v9M2 10h7a2 2 0 0 1 2 2v8M9 21h8\"/>",
+    "faucet": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4 13h9a3 3 0 0 1 3 3v1M4 9h9a6 6 0 0 1 6 6v2M4 7v8M8 9V5M5 5h6M17.5 21v.5\"/>"
+  },
+  "accents": [
+    {
+      "name": "aqua",
+      "accent": "#1EC8E8",
+      "accent_text": "#0A7287",
+      "accent_soft": "#D2F4FA"
+    },
+    {
+      "name": "pipe blue",
+      "accent": "#5B9BFF",
+      "accent_text": "#1E56C4",
+      "accent_soft": "#DCE8FF"
+    },
+    {
+      "name": "copper",
+      "accent": "#F08A4B",
+      "accent_text": "#A84E16",
+      "accent_soft": "#FDE4D3"
+    }
+  ],
+  "headlines": [
+    [
+      "Plumbing that",
+      "just works."
+    ],
+    [
+      "Your {{ city }}",
+      "plumber."
+    ],
+    [
+      "Leak today?",
+      "Call us now."
+    ]
+  ],
+  "hero_photos": [
+    {
+      "src": "https://images.unsplash.com/photo-1521207418485-99c705420785",
+      "alt": "Water running from a kitchen faucet in a dark kitchen",
+      "pos": "40% 50%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1652662700928-5a4685e87d64",
+      "alt": "Water falling from a shower head",
+      "pos": "50% 40%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1676210134188-4c05dd172f89",
+      "alt": "Plumber fixing the pipes under a sink",
+      "pos": "62% 45%",
+      "rain": 0.7
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1676210134190-3f2c0d5cf58d",
+      "role": "cta",
+      "alt": "",
+      "pos": "55% 50%"
+    }
+  ],
+  "hero_sub": "Leaks, blocked drains, water heaters and new fixtures for homes across {{ city }} and nearby. We find the real cause, tell you the price before any work starts, and leave the place clean.",
+  "cta_primary": "Book a plumber",
+  "marquee": [
+    "Leak repair",
+    "Drain cleaning",
+    "Water heaters",
+    "Toilets & faucets",
+    "Sewer lines",
+    "Repiping"
+  ],
+  "stats_extra": {
+    "value": "Upfront",
+    "label": "prices, before any work"
+  },
+  "services": [
+    {
+      "slug": "leak-repair",
+      "icon": "drop",
+      "title": "Leak Repair",
+      "blurb": "A drip under the sink, a damp patch on the ceiling. We find where the water really comes from and fix it there.",
+      "photo": "https://images.unsplash.com/photo-1676210133055-eab6ef033ce3",
+      "alt": "Plumber repairing the pipes inside a sink cabinet"
+    },
+    {
+      "slug": "drain-cleaning",
+      "icon": "pipe",
+      "title": "Drain Cleaning",
+      "blurb": "Slow sinks, gurgling tubs, a shower that won't empty. Cleared properly, not just pushed further down the pipe.",
+      "photo": "https://images.unsplash.com/photo-1654440122140-f1fc995ddb34",
+      "alt": "Close-up of a stainless steel sink drain"
+    },
+    {
+      "slug": "water-heaters",
+      "icon": "flame",
+      "title": "Water Heaters",
+      "blurb": "Repairs, flushes and replacements for tank and tankless heaters, so the hot water lasts the whole shower.",
+      "photo": "https://images.unsplash.com/photo-1620653713380-7a34b773fef8",
+      "alt": "Plumber tightening a fitting on top of a water heater"
+    },
+    {
+      "slug": "fixtures",
+      "icon": "faucet",
+      "title": "Toilets & Faucets",
+      "blurb": "Running toilets, dripping taps, a new vanity or kitchen faucet. Fitted neatly and tested before we leave.",
+      "photo": "https://images.unsplash.com/photo-1585704032915-c3400ca199e7",
+      "alt": "Chrome tub faucet with a shower hose"
+    },
+    {
+      "slug": "sewer-lines",
+      "icon": "search",
+      "title": "Sewer & Water Lines",
+      "blurb": "Backups, roots and old lines under the yard. We find the problem first and explain the options before anything is dug up.",
+      "photo": "https://images.unsplash.com/photo-1693907986952-3cd372e4c9d8",
+      "alt": "New water line with valves laid in a trench"
+    },
+    {
+      "slug": "repiping",
+      "icon": "wrench",
+      "title": "Repiping",
+      "blurb": "Old or leaking pipes replaced with new lines, for steady pressure and clean water all through the house.",
+      "photo": "https://images.unsplash.com/photo-1768321913920-d3ac011e0683",
+      "alt": "New water pipes inside an open wall"
+    }
+  ],
+  "explorer": {
+    "kind": "drawing",
+    "kicker": "Interactive plumbing check",
+    "title": "See where your plumbing goes wrong.",
+    "intro": "Water is moving through the pipes in your walls right now. Tap a marker to see what goes wrong there, and the signs you can spot yourself.",
+    "svg": "assets/plumber/house-check.svg",
+    "alt": "A drawing of a house cut open, with its water pipes, water heater and drains",
+    "part": "part of the plumbing",
+    "go": "Not sure? Ask us to take a look",
+    "legend": [
+      {
+        "label": "Cold water",
+        "color": "#3D93F0"
+      },
+      {
+        "label": "Hot water",
+        "color": "#F0583A"
+      },
+      {
+        "label": "Drains",
+        "color": "#8D9AB3"
+      }
+    ],
+    "spots": [
+      {
+        "key": "water-heater",
+        "label": "Water heater",
+        "x": 30.83,
+        "y": 88.24,
+        "service": "water-heaters",
+        "what": "Sediment settles at the bottom of the tank and the parts inside wear out. Most tank heaters last 8 to 12 years.",
+        "signs": [
+          "Rumbling or popping when it heats",
+          "Rusty or only lukewarm water",
+          "Water pooling around the base"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "kitchen",
+        "label": "Kitchen sink",
+        "x": 65.1,
+        "y": 65.44,
+        "service": "drain-cleaning",
+        "what": "Grease and food scraps build up in the drain, and the faucet's seals wear out a little with every use.",
+        "signs": [
+          "Water draining slowly or backing up",
+          "A faucet that drips when it's off",
+          "Damp or swollen wood in the cabinet below"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "toilet",
+        "label": "Toilet",
+        "x": 43.23,
+        "y": 43.93,
+        "service": "fixtures",
+        "what": "A worn flapper or fill valve lets water run all day, and a failing wax seal leaks under the floor where you can't see it.",
+        "signs": [
+          "It runs or refills on its own",
+          "Water around the base",
+          "It rocks when you sit on it"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "shower",
+        "label": "Shower & tub",
+        "x": 29.17,
+        "y": 38.6,
+        "service": "leak-repair",
+        "what": "Hair and soap narrow the drain, and old valves start to leak inside the wall long before it shows.",
+        "signs": [
+          "Water pooling while you shower",
+          "Hot water that comes and goes",
+          "Stains on the ceiling below the bathroom"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "shutoff",
+        "label": "Main shut-off",
+        "x": 21.88,
+        "y": 88.42,
+        "service": "leak-repair",
+        "what": "The valve that turns off the water to the whole house. When a pipe bursts, finding it fast saves the floors.",
+        "signs": [
+          "You don't know where it is",
+          "It's stiff, rusted or won't close all the way",
+          "It drips around the handle"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "sewer",
+        "label": "Sewer line",
+        "x": 67.71,
+        "y": 92.65,
+        "service": "sewer-lines",
+        "what": "The main line carries everything out to the street. Tree roots, grease and sagging pipe block it.",
+        "signs": [
+          "Several drains slow at the same time",
+          "The toilet gurgles when the sink drains",
+          "A sewage smell or soggy patches in the yard"
+        ],
+        "side": "left"
+      }
+    ]
+  },
+  "process": [
+    {
+      "title": "You call or book online",
+      "text": "Tell us what's going on. We'll find a time that suits you."
+    },
+    {
+      "title": "We find the cause",
+      "text": "We look at the whole problem, not just the drip you can see, and explain what we find."
+    },
+    {
+      "title": "You get the price first",
+      "text": "You know what it costs before any work starts. No surprises on the bill."
+    },
+    {
+      "title": "Fixed, tested, tidy",
+      "text": "We do the work, run the water to test it, and leave the place as clean as we found it."
+    }
+  ],
+  "why": {
+    "photo": "https://images.unsplash.com/photo-1676210134050-6f12c6898395",
+    "alt": "Plumber in work gloves fitting a flush plate on a bathroom wall",
+    "title": "A plumber who explains, not just bills.",
+    "points": [
+      {
+        "icon": "pin",
+        "title": "Local to {{ city }}",
+        "text": "We work in {{ city }} and the towns around it, so we're never far away when you need us."
+      },
+      {
+        "icon": "doc",
+        "title": "The price before the work",
+        "text": "You know what it costs before we start. The number we agree is the number you pay."
+      },
+      {
+        "icon": "search",
+        "title": "The real cause, fixed",
+        "text": "Patching the symptom means another call next month. We trace the problem back to where it starts."
+      },
+      {
+        "icon": "broom",
+        "title": "Clean and tidy",
+        "text": "Covers down, mess cleared up. You'd hardly know we were there, except that it works."
+      }
+    ]
+  },
+  "gallery": [
+    {
+      "src": "https://images.unsplash.com/photo-1749532125405-70950966b0e5",
+      "alt": "Plumber working in a modern bathroom",
+      "tag": "Bathroom plumbing"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1775359924006-557dba8c862b",
+      "alt": "White farmhouse sink with a black kitchen faucet",
+      "tag": "Kitchen sink & faucet"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1771929662486-f793e08f0f16",
+      "alt": "Walk-in shower with glass panels and marble walls",
+      "tag": "Walk-in shower"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39",
+      "alt": "Pipes, valves and a meter on a brick wall",
+      "tag": "Mechanical room"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1538474705339-e87de81450e8",
+      "alt": "Neat runs of painted pipe along a wall",
+      "tag": "Pipe runs"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1761758674188-2b8e4c89c5e2",
+      "alt": "Close-up of a red shut-off valve and pressure gauge",
+      "tag": "Shut-off valves"
+    }
+  ],
+  "faq": [
+    {
+      "q": "A pipe just burst. What do I do first?",
+      "a": "Turn off the main shut-off valve, switch off the water heater, and call us. Move anything valuable away from the water while you wait."
+    },
+    {
+      "q": "How long does a water heater last?",
+      "a": "A tank heater usually lasts 8 to 12 years, and a tankless one longer. Hard water and skipped flushes shorten that."
+    },
+    {
+      "q": "Should I use drain cleaner from the store?",
+      "a": "It can clear a light clog, but it's harsh on older pipes and often just moves the blockage further down. If a drain keeps going slow, it's worth clearing properly."
+    },
+    {
+      "q": "Why has my water bill gone up?",
+      "a": "A running toilet or a hidden leak is the usual reason. Turn every tap off and look at the water meter: if it's still moving, water is going somewhere."
+    },
+    {
+      "q": "Do you tell me the price before you start?",
+      "a": "Yes. Once we've seen the problem we tell you what it will cost, and the work only starts when you agree."
+    },
+    {
+      "q": "How do I know if it's my sewer line?",
+      "a": "If several drains back up at once, or the toilet gurgles when the sink drains, the main line is the usual suspect."
+    }
+  ],
+  "quote_options": [
+    {
+      "value": "leak",
+      "label": "Something's leaking",
+      "icon": "drop"
+    },
+    {
+      "value": "drain",
+      "label": "A drain is blocked",
+      "icon": "pipe"
+    },
+    {
+      "value": "hot",
+      "label": "No hot water",
+      "icon": "flame"
+    },
+    {
+      "value": "fixture",
+      "label": "New fixture or repair",
+      "icon": "faucet"
+    }
+  ],
+  "quote_for": {
+    "for": {
+      "leak-repair": "leak",
+      "drain-cleaning": "drain",
+      "sewer-lines": "drain",
+      "water-heaters": "hot",
+      "fixtures": "fixture",
+      "repiping": "leak"
+    },
+    "else": "fixture"
+  },
+  "cta_title": [
+    "Water where it shouldn't be?",
+    "We're one call away."
+  ],
+  "footer_blurb": "Leak repair, drain cleaning and water heaters for homes in {{ city }} and the surrounding area.",
+  "nav_explorer": "Plumbing check",
+  "area_title": [
+    "Plumbing across {{ city }}",
+    "and nearby."
+  ],
+  "quote_kicker": "Book a visit",
+  "quote_title": [
+    "Tell us what's wrong.",
+    "We'll sort it."
+  ],
+  "logo_strip": [
+    "Plumbing & Heating",
+    "Plumbing Services",
+    "Plumbing Company",
+    "Plumbing Co",
+    "Plumbing",
+    "Plumbers",
+    "Plumber"
+  ]
+}

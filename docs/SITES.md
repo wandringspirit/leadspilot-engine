@@ -25,8 +25,23 @@ flowchart LR
 | the business | its search row | name, city, state, phone, email, rating, reviews, place id, location |
 
 A business type without a trade pack has **no website design yet**: a campaign for it can't start
-(*there's no website design for Plumber yet …*). Today only **Roofer** has one; its design is locked
-(git tag `roofer-design-v1`).
+(*there's no website design for HVAC yet …*). **Roofer** and **Plumber** have one. The Roofer design is
+locked (git tag `roofer-design-v1`): everything the Plumber pack changes is an optional pack field whose
+default is the Roofer's text, so a roofer's page comes out byte for byte the same.
+
+The **Plumber** pack (`sites/trades/plumber.json`) has its own moving parts:
+
+- `"hero_fx": "drips"` – water drops fall over the hero photo and the closing band, speed up and ring
+  out where they land (instead of the Roofer's rain and lightning);
+- an explorer drawn instead of photographed (`"svg"`): a house cut open at night with its cold and hot
+  pipes and drains, water moving through every pipe, the shower running, a dripping kitchen faucet and
+  the water heater's flame – `sites/assets/plumber/make_house.py` draws it, and the pins' x / y are
+  percent of its view box;
+- its own words where the Roofer's were built in: `schema_type`, `logo_icon` + `symbols` (icons),
+  `nav_cta`, `form_title`, `mbar_cta`, `services_title`, `process_title`, `work_title`, the explorer's
+  `part` / `go` / `legend`, and `quote_for` (which quote option each service picks).
+
+Sample: `python sites/render.py sites/trades/plumber.json sites/samples/plumber-houston.json`.
 
 The accent colour, headline and hero photo are picked from the pack by a hash of the business's name
 and city, so two roofers in one city don't get the same page.

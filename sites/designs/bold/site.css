@@ -582,3 +582,57 @@ details[open] .pm::after { transform: rotate(0); }
   .town small { font-size: 11px; }
   .map-north { top: 12px; right: 12px; }
 }
+
+/* ---------- drawn explorer (a pack's "svg" instead of a photo: the plumber's house) ---------- */
+.xp-art, .xp-art .hx { display: block; width: 100%; height: 100%; }
+.rain[data-fx="drips"] { z-index: 0; pointer-events: none; }   /* over the hero's shade, under its words */
+.hx-room { fill: rgba(200, 215, 240, .035); }
+.hx-base { fill: rgba(0, 0, 0, .22); }
+.hx-roof { fill: rgba(200, 215, 240, .06); stroke: rgba(200, 215, 240, .4); stroke-width: 4; stroke-linejoin: round; }
+.hx-wall { fill: none; stroke: rgba(200, 215, 240, .42); stroke-width: 5; stroke-linejoin: round; }
+.hx-floor { fill: none; stroke: rgba(200, 215, 240, .22); stroke-width: 12; }
+.hx-grass { stroke: #3E5B3A; stroke-width: 6; }
+.hx-windows rect { fill: url(#hx-window); stroke: rgba(255, 201, 119, .45); stroke-width: 3; }
+.hx-detail { fill: none; stroke: rgba(200, 215, 240, .2); stroke-width: 3; stroke-linecap: round; }
+.hx-detail-fill { fill: rgba(200, 215, 240, .14); }
+.hx-fixture { fill: rgba(200, 215, 240, .1); stroke: rgba(200, 215, 240, .5); stroke-width: 3; stroke-linejoin: round; }
+.hx-fixture-line { fill: none; stroke: rgba(200, 215, 240, .62); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.hx-mirror { fill: rgba(170, 200, 255, .12); stroke: rgba(200, 215, 240, .4); stroke-width: 3; }
+.hx-sink { fill: #0A1120; stroke: rgba(200, 215, 240, .5); stroke-width: 3; }
+.hx-valve { fill: #101A2E; stroke: rgba(200, 215, 240, .7); stroke-width: 4; }
+.hx-tank { fill: url(#hx-tank); stroke: rgba(200, 215, 240, .55); stroke-width: 4; }
+.hx-burner { fill: #0A1120; stroke: rgba(200, 215, 240, .4); stroke-width: 2; }
+.hx-flame { fill: #FFB03A; transform-box: fill-box; transform-origin: 50% 100%; }
+.hx-shutoff circle { fill: #101A2E; stroke: #E5484D; stroke-width: 5; }
+.hx-shutoff path { stroke: #E5484D; stroke-width: 4; stroke-linecap: round; }
+.hx-pipe, .hx-pipe-edge, .hx-flow { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.hx-pipe-edge { stroke: rgba(0, 0, 0, .45); stroke-width: 12; }
+.hx-drain-edge { stroke-width: 19; }
+.hx-pipe { stroke-width: 7; }
+.hx-cold { stroke: #3D93F0; }
+.hx-hot { stroke: #F0583A; }
+.hx-drain { stroke: #5B6880; stroke-width: 13; }
+.hx-flow { stroke-width: 3; stroke-dasharray: 2 28; }
+.hx-flow-cold { stroke: #D6ECFF; }
+.hx-flow-hot { stroke: #FFE0D4; }
+.hx-flow-drain { stroke: rgba(205, 215, 235, .5); stroke-width: 5; stroke-dasharray: 12 30; }
+.hx-spray path { stroke: rgba(190, 225, 255, .55); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 8 16; }
+.hx-drip { fill: #9FD0FF; opacity: 0; transform-box: fill-box; transform-origin: 50% 0; }
+.is-drawn .xp-hint { top: 14px; right: 14px; bottom: auto; left: auto; }
+.xp-legend { position: absolute; top: 14px; left: 14px; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 12px; font-weight: 600; color: var(--on-night-muted); }
+.xp-legend li { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 999px; background: rgba(10, 17, 32, .72); }
+.xp-legend i { width: 14px; height: 4px; border-radius: 2px; background: var(--c); }
+@media (prefers-reduced-motion: no-preference) {
+  .hx-flow { animation: hx-flow 1.5s linear infinite; }
+  .hx-flow-hot { animation-duration: 1.8s; }
+  .hx-flow-drain { animation: hx-flow-drain 2.8s linear infinite; }
+  .hx-spray path { animation: hx-spray .7s linear infinite; }
+  .hx-drip { animation: hx-drip 2.2s cubic-bezier(.55, 0, .9, .45) infinite; }
+  .hx-flame { animation: hx-flame .35s ease-in-out infinite alternate; }
+}
+@keyframes hx-flow { to { stroke-dashoffset: -30; } }
+@keyframes hx-flow-drain { to { stroke-dashoffset: -42; } }
+@keyframes hx-spray { to { stroke-dashoffset: -24; } }
+@keyframes hx-drip { 0% { opacity: 0; transform: translateY(0) scale(.4); } 30% { opacity: 1; transform: translateY(0) scale(1); } 80% { opacity: 1; transform: translateY(36px) scale(.9, 1.2); } 100% { opacity: 0; transform: translateY(40px) scale(1.4, .4); } }
+@keyframes hx-flame { from { transform: scale(.85, .8); opacity: .8; } to { transform: scale(1.05, 1.15); opacity: 1; } }
+@media (max-width: 640px) { .xp-legend { top: 10px; left: 10px; font-size: 11px; } .xp-legend li { padding: 4px 8px; } .is-drawn .xp-hint { display: none; } }

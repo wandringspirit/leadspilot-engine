@@ -1,0 +1,18 @@
+{
+  "business": "Bayou City Plumbing LLC",
+  "city": "Houston",
+  "state": "TX",
+  "phone": "(713) 555-0142",
+  "email": "office@bayoucityplumbing.example",
+  "rating": 4.9,
+  "reviews": 87,
+  "maps_url": "https://www.google.com/maps",
+  "service_area": [
+    {"name": "Houston", "lat": 29.7604, "lon": -95.3698},
+    {"name": "Pasadena", "lat": 29.6911, "lon": -95.2091},
+    {"name": "Bellaire", "lat": 29.7058, "lon": -95.4588},
+    {"name": "Pearland", "lat": 29.5636, "lon": -95.286},
+    {"name": "Sugar Land", "lat": 29.6197, "lon": -95.6349},
+    {"name": "Spring", "lat": 30.0799, "lon": -95.4172}
+  ]
+}

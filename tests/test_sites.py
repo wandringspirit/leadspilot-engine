@@ -9,6 +9,7 @@ import random
 import re
 import stat
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -106,8 +107,8 @@ def test_the_searched_city_and_its_state():
 
 
 def test_only_trades_with_a_design_have_a_pack():
-    assert trade_pack("Roofer")[0] == "roofer"
-    assert trade_pack("Plumber") is None and trade_pack("") is None
+    assert trade_pack("Roofer")[0] == "roofer" and trade_pack("Plumber")[0] == "plumber"
+    assert trade_pack("HVAC") is None and trade_pack("") is None
 
 
 def test_a_business_without_a_city_gets_the_searched_one(sites_dir):
@@ -270,12 +271,12 @@ async def test_the_roofer_emails_link_the_site_and_set_its_end(tmp_path):
 
 async def test_a_campaign_for_a_trade_without_a_design_cannot_start(tmp_path):
     manager, sites, _, _ = site_manager(tmp_path)
-    plumber = next(t for t in manager.list_business_types() if t.name == "Plumber")
-    job = Job(query="plumber in Houston", business="plumber", place="Houston", limit=5, status=JobStatus.COMPLETED)
-    job.rows.append(PlaceRow(rank=1, name="Palm Breeze Plumbing", email="palm@gmail.com", place_id="p1"))
-    campaign = await manager.create(CampaignCreate(job_ids=[job.id], business_type_id=plumber.id), [job])
+    hvac = next(t for t in manager.list_business_types() if t.name == "HVAC")
+    job = Job(query="hvac in Houston", business="hvac", place="Houston", limit=5, status=JobStatus.COMPLETED)
+    job.rows.append(PlaceRow(rank=1, name="Palm Breeze Air", email="palm@gmail.com", place_id="p1"))
+    campaign = await manager.create(CampaignCreate(job_ids=[job.id], business_type_id=hvac.id), [job])
     assert [lead.site for lead in campaign.leads] == [""]
-    assert any("no website design for Plumber" in p for p in manager.campaign_problems(campaign))
+    assert any("no website design for HVAC" in p for p in manager.campaign_problems(campaign))
 
 
 async def test_a_failed_upload_says_why(tmp_path):
@@ -288,3 +289,15 @@ async def test_a_failed_upload_says_why(tmp_path):
     sites.uploader = not_logged_in
     assert not await sites.upload()
     assert "wrangler login" in manager.status()["sites"]["last_upload"]["error"]
+
+
+def test_the_plumber_pack_renders_its_own_drawing_and_drips(tmp_path):
+    """The plumber pack: drips instead of rain, the drawn plumbing check inlined, its own words."""
+    from sites.render import render
+    root = Path(__file__).resolve().parent.parent / "sites"
+    html = render(root / "trades" / "plumber.json", root / "samples" / "plumber-houston.json", tmp_path / "p").read_text(
+        encoding="utf-8")
+    assert html.count('data-fx="drips"') == 2 and '<svg class="hx"' in html and "hx-flow-cold" in html
+    assert '"@type": "Plumber"' in html and "Book a plumber" in html and "#i-wrench" in html
+    words = re.sub(r"<[^>]+>", " ", re.sub(r"<!--.*?-->", "", html, flags=re.S)).lower()   # what a visitor reads
+    assert "roof" not in words and "inspection" not in words

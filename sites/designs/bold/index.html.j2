@@ -18,7 +18,7 @@
 <script>document.documentElement.classList.add("js");setTimeout(function(){if(!window.siteReady)document.documentElement.classList.remove("js")},4000)</script>
 <style>:root{--accent:{{ accent.accent }};--accent-text:{{ accent.accent_text }};--accent-soft:{{ accent.accent_soft }}}</style>
 <script type="application/ld+json">
-{{ {"@context": "https://schema.org", "@type": "RoofingContractor", "name": business, "telephone": phone, "email": email,
+{{ {"@context": "https://schema.org", "@type": t.schema_type | default("RoofingContractor"), "name": business, "telephone": phone, "email": email,
     "address": {"@type": "PostalAddress", "addressLocality": city, "addressRegion": state},
     "areaServed": area} | tojson }}
 </script>
@@ -44,6 +44,9 @@
     <symbol id="i-chat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2-5.3A8.4 8.4 0 1 1 21 11.5z"/></symbol>
     <symbol id="i-mail" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm18 2-10 7L2 6"/></symbol>
     <symbol id="i-roof" viewBox="0 0 32 32"><path fill="currentColor" d="M16 3 1 15.2l3 3.6 12-9.8 12 9.8 3-3.6zm-7 13.5V29h5.5v-7h3v7H23V16.5L16 11z"/></symbol>
+    {% for name, body in (t.symbols | default({})).items() %}
+    <symbol id="i-{{ name }}" viewBox="0 0 24 24">{{ body | safe }}</symbol>
+    {% endfor %}
   </defs>
 </svg>
 
@@ -62,7 +65,7 @@
   <header class="hd">
     <div class="wrap hd-in">
       <a class="logo" href="#top" aria-label="{{ business }}, home">
-        <span class="logo-badge" aria-hidden="true"><svg><use href="#i-roof"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span>
+        <span class="logo-badge" aria-hidden="true"><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span>
       </a>
       <nav class="nav" aria-label="Main">
         <a href="#services">Services</a>
@@ -73,7 +76,7 @@
       </nav>
       <div class="hd-cta">
         {% if phone %}<a class="hd-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
-        <a class="btn btn-accent btn-sm" href="#quote" data-magnetic>Free inspection</a>
+        <a class="btn btn-accent btn-sm" href="#quote" data-magnetic>{{ t.nav_cta | default("Free inspection") }}</a>
         <button class="burger" type="button" aria-expanded="false" aria-controls="menu" data-burger><span></span><span></span><span class="sr">Menu</span></button>
       </div>
     </div>
@@ -82,7 +85,7 @@
 
 <div class="menu" id="menu" hidden data-menu>
   <nav aria-label="Mobile">
-    {% for href, label in [("#services", "Services"), ("#explore", t.nav_explorer), ("#why", "Why us"), ("#reviews", "Reviews"), ("#area", "Service area"), ("#quote", "Free inspection")] %}
+    {% for href, label in [("#services", "Services"), ("#explore", t.nav_explorer), ("#why", "Why us"), ("#reviews", "Reviews"), ("#area", "Service area"), ("#quote", t.nav_cta | default("Free inspection"))] %}
     <a href="{{ href }}" style="--i:{{ loop.index0 }}">{{ label }}</a>
     {% endfor %}
   </nav>
@@ -95,7 +98,7 @@
     <div class="hero-media">
       <img src="{{ hero.src | img(1400) }}" srcset="{{ hero.src | srcset }}" sizes="100vw" alt="{{ hero.alt }}" style="object-position:{{ hero.pos }}" width="2000" height="1250" fetchpriority="high">
     </div>
-    <canvas class="rain" data-rain="{{ hero.rain | default(1) }}" aria-hidden="true"></canvas>
+    <canvas class="rain" data-rain="{{ hero.rain | default(1) }}"{% if t.hero_fx is defined %} data-fx="{{ t.hero_fx }}"{% endif %} aria-hidden="true"></canvas>
     <div class="flash" data-flash aria-hidden="true"></div>
     <div class="hero-shade" aria-hidden="true"></div>
     <div class="wrap hero-in">
@@ -129,7 +132,7 @@
   <div class="mq" aria-hidden="true">
     <div class="mq-track">
       {% for _ in range(2) %}
-      <div class="mq-set">{% for item in t.marquee %}<span>{{ item }}</span><svg><use href="#i-roof"/></svg>{% endfor %}</div>
+      <div class="mq-set">{% for item in t.marquee %}<span>{{ item }}</span><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg>{% endfor %}</div>
       {% endfor %}
     </div>
   </div>
@@ -149,7 +152,8 @@
     <div class="wrap">
       <div class="sec-head" data-reveal>
         <p class="kicker">What we do</p>
-        <h2 class="h2">Every part of your roof, <em>handled.</em></h2>
+        {% set st = t.services_title | default(["Every part of your roof,", "handled."]) %}
+        <h2 class="h2">{{ st[0] }} <em>{{ st[1] }}</em></h2>
       </div>
       <div class="bento">
         {% for s in t.services %}
@@ -179,13 +183,18 @@
         <p class="lead">{{ x.intro }}</p>
       </div>
       <div class="xp-grid">
-        <div class="xp-stage" data-reveal>
+        <div class="xp-stage{% if x.svg is defined %} is-drawn{% endif %}" data-reveal>
           <div class="xp-zoom" data-zoom>
+            {% if x.svg is defined %}
+            <div class="xp-art" role="img" aria-label="{{ x.alt }}">{{ x.svg }}</div>
+            {% else %}
             <img src="{{ x.photo | img(1400) }}" srcset="{{ x.photo | srcset }}" sizes="(max-width: 900px) 100vw, 60vw" alt="{{ x.alt }}" loading="lazy" width="1920" height="1088">
+            {% endif %}
             {% for s in x.spots %}
             <button class="pin pin-{{ s.side }}{% if loop.first %} is-on{% endif %}" type="button" style="left:{{ s.x }}%;top:{{ s.y }}%" data-spot="{{ s.key }}" data-x="{{ s.x }}" data-y="{{ s.y }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><span class="pin-dot" aria-hidden="true">{{ loop.index }}</span><span class="pin-label"><b>0{{ loop.index }}</b> {{ s.label }}</span></button>
             {% endfor %}
           </div>
+          {% if x.legend is defined %}<ul class="xp-legend" aria-hidden="true">{% for l in x.legend %}<li><i style="--c:{{ l.color }}"></i>{{ l.label }}</li>{% endfor %}</ul>{% endif %}
           <p class="xp-hint" aria-hidden="true"><span class="live-dot"></span>Tap a marker</p>
         </div>
         <div class="xp-panel" data-reveal>
@@ -196,13 +205,13 @@
             <p class="xp-what">{{ s.what }}</p>
             <p class="xp-sub">Signs to look for</p>
             <ul>{% for sign in s.signs %}<li><svg aria-hidden="true"><use href="#i-check"/></svg>{{ sign }}</li>{% endfor %}</ul>
-            <a class="link-go" href="#quote" data-pick="{{ s.service }}">Not sure? We'll check it for free <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="link-go" href="#quote" data-pick="{{ s.service }}">{% if x.go is defined %}{{ x.go }}{% else %}Not sure? We'll check it for free{% endif %} <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
           </article>
           {% endfor %}
           <div class="xp-nav">
-            <button class="xp-arrow xp-prev" type="button" data-xp-step="-1" aria-label="Previous part of the roof"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <button class="xp-arrow xp-prev" type="button" data-xp-step="-1" aria-label="Previous {{ x.part | default('part of the roof') }}"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
             <span class="xp-dots" aria-hidden="true">{% for s in x.spots %}<i data-dot="{{ s.key }}"{% if loop.first %} class="is-on"{% endif %}></i>{% endfor %}</span>
-            <button class="xp-arrow" type="button" data-xp-step="1" aria-label="Next part of the roof"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <button class="xp-arrow" type="button" data-xp-step="1" aria-label="Next {{ x.part | default('part of the roof') }}"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
           </div>
         </div>
       </div>
@@ -214,7 +223,8 @@
     <div class="wrap">
       <div class="sec-head" data-reveal>
         <p class="kicker">How it works</p>
-        <h2 class="h2">From first call to <em>clean driveway.</em></h2>
+        {% set pt = t.process_title | default(["From first call to", "clean driveway."]) %}
+        <h2 class="h2">{{ pt[0] }} <em>{{ pt[1] }}</em></h2>
       </div>
       <div class="steps-wrap">
       <span class="steps-line" aria-hidden="true"><span></span></span>
@@ -260,7 +270,8 @@
     <div class="wrap work-head" data-reveal>
       <div>
         <p class="kicker">Our work</p>
-        <h2 class="h2">Built to last. <em>Built to look good.</em></h2>
+        {% set wt = t.work_title | default(["Built to last.", "Built to look good."]) %}
+        <h2 class="h2">{{ wt[0] }} <em>{{ wt[1] }}</em></h2>
       </div>
       {% if preview %}<p class="chip chip-note">Sample photos. Your own jobs go here.</p>{% endif %}
     </div>
@@ -315,7 +326,7 @@
           {% for c in m.towns %}
           <span class="town town-{{ c.side }}" style="left:{{ c.x }}%;top:{{ c.y }}%;--d:{{ loop.index0 }}"><i></i><span><b>{{ c.name }}</b><small>{{ c.mi }} mi</small></span></span>
           {% endfor %}
-          <span class="map-home" style="left:{{ m.home.x }}%;top:{{ m.home.y }}%"><span class="map-pulse"></span><svg><use href="#i-roof"/></svg><b>{{ m.home.name }}</b></span>
+          <span class="map-home" style="left:{{ m.home.x }}%;top:{{ m.home.y }}%"><span class="map-pulse"></span><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg><b>{{ m.home.name }}</b></span>
           <span class="map-north">N</span>
         </div>
         <figcaption>Straight-line distances from {{ m.home.name }}.</figcaption>
@@ -334,8 +345,8 @@
         {% if phone %}<a class="big-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
         {% if email %}<a class="quote-mail" href="mailto:{{ email }}"><svg aria-hidden="true"><use href="#i-mail"/></svg>{{ email }}</a>{% endif %}
       </div>
-      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-phone="{{ phone }}" data-business="{{ business }}" novalidate data-reveal>
-        <h3 class="qf-title">Request your free inspection</h3>
+      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-phone="{{ phone }}" data-business="{{ business }}"{% if t.quote_for is defined %} data-for="{{ t.quote_for | tojson | forceescape }}"{% endif %} novalidate data-reveal>
+        <h3 class="qf-title">{{ t.form_title | default("Request your free inspection") }}</h3>
         <p class="qf-sub">It takes under a minute. We'll call you back to set a time.</p>
         <div class="qf-quick" role="group" aria-labelledby="qf-quick">
           <p class="qf-label" id="qf-quick">Quick start</p>
@@ -395,7 +406,7 @@
   <!-- CTA -->
   <section class="cta{% if cta_photo %} has-photo{% endif %}">
     {% if cta_photo %}<img class="cta-photo" src="{{ cta_photo.src | img(1400) }}" srcset="{{ cta_photo.src | srcset }}" sizes="100vw" alt="" loading="lazy" width="2000" height="1133" style="object-position:{{ cta_photo.pos }}">{% endif %}
-    <canvas class="cta-rain" data-rain="0.35" aria-hidden="true"></canvas>
+    <canvas class="cta-rain" data-rain="0.35"{% if t.hero_fx is defined %} data-fx="{{ t.hero_fx }}"{% endif %} aria-hidden="true"></canvas>
     <div class="wrap cta-in" data-reveal>
       <h2 class="cta-title">{{ t.cta_title[0] }}<br><em>{{ t.cta_title[1] }}</em></h2>
       <div class="hero-ctas">
@@ -409,7 +420,7 @@
 <footer class="ft">
   <div class="wrap ft-grid">
     <div>
-      <a class="logo" href="#top" aria-label="{{ business }}, back to top"><span class="logo-badge" aria-hidden="true"><svg><use href="#i-roof"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span></a>
+      <a class="logo" href="#top" aria-label="{{ business }}, back to top"><span class="logo-badge" aria-hidden="true"><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span></a>
       <p>{{ t.footer_blurb }}</p>
     </div>
     <div><p class="ft-h">Services</p><ul>{% for s in t.services %}<li><a href="#services">{{ s.title }}</a></li>{% endfor %}</ul></div>
@@ -426,7 +437,7 @@
 <div class="mbar" data-mbar>
   {% if phone %}<a class="btn btn-accent" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call</a>
   <a class="btn btn-glass" href="{{ sms_href }}"><svg aria-hidden="true"><use href="#i-chat"/></svg>Text</a>{% endif %}
-  <a class="btn btn-glass" href="#quote">Free quote</a>
+  <a class="btn btn-glass" href="#quote">{{ t.mbar_cta | default("Free quote") }}</a>
 </div>
 
 <script src="site.js" defer></script>

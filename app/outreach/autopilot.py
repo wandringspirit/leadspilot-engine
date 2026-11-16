@@ -108,7 +108,7 @@ class AutopilotUpdate(BaseModel):
     places: list[str] | None = Field(None, max_length=500, description="Searched in this order, e.g. 'Katy, TX'")
     next_place: int | None = Field(None, ge=0, description="Index of the next place to search")
     min_waiting: int | None = Field(None, ge=1, le=500)
-    searches_per_day: int | None = Field(None, ge=1, le=10)
+    searches_per_day: int | None = Field(None, ge=1, le=20)
     limit: int | None = Field(None, ge=1, le=500)
 
 
