@@ -41,7 +41,26 @@ The **Plumber** pack (`sites/trades/plumber.json`) has its own moving parts:
   `nav_cta`, `form_title`, `mbar_cta`, `services_title`, `process_title`, `work_title`, the explorer's
   `part` / `go` / `legend`, and `quote_for` (which quote option each service picks).
 
-Sample: `python sites/render.py sites/trades/plumber.json sites/samples/plumber-houston.json`.
+Plumbers get the **Flow** design (`sites/designs/flow/`, "website B"): the Bold design with water running
+through it –
+
+- the headline's coloured line drawn in outline and filling with moving water; ripples under the mouse
+  and where you tap on the hero photo; the line under the headline on frosted glass;
+- **"What's happening at your place?"** (the pack's `helper`): four problems, each with what to do in the
+  next five minutes, a safety note, *Call* and *Book a visit* (which picks the problem in the quote form);
+- a **drip calculator** (`drip_calc`): drips a minute → gallons a year and showers' worth, from the EPA's
+  WaterSense figures (a drip a second is over 3,000 gallons a year; a shower about 17 gallons), with a
+  tap dripping into a jug at that pace;
+- the rating as a tank of water filled to it, moving waves between the dark and light sections, the
+  "how it works" line as a pipe with water in it; the header's links switch to the menu button below
+  1240px instead of wrapping.
+
+A pack can build on another: `"extends": "plumber.json"` starts from that pack and its own keys win
+(`sites/render.py: load_pack`). `sites/trades/plumber-a.json` is the plumber page on the Bold design
+("website A"), kept to compare – no business type is called "Plumber A", so nothing sends it.
+
+Samples: `python sites/render.py sites/trades/plumber.json sites/samples/plumber-houston.json` (B), and
+the same with `plumber-a.json` (A).
 
 The accent colour, headline and hero photo are picked from the pack by a hash of the business's name
 and city, so two roofers in one city don't get the same page.

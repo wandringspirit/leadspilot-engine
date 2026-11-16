@@ -35,7 +35,7 @@ if str(ROOT.parent) not in sys.path:
     sys.path.insert(0, str(ROOT.parent))
 from app.outreach.leads import email_problem  # noqa: E402
 from sites.deploy import ends_at  # noqa: E402
-from sites.render import STATES, display_name, render_lead  # noqa: E402
+from sites.render import STATES, display_name, load_pack, render_lead  # noqa: E402
 
 DATA = ROOT.parent / "data"
 SITES = DATA / "sites"
@@ -113,7 +113,7 @@ def trade_pack(business_type: str) -> tuple[str, dict] | None:
     """(trade, pack) for a business type ("Roofer" -> trades/roofer.json); None: no website design yet."""
     trade = slugify(business_type) if business_type.strip() else ""
     path = ROOT / "trades" / f"{trade}.json"
-    return (trade, json.loads(path.read_text(encoding="utf-8"))) if trade and path.is_file() else None
+    return (trade, load_pack(path)) if trade and path.is_file() else None
 
 
 def searched_city(place_text: str, rows: list[dict]) -> tuple[str, str, dict | None]:

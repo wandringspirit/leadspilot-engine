@@ -1,0 +1,4 @@
+{
+  "extends": "plumber.json",
+  "design": "bold"
+}

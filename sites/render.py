@@ -241,8 +241,15 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
     }
 
 
+def load_pack(path: Path) -> dict:
+    """A trade pack. ``"extends": "plumber.json"`` starts from that pack (same folder); this one's keys win."""
+    pack = json.loads(path.read_text(encoding="utf-8"))
+    base = pack.pop("extends", None)
+    return {**load_pack(path.parent / base), **pack} if base else pack
+
+
 def render(pack_path: Path, lead_path: Path, out: Path, *, variant=None, preview=True, ends=None) -> Path:
-    pack = json.loads(pack_path.read_text(encoding="utf-8"))
+    pack = load_pack(pack_path)
     lead = json.loads(lead_path.read_text(encoding="utf-8"))
     return render_lead(pack, lead, out, variant=variant, preview=preview, ends=ends)
 

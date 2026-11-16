@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.2 – 2026-11-17
+
+### Changed
+- **Plumbers get website B**: the new Flow design (`sites/designs/flow/`) – a headline that fills with water,
+  ripples under the pointer, a "What's happening at your place?" helper with what to do in the next five
+  minutes, a drip calculator (EPA WaterSense figures), the rating as a tank of water, waves between sections
+  and the line under the headline on frosted glass. Website A stays as `sites/trades/plumber-a.json`.
+- A trade pack can build on another (`"extends"`).
+
 ## 1.27.1 – 2026-11-16
 
 ### Added

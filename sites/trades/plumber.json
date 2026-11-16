@@ -1,6 +1,6 @@
 {
   "trade": "plumber",
-  "design": "bold",
+  "design": "flow",
   "label": "Plumbing",
   "noun": "plumber",
   "schema_type": "Plumber",
@@ -394,6 +394,81 @@
       "repiping": "leak"
     },
     "else": "fixture"
+  },
+  "helper": {
+    "kicker": "Right now",
+    "title": [
+      "What's happening",
+      "at your place?"
+    ],
+    "intro": "Pick the closest one. Here's what to do in the next five minutes, before we get there.",
+    "do_now": "Do this now",
+    "items": [
+      {
+        "key": "leak",
+        "label": "Water's leaking",
+        "icon": "drop",
+        "service": "leak-repair",
+        "steps": [
+          "Turn off the small valve under the sink or behind the toilet. If you can't find one, or the water won't stop, close the main shut-off.",
+          "Keep away from water near outlets, cords or the electrical panel. Don't touch switches with wet hands.",
+          "Move what you can off the floor and soak up the water with towels."
+        ],
+        "note": "Most main shut-offs are where the water line comes in: by the water heater, in the garage, or in a box near the street."
+      },
+      {
+        "key": "hot",
+        "label": "No hot water",
+        "icon": "flame",
+        "service": "water-heaters",
+        "steps": [
+          "Electric heater: check the breaker marked for it in your panel.",
+          "Gas heater: check whether the pilot light is out. Relight it only if the instructions on the tank say how.",
+          "Water around the base of the tank? Close the cold water valve on top of it."
+        ],
+        "note": "Smell gas? Don't touch any switches. Leave the house and call your gas company's emergency line from outside."
+      },
+      {
+        "key": "drain",
+        "label": "Drain backing up",
+        "icon": "pipe",
+        "service": "drain-cleaning",
+        "steps": [
+          "Stop running water anywhere in the house, including the washer and the dishwasher.",
+          "One slow drain: try a plunger. Skip chemical drain cleaners, which can splash and harm older pipes.",
+          "Several drains slow at once, or water coming up in a tub or shower? That points to the main sewer line. Call us."
+        ],
+        "note": "Keep children and pets away from backed-up water. It can carry sewage."
+      },
+      {
+        "key": "toilet",
+        "label": "Toilet won't stop",
+        "icon": "faucet",
+        "service": "fixtures",
+        "steps": [
+          "Turn the valve behind the toilet clockwise until it stops. That shuts off the water to the tank.",
+          "Overflowing? Lift the tank lid and pull the float up to stop the fill.",
+          "Don't flush again until it's fixed."
+        ],
+        "note": "A leaking toilet can waste about 200 gallons a day, says the EPA, often without a sound."
+      }
+    ]
+  },
+  "drip_calc": {
+    "kicker": "That little drip",
+    "title": [
+      "What's that drip",
+      "really costing?"
+    ],
+    "intro": "Count the drops for a minute, then slide to the number.",
+    "label": "Drips a minute",
+    "default": 30,
+    "max": 120,
+    "per_year": "gallons a year",
+    "showers": "showers' worth",
+    "source": "Based on the EPA's WaterSense figures: a tap dripping once a second wastes over 3,000 gallons a year, and an average shower uses about 17 gallons.",
+    "go": "Fix that drip",
+    "service": "fixtures"
   },
   "cta_title": [
     "Water where it shouldn't be?",

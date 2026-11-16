@@ -301,3 +301,24 @@ def test_the_plumber_pack_renders_its_own_drawing_and_drips(tmp_path):
     assert '"@type": "Plumber"' in html and "Book a plumber" in html and "#i-wrench" in html
     words = re.sub(r"<[^>]+>", " ", re.sub(r"<!--.*?-->", "", html, flags=re.S)).lower()   # what a visitor reads
     assert "roof" not in words and "inspection" not in words
+
+
+def test_plumbers_get_website_b_and_website_a_stays_renderable(tmp_path):
+    """Plumbers get website B (the flow design): A's words and drawing plus the helper, the drip calculator,
+    the rating tank and the waves. Website A ("extends": plumber.json, the bold design) still renders."""
+    from sites.render import load_pack, render
+    root = Path(__file__).resolve().parent.parent / "sites"
+    pack = load_pack(root / "trades" / "plumber-a.json")
+    assert pack["design"] == "bold" and pack["label"] == "Plumbing" and "extends" not in pack
+    a = render(root / "trades" / "plumber-a.json", root / "samples" / "plumber-houston.json", tmp_path / "a",
+               variant=0).read_text(encoding="utf-8")
+    assert '<svg class="hx"' in a and 'role="tab"' not in a and "data-calc" not in a and 'class="wave"' not in a
+    assert load_pack(root / "trades" / "plumber.json")["design"] == "flow"
+    html = render(root / "trades" / "plumber.json", root / "samples" / "plumber-houston.json", tmp_path / "b",
+                  variant=0).read_text(encoding="utf-8")
+    assert '<svg class="hx"' in html and html.count('data-fx="drips"') == 2
+    assert html.count('role="tab"') == 4 and html.count('role="tabpanel"') == 4 and 'data-pick="water-heaters"' in html
+    assert "data-calc-in" in html and ">1,500<" in html and ">88<" in html       # 30 drips a minute
+    assert 'class="ring tank"' in html and "--lvl:10.1px" in html and html.count('class="wave"') == 7
+    assert "--wave:url(&quot;" not in html and "fill=%22%231EC8E8%22" in html     # the data URI is not escaped
+    assert (tmp_path / "b" / "site.css").read_text(encoding="utf-8").count(".help-tab") > 3
