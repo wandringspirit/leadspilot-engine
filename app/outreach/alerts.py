@@ -248,7 +248,8 @@ class Alerts:
         else:
             nxt = _parse(outreach.get("next_send_at") or "")
             sending = (f"on – next email {_local(nxt) if nxt else 'not planned'} · "
-                       f"{outreach.get('sent_today', 0)} of {outreach.get('daily_limit')} sent today")
+                       f"{outreach.get('sent_24h', outreach.get('sent_today', 0))} of {outreach.get('daily_limit')} "
+                       "sent in the last 24 hours")
         rows.append(["Sending", sending])
         verify = info.get("verify") or {}
         if verify:

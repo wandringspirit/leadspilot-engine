@@ -73,10 +73,11 @@ class Settings(BaseSettings):
     ALERT_TO: str = ""                    # where alerts about the panel go (Google Drive disconnected …),
                                           # comma-separated; empty: the From address
     OUTREACH_AUTOSEND: bool = True        # false: the server never sends on its own
-    OUTREACH_TIMEZONE: str = "America/Chicago"  # time zone of the send window (your leads')
-    OUTREACH_DAYS: str = "mon-fri"        # days emails go out
+    OUTREACH_TIMEZONE: str = "America/Chicago"  # a business's time zone when its address doesn't say
+    OUTREACH_DAYS: str = "mon-fri"        # days emails go out, in each business's own time zone
     OUTREACH_HOURS: str = "8-12"          # hours emails go out, e.g. 8-12 = 08:00 to 11:59
-    OUTREACH_DAILY_LIMIT: int = 30        # emails per day, all campaigns and follow-ups together
+    OUTREACH_DAILY_LIMIT: int = 30        # emails in any 24 hours, all campaigns and follow-ups together
+    OUTREACH_SPREAD: bool = True          # spread the emails over the evening's send windows (one zone after another)
     OUTREACH_MIN_GAP_S: int = 90          # random pause between two emails: at least ...
     OUTREACH_MAX_GAP_S: int = 240         # ... and at most this many seconds
     OUTREACH_CHECK_MINUTES: int = 10      # how often the mailbox is checked for replies and bounces

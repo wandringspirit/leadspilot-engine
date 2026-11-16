@@ -248,7 +248,7 @@
     if (!s.autosend) facts.push(["Sending", "off – Settings › When emails go out"]);
     facts.push(["From", s.sender || "not set"]);
     facts.push(["Send window", s.window ? s.window + (s.window_open ? " · open now" : "") : "—"]);
-    facts.push(["Today", `${s.sent_today} of ${s.daily_limit} emails sent`]);
+    facts.push(["Last 24 hours", `${s.sent_24h ?? s.sent_today} of ${s.daily_limit} emails sent`]);
     facts.push(["Next email", !s.autosend ? "— (sending is off)" : s.next_send_at ? when(s.next_send_at)
       : s.running ? "nothing due" : "no campaign sending"]);
     const check = s.last_check;

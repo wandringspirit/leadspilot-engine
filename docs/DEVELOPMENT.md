@@ -189,10 +189,11 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `SENDER_COMPANY` | *(empty)* | `{SenderCompany}` |
 | `SENDER_ADDRESS` | *(empty)* | `{SenderAddress}`, your postal address – required (CAN-SPAM), it goes in every footer |
 | `OUTREACH_AUTOSEND` | `true` | `false`: the server never sends on its own and checks replies only on request (the tests set it) |
-| `OUTREACH_TIMEZONE` | `America/Chicago` | time zone of the send window – your leads' (needs the `tzdata` package on Windows) |
-| `OUTREACH_DAYS` | `mon-fri` | days emails go out: `mon-fri`, `mon,wed,fri`, `mon-sat` … |
-| `OUTREACH_HOURS` | `8-12` | hours emails go out: `8-12` = 08:00 until 11:59 |
-| `OUTREACH_DAILY_LIMIT` | `30` | emails per day, all campaigns and follow-ups together |
+| `OUTREACH_TIMEZONE` | `America/Chicago` | a business's time zone when its address and town don't say – each business gets its emails in its own (`app/outreach/zones.py`; needs the `tzdata` package on Windows) |
+| `OUTREACH_DAYS` | `mon-fri` | days emails go out, the business's days: `mon-fri`, `mon,wed,fri`, `mon-sat` … |
+| `OUTREACH_HOURS` | `8-12` | hours emails go out, the business's time: `8-12` = 08:00 until 11:59 |
+| `OUTREACH_DAILY_LIMIT` | `30` | emails in any 24 hours, all campaigns and follow-ups together |
+| `OUTREACH_SPREAD` | `true` | spread those emails over the evening's send windows still to come (each time zone opens an hour after the last) instead of sending them all in the first |
 | `OUTREACH_MIN_GAP_S` / `OUTREACH_MAX_GAP_S` | `90` / `240` | random pause between two emails |
 | `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |
 | `OUTREACH_MIN_REVIEWS` / `OUTREACH_MIN_RATING` | `10` / `4.0` | `{Rating}` and `{Reviews}` only have a value for a business with this many reviews and stars |

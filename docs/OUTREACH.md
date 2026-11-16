@@ -124,16 +124,29 @@ The server's send loop wakes every 20 s (only with `OUTREACH_AUTOSEND=true`) and
 one email** per round when all of this holds:
 
 - a campaign is **running**;
-- the **send window** is open: `OUTREACH_DAYS` and `OUTREACH_HOURS` in `OUTREACH_TIMEZONE`, by
-  default Mon–Fri 08:00–12:00 America/Chicago;
-- fewer than `OUTREACH_DAILY_LIMIT` emails went out today, counting all campaigns and follow-ups,
-  by the window's calendar day;
-- the random pause since the last email (`OUTREACH_MIN_GAP_S`–`OUTREACH_MAX_GAP_S`) is over;
+- the business's **send window** is open: `OUTREACH_DAYS` and `OUTREACH_HOURS` in **its own time
+  zone**, by default Mon–Fri 08:00–12:00 their time (see *Time zones* below);
+- fewer than `OUTREACH_DAILY_LIMIT` emails went out **in the last 24 hours**, counting all
+  campaigns and follow-ups – whatever the clock says, the mailbox never sends more than that in a
+  day;
+- the pause since the last email is over: at least the random `OUTREACH_MIN_GAP_S`–
+  `OUTREACH_MAX_GAP_S`, and with `OUTREACH_SPREAD` (on) long enough to spread the emails still
+  possible over what is left of the evening's windows (at most an hour);
 - the inbox was checked less than 2 minutes ago, and the check worked. If replies can't be
   checked, nothing is sent.
 
 **Order:** follow-ups that are due go first, earliest first; then first emails, in the order of
-the campaign's list, oldest campaign first.
+the campaign's list, oldest campaign first. Within each, the time zone that had the fewest emails in
+the last 24 hours goes first, so a zone that opens later still gets its share.
+
+**Time zones** (`app/outreach/zones.py`): each business – whatever it does – gets its emails in its
+own morning. Its zone comes from its Google Maps address when the campaign is made: the state, and
+the ZIP code for the parts of a state on another clock (El Paso, the Florida Panhandle, East
+Tennessee, Western Kentucky ...). Without an address, the searched town ("Tampa, FL") says; when
+nothing does, `OUTREACH_TIMEZONE`. In India time, 08:00–12:00 is 18:30–22:30 Eastern, 19:30–23:30
+Central, 20:30–00:30 Mountain and 21:30–01:30 Pacific (US winter time; an hour earlier in US summer).
+The Calls tab's "call" times are each business's 9–11am, in your time. Everything shown to you – sent
+today, the Activity, the 10 searches a day – counts this computer's days (India).
 
 **Spacing:** a follow-up is due its gap in days after **the previous email actually went out**:
 day 3 and day 7 mean 3 days after the first email, then 4 days after the second. That spacing

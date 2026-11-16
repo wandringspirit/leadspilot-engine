@@ -107,7 +107,7 @@ def test_campaign_routes(env):
     assert client.delete(f"/api/campaigns/{cid}").status_code == 204
     assert client.get(f"/api/campaigns/{cid}").status_code == 404
     status = client.get("/api/outreach").json()
-    assert status["ready"] and status["window"] == "Mon–Fri 08:00–12:00 (America/Chicago)"
+    assert status["ready"] and status["window"] == "Mon–Fri 08:00–12:00 their time"
 
 
 def test_start_refused_without_a_complete_setup(env, monkeypatch):

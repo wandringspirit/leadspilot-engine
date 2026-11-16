@@ -68,8 +68,8 @@ def test_the_status_row_says_how_many_and_when(tmp_path):
     cfg = make_settings(tmp_path)
     campaign, _ = table(lead("A", "214-555-0001"), lead("B", "214-555-0002", call_outcome="Interested"), cfg=cfg)
     text = summary([campaign], cfg, NOW)
-    assert text.startswith("1 to call (0 call-backs due) · 1 interested or signed up · best ")
-    assert "(9–11am theirs)" in text
+    assert text.startswith("1 to call (0 call-backs due) · 1 interested or signed up · best 9–11am theirs = ")
+    assert text.endswith(" Central your time – the Calls tab")
     assert summary([], cfg, NOW) == ""
 
 

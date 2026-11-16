@@ -104,12 +104,16 @@ OPTIONS = (
     # --- sending ---
     Option("OUTREACH_AUTOSEND", "sending", "Send automatically",
            "Off: the server never sends on its own – campaigns wait"),
-    Option("OUTREACH_TIMEZONE", "sending", "Time zone",
-           "Your leads' time zone: America/Chicago (Houston, Dallas), America/New_York, America/Denver, "
-           "America/Los_Angeles …", "America/Chicago"),
-    Option("OUTREACH_DAYS", "sending", "Days", "e.g. mon-fri, or mon,wed,fri", "mon-fri"),
-    Option("OUTREACH_HOURS", "sending", "Hours", "e.g. 8-12 = from 08:00 to 11:59", "8-12"),
-    Option("OUTREACH_DAILY_LIMIT", "sending", "Emails per day", "All campaigns and follow-ups together", minimum=1),
+    Option("OUTREACH_TIMEZONE", "sending", "Time zone if unknown",
+           "Each business gets its emails in its own time zone, worked out from its address. This one is for a "
+           "business whose time zone can't be worked out: America/Chicago, America/New_York …", "America/Chicago"),
+    Option("OUTREACH_DAYS", "sending", "Days", "Their days – e.g. mon-fri, or mon,wed,fri", "mon-fri"),
+    Option("OUTREACH_HOURS", "sending", "Hours", "Their time – e.g. 8-12 = from 08:00 to 11:59", "8-12"),
+    Option("OUTREACH_DAILY_LIMIT", "sending", "Emails per day",
+           "In any 24 hours – all campaigns and follow-ups together", minimum=1),
+    Option("OUTREACH_SPREAD", "sending", "Spread the emails over the evening",
+           "The emails a day allows go out spread over the send windows still to come (each time zone opens an "
+           "hour after the last), not all in the first; off: only the pause below"),
     Option("OUTREACH_MIN_GAP_S", "sending", "Pause between two emails – at least (seconds)", minimum=0),
     Option("OUTREACH_MAX_GAP_S", "sending", "… and at most (seconds)", minimum=0),
     Option("OUTREACH_CHECK_MINUTES", "sending", "Look for replies every (minutes)",

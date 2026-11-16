@@ -21,6 +21,7 @@ from app.enrichment.sitefinder import is_free_mail, is_third_party
 from app.models import Job, PlaceRow, split_places
 from app.outreach.models import Lead, LeftOut
 from app.outreach.templates import display_name
+from app.outreach.zones import zone_for
 from app.scraper.parsing import website_domain
 
 # Addresses in page templates, examples and error trackers - nobody reads them.
@@ -98,9 +99,11 @@ def leads_from_jobs(jobs: Iterable[Job], *, taken: Mapping[str, str]) -> tuple[l
                 continue
             for e in usable:
                 addresses[e.lower()] = first.name
+            city = search_city(job, first)
             leads.append(Lead(
                 job_id=job.id, place_id=first.place_id, name=first.name, business=display_name(first.name),
-                email=usable[0], other_emails=usable[1:], city=search_city(job, first),
+                email=usable[0], other_emails=usable[1:], city=city,
+                time_zone=zone_for(first.address, first.state, city),
                 rating=first.rating, reviews=first.review_count, phone=first.phone,
                 category=first.category, maps_url=first.url or first.maps_url,
             ))

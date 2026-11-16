@@ -36,7 +36,7 @@ def make_settings(tmp_path, **overrides) -> Settings:
         MAIL_USERNAME="me@mysender.com", MAIL_PASSWORD="secret", SENDER_NAME="Pat", SENDER_COMPANY="Pat's Web Co",
         SENDER_ADDRESS="1 Main St, Houston, TX 77002", OUTREACH_AUTOSEND=True, OUTREACH_TIMEZONE="America/Chicago",
         OUTREACH_DAYS="mon-fri", OUTREACH_HOURS="8-12", OUTREACH_DAILY_LIMIT=30, OUTREACH_MIN_GAP_S=60,
-        OUTREACH_MAX_GAP_S=60, OUTREACH_CHECK_MINUTES=10, OUTREACH_MIN_REVIEWS=10, OUTREACH_MIN_RATING=4.0,
+        OUTREACH_MAX_GAP_S=60, OUTREACH_SPREAD=False, OUTREACH_CHECK_MINUTES=10, OUTREACH_MIN_REVIEWS=10, OUTREACH_MIN_RATING=4.0,
     )
     values.update(overrides)
     return Settings(**values)
@@ -786,3 +786,61 @@ async def test_email_me_sends_a_note_to_yourself(tmp_path):
     assert mailbox.sent[-1]["To"] == "me@gmail.com, other@example.com"
     mailbox.send_error = MailError("server down")
     assert not await manager.email_me("Google Drive disconnected", "Connect it again.")
+
+
+# --------------------------------------------------------------------------
+# time zones: each business gets its emails in its own morning
+# --------------------------------------------------------------------------
+EASTERN_8AM = datetime(2026, 11, 17, 13, 0, tzinfo=UTC)          # Tuesday 08:00 Eastern, 07:00 Central (CST)
+
+
+def test_each_business_gets_its_emails_in_its_own_morning(tmp_path):
+    clock = Clock(EASTERN_8AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock)
+    leads = manager.get(campaign.id).leads
+    leads[0].time_zone = "America/New_York"                          # the others: Houston, Central
+    assert manager.status()["window"] == "Mon–Fri 08:00–12:00 their time (Eastern, Central)"
+    run(manager.tick())
+    clock.advance(seconds=61)
+    run(manager.tick())
+    assert [len(lead.sent) for lead in leads] == [1, 0, 0]           # Houston is at 07:01
+    clock.now = EASTERN_8AM + timedelta(hours=1)                     # 08:00 Central
+    run(manager.tick())
+    assert [len(lead.sent) for lead in leads] == [1, 1, 0]
+
+
+def test_the_zone_with_fewer_emails_goes_first(tmp_path):
+    clock = Clock(EASTERN_8AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock)
+    leads = manager.get(campaign.id).leads
+    leads[0].time_zone = leads[1].time_zone = "America/New_York"     # the third: Houston, Central
+    run(manager.tick())
+    clock.now = EASTERN_8AM + timedelta(hours=1)                     # both open now
+    run(manager.tick())
+    assert [len(lead.sent) for lead in leads] == [1, 0, 1]           # Central's turn before Eastern's second
+
+
+def test_the_daily_limit_counts_any_24_hours(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, _, _ = started(tmp_path, clock, OUTREACH_DAILY_LIMIT=2)
+    for _ in range(3):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    assert len(mailbox.sent) == 2 and manager.status()["sent_24h"] == 2
+    assert manager.status()["next_send_at"] == (TUESDAY_9AM + timedelta(hours=24)).isoformat()
+    clock.now = TUESDAY_9AM + timedelta(hours=23, minutes=59)
+    run(manager.tick())
+    assert len(mailbox.sent) == 2                                    # the first went out less than 24 hours ago
+    clock.now = TUESDAY_9AM + timedelta(hours=24, minutes=1)
+    run(manager.tick())
+    assert len(mailbox.sent) == 3
+
+
+def test_the_emails_are_spread_over_the_evening(tmp_path):
+    clock = Clock(EASTERN_8AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock, OUTREACH_SPREAD=True, OUTREACH_DAILY_LIMIT=10)
+    manager.get(campaign.id).leads[0].time_zone = "America/New_York"
+    run(manager.tick())
+    assert len(mailbox.sent) == 1
+    # 9 more allowed, over the 5 hours until Central's window closes (12:00 there, 18:00 UTC): about 33 minutes
+    assert timedelta(minutes=28) < manager.next_send_at - clock.now <= timedelta(minutes=34)

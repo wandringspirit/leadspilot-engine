@@ -59,6 +59,7 @@ class Lead(BaseModel):
     email: str                     # the address the emails go to
     other_emails: list[str] = Field(default_factory=list)   # further usable addresses (not emailed)
     city: str = ""                 # {City}: the place that was searched
+    time_zone: str = ""            # the business's own, from its address (app/outreach/zones.py); '' = from city
     rating: float | None = None
     reviews: int | None = None
     phone: str = ""

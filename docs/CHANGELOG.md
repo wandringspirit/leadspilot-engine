@@ -3,6 +3,25 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.0 – 2026-11-16
+
+### Changed
+- **Each business gets its emails in its own morning** – whatever the business does. Its time zone comes
+  from its Google Maps address (state, and the ZIP code for the parts of a state on another clock: El Paso,
+  the Florida Panhandle, East Tennessee, Western Kentucky ...), else the searched town, else
+  `OUTREACH_TIMEZONE` (now only that fallback). `OUTREACH_DAYS` / `OUTREACH_HOURS` are the business's days and
+  hours. New `app/outreach/zones.py`; leads carry `time_zone`.
+- **`OUTREACH_DAILY_LIMIT` counts any 24 hours**, not a calendar day – the windows of the later zones run past
+  midnight in India, so a calendar day would have let twice the limit out in one evening.
+- **The emails are spread over the evening** (`OUTREACH_SPREAD`, on): the pause after an email spreads the
+  emails still possible over what is left of the evening's windows (at most an hour, at least the random
+  `OUTREACH_MIN_GAP_S`–`OUTREACH_MAX_GAP_S`), and the zone with the fewest emails in the last 24 hours goes
+  first – so Eastern, opening first, doesn't take them all.
+- **Your side counts your days**: the autopilot's searches a day, *sent today*, the Activity and the campaign
+  CSV use this computer's time (India), not the leads'.
+- The Calls tab's Town column says when to call each business (its 9–11am, your time); the Status row lists
+  it per zone. The panel's and the Status tab's sending line show the last 24 hours.
+
 ## 1.26.2 – 2026-11-14
 
 ### Changed

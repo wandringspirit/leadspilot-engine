@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from app.outreach.models import LeadStatus
+from app.outreach.zones import ZONE_NAMES, lead_zone, zone_name
 
 if TYPE_CHECKING:
     from app.config import Settings
@@ -144,7 +145,10 @@ def calls_table(campaigns: list["Campaign"], cfg: "Settings", today: date | None
     for group, campaign, lead in ordered(campaigns, today):
         if group <= 3:
             number += 1
-        rows.append([number if group <= 3 else "", lead.business or lead.name, show_phone(lead.phone), lead.city,
+        town = lead.city
+        if group <= 3 and (window := call_window(lead_zone(lead, cfg.OUTREACH_TIMEZONE), today)):
+            town = f"{town} · call {window}" if town else f"call {window}"
+        rows.append([number if group <= 3 else "", lead.business or lead.name, show_phone(lead.phone), town,
                      f"{cfg.SITES_URL.rstrip('/')}/{lead.site}/" if lead.site else "",
                      _local_day(_last_email(lead)), _opened(lead), _emails(campaign, lead),
                      lead.call_outcome, sheet_day(lead.call_back), lead.call_note, campaign.name, lead.id])
@@ -162,15 +166,18 @@ def summary(campaigns: list["Campaign"], cfg: "Settings", now: datetime) -> str:
     due = groups.count(0)
     interested = sum(lead.call_outcome in (INTERESTED, SIGNED_UP) for lead in leads)
     text = f"{to_call} to call ({due} call-back{'' if due == 1 else 's'} due) · {interested} interested or signed up"
-    window = call_window(cfg, today)
-    return text + (f" · best {window} your time ({CALL_HOURS[0]}–{CALL_HOURS[1]}am theirs) – the Calls tab"
-                   if window else " – the Calls tab")
+    zones = {lead_zone(lead, cfg.OUTREACH_TIMEZONE) for group, lead in zip(groups, leads) if group <= 3}
+    order = list(ZONE_NAMES)
+    times = [f"{window} {zone_name(zone)}" for zone in sorted(zones, key=lambda z: (order + [z]).index(z))
+             if (window := call_window(zone, today))]
+    return text + (f" · best {CALL_HOURS[0]}–{CALL_HOURS[1]}am theirs = {', '.join(times)} your time – the Calls tab"
+                   if times else " – the Calls tab")
 
 
-def call_window(cfg: "Settings", day: date) -> str:
-    """CALL_HOURS in the leads' time zone (OUTREACH_TIMEZONE) as this computer's time, e.g. '18:30–21:30'."""
+def call_window(zone_id: str, day: date) -> str:
+    """CALL_HOURS in a business's time zone as this computer's time, e.g. '18:30–21:30'."""
     try:
-        zone = ZoneInfo(cfg.OUTREACH_TIMEZONE)
+        zone = ZoneInfo(zone_id)
     except Exception:  # noqa: BLE001
         return ""
     start, end = (datetime.combine(day, time(hour), zone).astimezone() for hour in CALL_HOURS)

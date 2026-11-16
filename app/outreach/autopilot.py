@@ -8,7 +8,7 @@ without a website that have an email. When the search finishes it makes the camp
 
 It holds back:
 
-* at most ``searches_per_day`` searches a day (the send window's time zone), one at a time;
+* at most ``searches_per_day`` searches a day (this computer's day - India), one at a time;
 * while a campaign was paused because of the mailbox (a refused login …) or the mailbox settings
   have a problem;
 * and it stops itself - pausing the running campaigns too - when ``BOUNCE_LIMIT`` of the last
@@ -32,7 +32,6 @@ from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 
@@ -206,15 +205,9 @@ class Autopilot:
                    if c.status == CampaignStatus.RUNNING for lead in c.leads)
 
     def searches_today(self, now: datetime) -> int:
-        zone = self._zone()
-        today = now.astimezone(zone).date()
-        return sum(run.started_at.astimezone(zone).date() == today for run in self.state.runs)
-
-    def _zone(self) -> ZoneInfo | timezone:
-        try:
-            return ZoneInfo(self.cfg.OUTREACH_TIMEZONE)
-        except Exception:  # noqa: BLE001 - the send window reports a bad time zone
-            return timezone.utc
+        """Searches started on this computer's day (yours - India on the cloud server and the laptop)."""
+        today = now.astimezone().date()
+        return sum(run.started_at.astimezone().date() == today for run in self.state.runs)
 
     def _running_run(self) -> AutopilotRun | None:
         for run in reversed(self.state.runs):

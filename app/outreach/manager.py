@@ -6,10 +6,14 @@ every address that was ever emailed is kept in ``data/contacted.json`` so no
 business gets the first email twice - even after its campaign is deleted.
 
 The send loop (``tick`` every ``TICK_S`` seconds, only with
-``OUTREACH_AUTOSEND``) sends at most one email per tick, only inside the send
-window, never more than ``OUTREACH_DAILY_LIMIT`` a day, with a random pause of
-``OUTREACH_MIN_GAP_S``–``OUTREACH_MAX_GAP_S`` between two emails. Follow-ups
-that are due go before first emails. Before an email goes out the mailbox is
+``OUTREACH_AUTOSEND``) sends at most one email per tick, each inside the send
+window in the business's own time zone (``app/outreach/zones.py``), never more
+than ``OUTREACH_DAILY_LIMIT`` in any 24 hours. The emails still possible are
+spread over what is left of the evening's windows (``_spread``) - at least
+``OUTREACH_MIN_GAP_S``–``OUTREACH_MAX_GAP_S`` apart - and the time zone that
+had the fewest emails in the last 24 hours goes first, so a zone opening later
+still gets its share. Follow-ups that are due go before first emails. Days
+shown to you (sent today, the activity) are this computer's days. Before an email goes out the mailbox is
 checked for replies (at most ``FRESH_CHECK`` earlier); a reply, an unsubscribe
 or a bounce stops that business's follow-ups. When the mailbox refuses the
 login or the email, every running campaign is paused with the reason.
@@ -56,8 +60,9 @@ from app.outreach.mailbox import (declined, MailAuthError, MailboxClient, Mailbo
 from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign,
                                  CampaignCreate, CampaignStatus, CampaignUpdate, DriveSource, InboundEmail, Lead,
                                  LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
-from app.outreach.schedule import SendWindow, WindowError, day_label
+from app.outreach.schedule import SendWindow, WindowError, day_label, days_label
 from app.outreach.sites import SiteService
+from app.outreach.zones import ZONE_NAMES, lead_zone, zone_name
 from app.outreach.visits import Visits, place
 from app.outreach.templates import (DEFAULT_BUSINESS_TYPES, DEFAULT_FOOTER, PLACEHOLDERS, SITE_FOOTER, SITE_STEPS,
                                     compose, lead_values, links_site, missing_fields, template_errors, used_fields)
@@ -72,6 +77,9 @@ RETRY_AFTER = timedelta(minutes=5)       # pause after a failed send
 MAX_FAILURES = 3                         # failed sends in a row before the campaigns are paused
 STOP_WAIT_S = 90                         # stopping waits this long at most for the email being sent
 LINK_CHECK = timedelta(minutes=2)        # a website opened this soon after its email: a mail server checking it
+DAY = timedelta(hours=24)                # OUTREACH_DAILY_LIMIT counts the emails in any 24 hours
+SPREAD_AHEAD = timedelta(hours=12)       # send windows opening within this long count as this evening's
+MAX_SPREAD = timedelta(minutes=60)       # spreading never waits longer than this between two emails
 PERSON_KINDS = frozenset({"seen", "call", "email", "keep"})   # visits only a person makes
 TAPS = {"call": "Tapped call", "email": "Tapped email", "keep": "Asked to keep website",
         "quote": "Website form sent"}
@@ -167,6 +175,7 @@ class OutreachManager:
         self.business_types: dict[str, BusinessType] = {}
         self.contacted: dict[str, dict] = {}     # address -> business, place id, campaign, first email, status
         self.next_send_at: datetime | None = None
+        self._windows: dict[tuple[str, str, str], SendWindow | None] = {}
         self.last_check: dict = {"at": None, "ok_at": None, "error": "", "emails": 0, "replies": 0, "bounces": 0}
         self._failures = 0
         self._task: asyncio.Task | None = None
@@ -258,16 +267,10 @@ class OutreachManager:
         sent_today = self.sent_today(now)
         running = sum(c.status == CampaignStatus.RUNNING for c in self.campaigns.values())
         next_send = None
-        pick = self._next_email(now) or self._next_email(now, any_time=True)
-        if window and not problems and cfg.OUTREACH_AUTOSEND and pick is not None:
-            at = max(now, self.next_send_at or now)
-            lead = pick[1]
-            if lead.status == LeadStatus.SENT and lead.next_due:
-                at = max(at, lead.next_due)
-            if sent_today >= cfg.OUTREACH_DAILY_LIMIT:
-                tomorrow = window.local_date(now) + timedelta(days=1)
-                at = max(at, datetime.combine(tomorrow, time(0), window.tz).astimezone(timezone.utc))
-            next_send = window.next_open(at)
+        if window and not problems and cfg.OUTREACH_AUTOSEND:
+            next_send = self._next_send_time(now)
+        zones = sorted({zone_name(self.zone_of(lead)) for c, lead in self._to_send()},
+                       key=lambda name: (list(ZONE_NAMES.values()) + [name]).index(name))
         check = self.last_check
         return {
             "ready": not problems,
@@ -277,10 +280,12 @@ class OutreachManager:
             "sender": sender_header(cfg),
             "smtp": f"{cfg.SMTP_HOST}:{cfg.SMTP_PORT}" if cfg.SMTP_HOST else "",
             "imap": f"{cfg.IMAP_HOST}:{cfg.IMAP_PORT}" if cfg.IMAP_HOST else "",
-            "window": window.label() if window else "",
-            "window_open": bool(window and window.is_open(now)),
+            "window": (f"{days_label(window.days)} {window.start:02d}:00–{window.end:02d}:00 their time"
+                       + (f" ({', '.join(zones)})" if zones else "")) if window else "",
+            "window_open": self._sending_hours(now),
             "daily_limit": cfg.OUTREACH_DAILY_LIMIT,
             "sent_today": sent_today,
+            "sent_24h": self.sent_in_24h(now),
             "next_send_at": _iso(next_send),
             "last_check": {"at": _iso(check["at"]), "error": check["error"], "emails": check["emails"],
                            "replies": check["replies"], "bounces": check["bounces"]},
@@ -293,11 +298,99 @@ class OutreachManager:
             "test_copy_to": test_copy_addresses(cfg),
         }
 
+    def _sent_times(self) -> list[datetime]:
+        return [s.sent_at for c in self.campaigns.values() for lead in c.leads for s in lead.sent]
+
     def sent_today(self, now: datetime) -> int:
-        window, _ = self._window()
-        today = window.local_date(now) if window else now.date()
-        day = (lambda moment: window.local_date(moment)) if window else (lambda moment: moment.date())
-        return sum(1 for c in self.campaigns.values() for lead in c.leads for s in lead.sent if day(s.sent_at) == today)
+        """Emails sent on this computer's day (your day)."""
+        today = now.astimezone().date()
+        return sum(1 for at in self._sent_times() if at.astimezone().date() == today)
+
+    def sent_in_24h(self, now: datetime) -> int:
+        """Emails sent in the last 24 hours - what OUTREACH_DAILY_LIMIT counts."""
+        return sum(1 for at in self._sent_times() if timedelta(0) <= now - at < DAY)
+
+    def _cap_free_at(self, now: datetime) -> datetime | None:
+        """When the next email fits under OUTREACH_DAILY_LIMIT again (None: it does now)."""
+        recent = sorted((at for at in self._sent_times() if timedelta(0) <= now - at < DAY), reverse=True)
+        limit = max(1, self.cfg.OUTREACH_DAILY_LIMIT)
+        return recent[limit - 1] + DAY if len(recent) >= limit else None
+
+    # ------------------------------------------------------------------
+    # Time zones: each business gets its emails in its own morning
+    # ------------------------------------------------------------------
+    def zone_of(self, lead: Lead) -> str:
+        return lead_zone(lead, self.cfg.OUTREACH_TIMEZONE)
+
+    def _window_in(self, zone: str) -> SendWindow | None:
+        """The send window in ``zone`` (None: the settings are wrong - problems() says why)."""
+        key = (zone, self.cfg.OUTREACH_DAYS, self.cfg.OUTREACH_HOURS)
+        if key not in self._windows:
+            try:
+                self._windows[key] = SendWindow.parse(*key)
+            except WindowError:
+                self._windows[key] = None
+        return self._windows[key]
+
+    def _window_of(self, lead: Lead) -> SendWindow | None:
+        return self._window_in(self.zone_of(lead))
+
+    def _to_send(self) -> list[tuple[Campaign, Lead]]:
+        """Leads of running campaigns with an email still to go: a first email (its website online) or a
+        follow-up."""
+        found = []
+        for campaign in self.campaigns.values():
+            if campaign.status != CampaignStatus.RUNNING:
+                continue
+            for lead in campaign.leads:
+                if ((lead.status == LeadStatus.SENT and len(lead.sent) < len(campaign.steps_of(lead)))
+                        or (lead.status == LeadStatus.QUEUED and self.site_ready(campaign, lead))):
+                    found.append((campaign, lead))
+        return found
+
+    def _sending_hours(self, now: datetime) -> bool:
+        """Whether some business with an email to go is in its send window now."""
+        zones = {self.zone_of(lead) for _, lead in self._to_send()}
+        return any((w := self._window_in(zone)) is not None and w.is_open(now) for zone in zones)
+
+    def _next_send_time(self, now: datetime) -> datetime | None:
+        """When the next email goes out: the earliest a business's window, its follow-up, the pause after the
+        last email and the 24-hour limit all allow."""
+        base = max(now, self.next_send_at or now, self._cap_free_at(now) or now)
+        best = None
+        for _, lead in self._to_send():
+            window = self._window_of(lead)
+            if window is None:
+                continue
+            at = max(base, lead.next_due or base) if lead.status == LeadStatus.SENT else base
+            at = window.next_open(at)
+            best = at if best is None or at < best else best
+        return best
+
+    def _closes(self, window: SendWindow, now: datetime) -> datetime | None:
+        """When this evening's window in ``window``'s zone closes (None: it doesn't open within SPREAD_AHEAD)."""
+        opens = window.next_open(now)
+        if opens - now > SPREAD_AHEAD:
+            return None
+        day = window.local(opens).date()
+        return (datetime.combine(day, time(0), window.tz) + timedelta(hours=window.end)).astimezone(timezone.utc)
+
+    def _spread(self, now: datetime) -> timedelta:
+        """The pause that spreads the emails still possible over what is left of this evening's send windows:
+        the zones open one after another (Eastern first), so without it the first one would take them all."""
+        end = None
+        for _, lead in self._to_send():
+            window = self._window_of(lead)
+            closes = self._closes(window, now) if window else None
+            if closes is None or (lead.status == LeadStatus.SENT and (lead.next_due or now) >= closes):
+                continue
+            end = closes if end is None or closes > end else end
+        if end is None or end <= now:
+            return timedelta(0)
+        left = self.cfg.OUTREACH_DAILY_LIMIT - sum(1 for at in self._sent_times() if at > end - DAY)
+        if left <= 0:
+            return timedelta(0)
+        return min((end - now) / left * self.rng.uniform(0.85, 1.0), MAX_SPREAD)
 
     # ------------------------------------------------------------------
     # Business types
@@ -474,7 +567,7 @@ class OutreachManager:
     # -- Google Drive: app/drive/sync.py uploads, the campaign keeps where to -------
     def results(self, campaign: Campaign) -> bytes:
         """The campaign's results CSV (who was emailed when, who answered …)."""
-        return results_csv(campaign, self._window()[0], self.cfg.SITES_URL if self.sites else "")
+        return results_csv(campaign, None, self.cfg.SITES_URL if self.sites else "")
 
     def record_drive(self, campaign: Campaign, file: dict, path: str, digest: str) -> None:
         campaign.drive_file_id, campaign.drive_link = file.get("id", ""), file.get("webViewLink", "")
@@ -635,11 +728,10 @@ class OutreachManager:
                 return
             if self.problems():
                 return                                   # the panel shows them
-            window, _ = self._window()
-            is_open = window is not None and window.is_open(now)
+            is_open = self._sending_hours(now)
             pick = None
             if (running and is_open and self.cfg.OUTREACH_AUTOSEND
-                    and self.sent_today(now) < self.cfg.OUTREACH_DAILY_LIMIT
+                    and self.sent_in_24h(now) < self.cfg.OUTREACH_DAILY_LIMIT
                     and (self.next_send_at is None or now >= self.next_send_at)):
                 pick = self._next_email(now)
             # outside the send window replies only need to show up in the panel: once an hour is enough
@@ -684,23 +776,36 @@ class OutreachManager:
         return ok_at is not None and not self.last_check["error"] and now - ok_at <= FRESH_CHECK
 
     def _next_email(self, now: datetime, *, any_time: bool = False) -> tuple[Campaign, Lead] | None:
-        """The next email to send: due follow-ups first (earliest first), then first emails in order.
+        """The next email to send, to a business whose send window is open now: due follow-ups first, then
+        first emails in order - within each, the time zone with the fewest emails in the last 24 hours first.
 
-        ``any_time`` also takes follow-ups that aren't due yet (for the status's "next email").
+        ``any_time`` also takes follow-ups that aren't due yet and businesses outside their window.
         """
         best, best_key = None, None
+        served: dict[str, int] = {}
+        for campaign in self.campaigns.values():
+            for lead in campaign.leads:
+                recent = sum(1 for s in lead.sent if timedelta(0) <= now - s.sent_at < DAY)
+                if recent:
+                    zone = self.zone_of(lead)
+                    served[zone] = served.get(zone, 0) + recent
         running = [c for c in self.campaigns.values() if c.status == CampaignStatus.RUNNING]
         for campaign in sorted(running, key=lambda c: c.started_at or c.created_at):
             for index, lead in enumerate(campaign.leads):
+                if lead.status not in (LeadStatus.SENT, LeadStatus.QUEUED):
+                    continue
+                zone = self.zone_of(lead)
+                if not any_time and not ((window := self._window_in(zone)) is not None and window.is_open(now)):
+                    continue
                 if lead.status == LeadStatus.SENT and len(lead.sent) < len(campaign.steps_of(lead)):
                     due = lead.next_due or now
                     if due > now and not any_time:
                         continue
-                    key = (0, due, index)
+                    key = (0, served.get(zone, 0), due, index)
                 elif lead.status == LeadStatus.QUEUED:
                     if not self.site_ready(campaign, lead):
                         continue
-                    key = (1, campaign.started_at or campaign.created_at, index)
+                    key = (1, served.get(zone, 0), campaign.started_at or campaign.created_at, index)
                 else:
                     continue
                 if best_key is None or key < best_key:
@@ -848,8 +953,9 @@ class OutreachManager:
         owners = {lead.site: (c, lead) for c in self.campaigns.values() for lead in c.leads if lead.site}
         # the page stayed open or something was tapped: a person, even right after the email
         people = {(v.get("slug"), v.get("who")) for v in visits if v.get("kind") in PERSON_KINDS}
-        window, _ = self._window()
-        day = (lambda moment: window.local_date(moment)) if window else (lambda moment: moment.date())
+        def day(moment: datetime):
+            return moment.astimezone().date()
+
         changed: dict[str, Campaign] = {}
         for visit in sorted(visits, key=lambda v: v.get("id", 0)):
             found = owners.get(visit.get("slug"))
@@ -891,7 +997,8 @@ class OutreachManager:
 
     def _after_send(self, now: datetime) -> None:
         low, high = sorted((max(0, self.cfg.OUTREACH_MIN_GAP_S), max(0, self.cfg.OUTREACH_MAX_GAP_S)))
-        self.next_send_at = now + timedelta(seconds=self.rng.uniform(low, high))
+        spread = self._spread(now) if self.cfg.OUTREACH_SPREAD else timedelta(0)
+        self.next_send_at = now + max(timedelta(seconds=self.rng.uniform(low, high)), spread)
 
     def _schedule(self, campaign: Campaign, lead: Lead) -> None:
         """Set a lead's status and next follow-up from the emails it has had."""
@@ -1080,12 +1187,11 @@ class OutreachManager:
     def _taken(self) -> dict[str, str]:
         """Addresses / place ids no new campaign may email, with the reason shown for them."""
         taken: dict[str, str] = {}
-        window, _ = self._window()
         for address, info in self.contacted.items():
             when = info.get("first_email", "")
             try:
                 moment = datetime.fromisoformat(when)
-                day = day_label(window.local_date(moment) if window else moment.date())
+                day = day_label(moment.astimezone().date())
             except (TypeError, ValueError):
                 day = "earlier"
             reason = f"emailed on {day} (campaign “{info.get('campaign', '')}”)"
@@ -1144,7 +1250,7 @@ def results_csv(campaign: Campaign, window: SendWindow | None, sites_url: str = 
     def when(moment: datetime | None) -> str:
         if moment is None:
             return ""
-        return (window.local(moment) if window else moment).strftime("%Y-%m-%d %H:%M")
+        return (window.local(moment) if window else moment.astimezone()).strftime("%Y-%m-%d %H:%M")
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
