@@ -62,6 +62,51 @@ A pack can build on another: `"extends": "plumber.json"` starts from that pack a
 Samples: `python sites/render.py sites/trades/plumber.json sites/samples/plumber-houston.json` (B), and
 the same with `plumber-a.json` (A).
 
+HVAC businesses get the **Air** design (`sites/designs/air/`, pack `sites/trades/hvac.json`): its own look
+(icy-blue paper, Bricolage Grotesque headings) on the shared parts of Bold –
+
+- a **thermostat** in the hero (the pack's `dial`): drag it round, use the arrow keys or the snowflake /
+  flame buttons. Like a real one it cools or heats until the room reaches the setting (an *Inside now*
+  reading on the photo counts there one degree at a time), then holds. The setting is the page's
+  temperature (`--t`, 0 cool – 1 warm; `--temp` runs icy blue – mint – warm orange): the headline's
+  coloured line, the arc, the air and the photo follow it – frost creeps in from the photo's edges when
+  it's cold, and it fades into a warm living room (`dial.warm_photo`) when it's hot. Once, on arrival, it
+  shows itself: a cold snap, a warm spell, back to 72°;
+- air streaming across the hero and the closing band (`data-fx="air"`): sinking while it cools, rising
+  while it heats, pushed aside by the mouse, a gust where you tap; snowflakes when it's cold, embers when
+  it's hot;
+- the **system check** drawing (`sites/assets/hvac/make_house.py` → `house-check.svg`): supply and return
+  air moving in the ducts, puffs from the vents, the outdoor unit's fan turning, the furnace flame;
+- **"What's your system doing?"** (`helper`, as the plumber's);
+- **"Is your old AC costing you?"** (`energy_calc`): what cooling adds to the summer bill × (1 − old SEER
+  / 16), the old SEER being the federal minimum when the system was put in (10 before 2006, 13 from 2006,
+  14 in the South from 2015); the page says it's a rough estimate and how it's worked out. Two outdoor
+  units side by side, the old one's fan spinning harder;
+- the rating as a gauge whose needle swings to it.
+
+Sample: `python sites/render.py sites/trades/hvac.json sites/samples/hvac-phoenix.json`.
+
+Electricians get the **Spark** design (`sites/designs/spark/`, pack `sites/trades/electrician.json`), built
+from Air with its own look (graphite and volt, Space Grotesk headings) –
+
+- a **wall switch and a dimmer** in the hero (the pack's `switch`): the page arrives dark and the lights
+  come on with one fluorescent flicker; flip the switch or slide the dimmer and the kitchen photo, the
+  headline's neon line and the glow follow (`--b`, 0 off – 1). The photo's reading shows the watts its
+  LED bulbs draw at that level;
+- current running along circuit traces across the hero and the closing band (`data-fx="spark"`): near
+  the mouse an arc jumps to the nearest trace, a tap throws sparks; off, the traces go dim;
+- the **power check** drawing (`sites/assets/electrician/make_house.py` → `house-check.svg`): current from
+  the pole through the meter (its disc turning) to the panel and out along the circuits, lights glowing,
+  smoke alarms blinking, the EV charger charging a car;
+- **"What's happening with your power?"** (`helper`): a tripped breaker, dead outlets, flickering lights,
+  a burning smell or sparks – with when to stop and call 911 or the utility;
+- **"What are your bulbs really costing?"** (`led_calc`): bulbs × watts × hours × 365 ÷ 1,000 × the rate
+  the visitor sets, 60 W bulbs against 9 W LEDs (DOE: LEDs use at least 75% less energy), each with a
+  meter turning at its own speed;
+- the rating as a gauge, as Air's.
+
+Sample: `python sites/render.py sites/trades/electrician.json sites/samples/electrician-denver.json`.
+
 The accent colour, headline and hero photo are picked from the pack by a hash of the business's name
 and city, so two roofers in one city don't get the same page.
 

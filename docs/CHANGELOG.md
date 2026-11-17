@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.4 – 2026-11-17
+
+### Added
+- **A website for HVAC businesses** (`sites/trades/hvac.json`, the new Air design `sites/designs/air/`): a
+  thermostat in the hero that sets the whole page's temperature – the room counts to the setting, frost or a
+  warm living room on the photo, air streaming across the page with snowflakes or embers – an animated system
+  check (air in the ducts, the outdoor fan turning), "What's your system doing?", an "Is your old AC costing
+  you?" calculator and the rating as a gauge.
+- **A website for electricians** (`sites/trades/electrician.json`, the new Spark design `sites/designs/spark/`):
+  a wall switch and dimmer that light the page (the kitchen photo, a neon headline), current running along
+  circuit traces with arcs to the pointer, an animated power check (meter, panel, circuits, EV charger),
+  "What's happening with your power?", a "What are your bulbs really costing?" calculator and the rating as a
+  gauge.
+
 ## 1.27.3 – 2026-11-17
 
 ### Added

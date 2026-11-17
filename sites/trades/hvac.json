@@ -1,0 +1,541 @@
+{
+  "trade": "hvac",
+  "design": "air",
+  "label": "Heating & Cooling",
+  "noun": "HVAC technician",
+  "schema_type": "HVACBusiness",
+  "logo_icon": "fan",
+  "nav_cta": "Book a visit",
+  "form_title": "Book a technician",
+  "mbar_cta": "Get a quote",
+  "services_title": [
+    "Heating and cooling,",
+    "handled."
+  ],
+  "process_title": [
+    "From the first call to",
+    "the right temperature."
+  ],
+  "work_title": [
+    "Clean installs.",
+    "Quiet systems."
+  ],
+  "symbols": {
+    "fan": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 12c-3-2-3.5-6.5 0-8.5 2.2 1.6 2.2 5.4 0 8.5zm0 0c2 3 6.5 3.5 8.5 0-1.6-2.2-5.4-2.2-8.5 0zm0 0c3 2 3.5 6.5 0 8.5-2.2-1.6-2.2-5.4 0-8.5zm0 0c-2-3-6.5-3.5-8.5 0 1.6 2.2 5.4 2.2 8.5 0z\"/>",
+    "thermo": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M14 14.8V4a2 2 0 1 0-4 0v10.8a4 4 0 1 0 4 0zM12 9v7\"/>",
+    "duct": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 7h11a5 5 0 0 1 5 5v9M3 12h8a3 3 0 0 1 3 3v6M3 5v9M10 21h11\"/>",
+    "gauge": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.9 19.1a10 10 0 1 1 14.2 0M12 14l4-4\"/><circle cx=\"12\" cy=\"14\" r=\"1.6\" fill=\"currentColor\"/>",
+    "sound": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13\"/>"
+  },
+  "accents": [
+    {
+      "name": "cool blue",
+      "accent": "#3AA8F5",
+      "accent_text": "#0B5FA5",
+      "accent_soft": "#DCEFFD"
+    },
+    {
+      "name": "fresh teal",
+      "accent": "#26C6B0",
+      "accent_text": "#08705F",
+      "accent_soft": "#D3F4EE"
+    },
+    {
+      "name": "ember",
+      "accent": "#FF8A4C",
+      "accent_text": "#A3440E",
+      "accent_soft": "#FFE5D5"
+    }
+  ],
+  "headlines": [
+    [
+      "Comfort,",
+      "dialed in."
+    ],
+    [
+      "Heating & cooling",
+      "for {{ city }}."
+    ],
+    [
+      "Too hot? Too cold?",
+      "We fix that."
+    ]
+  ],
+  "hero_photos": [
+    {
+      "src": "https://images.unsplash.com/photo-1759216853052-883040267c8c",
+      "alt": "Hand adjusting a digital thermostat on a wall",
+      "pos": "50% 50%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1770625467384-304e461ef1be",
+      "alt": "Finger adjusting a digital thermostat on a white wall",
+      "pos": "55% 50%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1776860150305-108ed577d7d4",
+      "alt": "Outdoor heat pump unit beside a brick house",
+      "pos": "40% 60%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1780170008509-d2dee1c7479d",
+      "role": "cta",
+      "alt": "",
+      "pos": "50% 55%"
+    }
+  ],
+  "hero_sub": "Air conditioning, heating and ductwork for homes across {{ city }} and nearby. We find out why your system isn't keeping up, tell you the price before any work starts, and leave it running right.",
+  "cta_primary": "Book a technician",
+  "marquee": [
+    "AC repair",
+    "Furnace repair",
+    "Heat pumps",
+    "New systems",
+    "Tune-ups",
+    "Ductwork",
+    "Thermostats"
+  ],
+  "stats_extra": {
+    "value": "Upfront",
+    "label": "prices, before any work"
+  },
+  "dial": {
+    "label": "Thermostat",
+    "min": 60,
+    "max": 85,
+    "default": 72,
+    "cool": "Cooling to",
+    "heat": "Heating to",
+    "hold": "Holding at",
+    "hint": "Try it",
+    "room_start": 77,
+    "inside": "Inside now",
+    "cooling": "Cooling down",
+    "heating": "Warming up",
+    "steady": "Steady",
+    "warm_photo": {
+      "src": "https://images.unsplash.com/photo-1780170008509-d2dee1c7479d",
+      "pos": "50% 55%"
+    }
+  },
+  "services": [
+    {
+      "slug": "ac-repair",
+      "icon": "snow",
+      "title": "AC Repair",
+      "blurb": "Warm air from the vents, a unit that won't start, ice on the lines. We find what's failing and fix it, so the house cools down again.",
+      "photo": "https://images.unsplash.com/photo-1718203862467-c33159fdc504",
+      "alt": "Outdoor air conditioning unit against a dark brick wall"
+    },
+    {
+      "slug": "heating",
+      "icon": "flame",
+      "title": "Heating & Furnaces",
+      "blurb": "No heat, short cycles, a furnace that clicks but won't light. Repairs for gas furnaces and heat pumps, before the cold nights.",
+      "photo": "https://images.unsplash.com/photo-1768488314310-3742b3c75579",
+      "alt": "Cozy living room with a fireplace and orange chairs"
+    },
+    {
+      "slug": "installation",
+      "icon": "fan",
+      "title": "New Systems",
+      "blurb": "When repairs stop making sense: a new AC, furnace or heat pump, sized for your home and installed cleanly.",
+      "photo": "https://images.unsplash.com/photo-1776860155275-eee24bfb1dee",
+      "alt": "Heat pump unit outside a modern white house"
+    },
+    {
+      "slug": "maintenance",
+      "icon": "gauge",
+      "title": "Tune-ups",
+      "blurb": "A seasonal check and clean that catches small problems early and keeps the system running the way it should.",
+      "photo": "https://images.unsplash.com/photo-1561400555-786780284b67",
+      "alt": "Technician in a hi-vis vest working on a control panel"
+    },
+    {
+      "slug": "ductwork",
+      "icon": "duct",
+      "title": "Ductwork",
+      "blurb": "Rooms that never feel right, dust, weak airflow. We check, seal and repair the ducts that carry the air.",
+      "photo": "https://images.unsplash.com/photo-1786840671711-bdabee8634cf",
+      "alt": "Flexible ventilation ducts hanging from a ceiling"
+    },
+    {
+      "slug": "thermostats",
+      "icon": "thermo",
+      "title": "Thermostats",
+      "blurb": "A new thermostat fitted and set up, or an old one that reads wrong put right.",
+      "photo": "https://images.unsplash.com/photo-1545259741-2ea3ebf61fa3",
+      "alt": "Round smart thermostat on a wall showing 63 degrees"
+    }
+  ],
+  "explorer": {
+    "kind": "drawing",
+    "kicker": "Interactive system check",
+    "title": "See where your system works hardest.",
+    "intro": "Air is moving through the ducts in your walls right now. Tap a marker to see what goes wrong there, and the signs you can spot yourself.",
+    "svg": "assets/hvac/house-check.svg",
+    "alt": "A drawing of a house cut open, with its furnace, ducts, vents, thermostat and outdoor unit",
+    "part": "part of the system",
+    "go": "Not sure? Ask us to take a look",
+    "legend": [
+      {
+        "label": "Supply air",
+        "color": "#5BB8FF"
+      },
+      {
+        "label": "Return air",
+        "color": "#A8B3C8"
+      },
+      {
+        "label": "Refrigerant lines",
+        "color": "#E0945A"
+      }
+    ],
+    "spots": [
+      {
+        "key": "outdoor",
+        "label": "Outdoor unit",
+        "x": 88.02,
+        "y": 68.2,
+        "service": "ac-repair",
+        "what": "The outdoor unit pushes the heat from inside your house out into the yard. Dirt on its coil, a worn fan motor or a weak part inside make it struggle on the hottest days.",
+        "signs": [
+          "The fan doesn't spin while the AC is on",
+          "Loud humming, buzzing or rattling",
+          "Ice on the copper lines, even in summer"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "thermostat",
+        "label": "Thermostat",
+        "x": 46.88,
+        "y": 62.13,
+        "service": "thermostats",
+        "what": "It tells the system when to run. Dead batteries, a spot in the afternoon sun or the wrong setting can make a good system look broken.",
+        "signs": [
+          "The screen is blank or keeps resetting",
+          "The house never reaches the set temperature",
+          "The system turns on and off every few minutes"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "furnace",
+        "label": "Furnace & blower",
+        "x": 30.52,
+        "y": 91.91,
+        "service": "heating",
+        "what": "The furnace heats the air, and its blower moves air through the whole house, in summer too. The parts that light the flame wear out the most.",
+        "signs": [
+          "It clicks but won't light",
+          "It shuts off a few minutes after starting",
+          "A burning smell that lasts past the first run of the season"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "filter",
+        "label": "Air filter",
+        "x": 36.46,
+        "y": 83.82,
+        "service": "maintenance",
+        "what": "Every bit of air passes through the filter. A clogged one chokes the airflow, so the system runs longer for less comfort.",
+        "signs": [
+          "It looks grey, or you can't remember changing it",
+          "More dust on the furniture than usual",
+          "Weak airflow from every vent"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "ducts",
+        "label": "Ducts",
+        "x": 55.21,
+        "y": 24.08,
+        "service": "ductwork",
+        "what": "The ducts carry the air to every room. Leaks and loose joints, often up in the attic, send air you've paid for into spaces you don't live in.",
+        "signs": [
+          "Some rooms are always hotter or colder",
+          "Dust blowing out of the vents",
+          "Whistling or rattling in the ceiling"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "vents",
+        "label": "Vents",
+        "x": 62.5,
+        "y": 30.7,
+        "service": "ductwork",
+        "what": "Where you feel the air. Blocked or closed vents upset the balance of the whole system, not just one room.",
+        "signs": [
+          "Furniture or rugs over the vents",
+          "Little or no air from one vent",
+          "Damp or dark marks around a ceiling vent"
+        ],
+        "side": "left"
+      }
+    ]
+  },
+  "helper": {
+    "kicker": "Right now",
+    "title": [
+      "What's your system",
+      "doing?"
+    ],
+    "intro": "Pick the closest one. Here's what to check in the next five minutes, before you call.",
+    "do_now": "Try this first",
+    "items": [
+      {
+        "key": "cool",
+        "label": "No cool air",
+        "icon": "snow",
+        "service": "ac-repair",
+        "steps": [
+          "Check the thermostat: set to Cool, and a few degrees below the room temperature. Replace its batteries if the screen is blank.",
+          "Look at the air filter. If it's grey and clogged, swap it for a clean one.",
+          "Check the breakers for the indoor and outdoor units. Reset a tripped one once; if it trips again, leave it off."
+        ],
+        "note": "Ice on the copper lines or the indoor coil? Turn the cooling off and run just the fan, so it can thaw before we get there."
+      },
+      {
+        "key": "heat",
+        "label": "No heat",
+        "icon": "flame",
+        "service": "heating",
+        "steps": [
+          "Check the thermostat is on Heat and set above the room temperature.",
+          "Make sure the furnace's power switch is on. It looks like a light switch, on or near the furnace.",
+          "Check the filter and the breaker, the same as for cooling."
+        ],
+        "note": "Smell gas? Don't touch any switches. Leave the house and call your gas company's emergency line from outside."
+      },
+      {
+        "key": "noise",
+        "label": "Strange noise or smell",
+        "icon": "sound",
+        "service": "maintenance",
+        "steps": [
+          "Banging, grinding or screeching: turn the system off at the thermostat, so a small problem doesn't become a big one.",
+          "A burning or electrical smell: switch it off at the breaker too.",
+          "A dusty smell on the first cold day is normal for a few minutes. If it lasts, call us."
+        ],
+        "note": "Note when the noise happens: starting up, running or stopping. It helps us find the cause faster."
+      },
+      {
+        "key": "leak",
+        "label": "Water around the unit",
+        "icon": "drop",
+        "service": "ac-repair",
+        "steps": [
+          "Turn the system off at the thermostat.",
+          "Soak up the water and move anything that could get damaged.",
+          "Look at the small drain line by the indoor unit. A clog there is the usual reason the water backs up."
+        ],
+        "note": "Keep the water away from outlets, cords and the furnace's electrical parts."
+      }
+    ]
+  },
+  "energy_calc": {
+    "kicker": "That old system",
+    "title": [
+      "Is your old AC",
+      "costing you?"
+    ],
+    "intro": "Slide to what cooling adds to your bill in summer, then pick when your system was put in.",
+    "label": "Cooling, a month in summer",
+    "hint": "Not sure? Take a summer bill and subtract a spring one.",
+    "min": 30,
+    "max": 500,
+    "default": 150,
+    "age_label": "Your AC was put in",
+    "ages": [
+      {
+        "label": "Before 2006",
+        "seer": 10
+      },
+      {
+        "label": "2006 to 2014",
+        "seer": 13
+      },
+      {
+        "label": "2015 or later",
+        "seer": 14
+      }
+    ],
+    "default_age": 1,
+    "new_seer": 16,
+    "months": 4,
+    "per_month": "a month you could save",
+    "per_season": "over a 4-month summer",
+    "yours": "Your system",
+    "newer": "A new system",
+    "go": "Ask about a new system",
+    "service": "installation",
+    "source": "A rough estimate, not a quote. Cooling costs fall as the SEER rating goes up. This assumes your system still works at the federal minimum it was built to (10 SEER before 2006, 13 from 2006, 14 in the South from 2015) and compares it with a new 16 SEER system. Your home, use and rates will change the result."
+  },
+  "process": [
+    {
+      "title": "You call or book online",
+      "text": "Tell us what the system is doing. We'll find a time that suits you."
+    },
+    {
+      "title": "We find the cause",
+      "text": "We check the whole system, not just the part that's making noise, and explain what we find."
+    },
+    {
+      "title": "You get the price first",
+      "text": "You know what it costs before any work starts. No surprises on the bill."
+    },
+    {
+      "title": "Running right, tested",
+      "text": "We do the work, run the system through a full cycle, and leave the place tidy."
+    }
+  ],
+  "why": {
+    "photo": "https://images.unsplash.com/photo-1785682118449-21da8825754d",
+    "alt": "Technician on a lift installing equipment in a ceiling",
+    "title": "A technician who explains, not just bills.",
+    "points": [
+      {
+        "icon": "pin",
+        "title": "Local to {{ city }}",
+        "text": "We work in {{ city }} and the towns around it, so we're never far away when the house gets too hot or too cold."
+      },
+      {
+        "icon": "doc",
+        "title": "The price before the work",
+        "text": "You know what it costs before we start. The number we agree is the number you pay."
+      },
+      {
+        "icon": "search",
+        "title": "The real cause, fixed",
+        "text": "Swapping a part without finding why it failed means another call next month. We trace the problem back to where it starts."
+      },
+      {
+        "icon": "broom",
+        "title": "Clean and tidy",
+        "text": "Covers down, mess cleared up. You'd hardly know we were there, except that the house feels right again."
+      }
+    ]
+  },
+  "gallery": [
+    {
+      "src": "https://images.unsplash.com/photo-1776860150272-653efc74193c",
+      "alt": "Heat pump unit on the lawn beside a modern building",
+      "tag": "Heat pump"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1776860150250-757406c52438",
+      "alt": "Three outdoor units mounted on a white wall",
+      "tag": "Outdoor units"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1770816306659-adcf99a11aeb",
+      "alt": "Round metal vent with its ductwork",
+      "tag": "Vents & ducts"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1757219525975-03b5984bc6e8",
+      "alt": "Outdoor unit on a wall bracket under a roof",
+      "tag": "Wall-mounted unit"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1615309662243-70f6df917b59",
+      "alt": "Large metal ducts running under a roof",
+      "tag": "Duct runs"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1681042803902-f79c240d8f03",
+      "alt": "Outdoor unit on a rooftop against a blue sky",
+      "tag": "Rooftop unit"
+    }
+  ],
+  "faq": [
+    {
+      "q": "The AC is running but the air isn't cold. What should I check?",
+      "a": "Make sure the thermostat is on Cool and set below the room temperature, then check the filter and the breaker for the outdoor unit. If the fan outside isn't spinning, turn the system off and call us."
+    },
+    {
+      "q": "How often should I change the air filter?",
+      "a": "Look at it every month and change it at least every three months, more often with pets or a lot of dust. The Department of Energy says a clean filter can lower an air conditioner's energy use by 5 to 15 percent."
+    },
+    {
+      "q": "When is it time for a new system?",
+      "a": "ENERGY STAR suggests looking at a new one when an air conditioner or heat pump is over 10 years old, or a furnace over 15, especially if it needs repairs often or the bills keep climbing."
+    },
+    {
+      "q": "Should I repair it or replace it?",
+      "a": "It depends on the age, the repair and how hard the system works. We'll tell you the price of both and give you a straight answer. The choice is yours."
+    },
+    {
+      "q": "Do you tell me the price before you start?",
+      "a": "Yes. Once we've found the problem we tell you what it will cost, and the work only starts when you agree."
+    },
+    {
+      "q": "Why are some rooms always hotter than others?",
+      "a": "Leaky or undersized ducts, closed or blocked vents, or a room that gets the afternoon sun. A duct check usually finds the reason."
+    }
+  ],
+  "quote_options": [
+    {
+      "value": "cool",
+      "label": "No cooling",
+      "icon": "snow"
+    },
+    {
+      "value": "heat",
+      "label": "No heat",
+      "icon": "flame"
+    },
+    {
+      "value": "noise",
+      "label": "Noise, smell or leak",
+      "icon": "sound"
+    },
+    {
+      "value": "new",
+      "label": "Tune-up or new system",
+      "icon": "fan"
+    }
+  ],
+  "quote_for": {
+    "for": {
+      "ac-repair": "cool",
+      "heating": "heat",
+      "installation": "new",
+      "maintenance": "new",
+      "ductwork": "noise",
+      "thermostats": "new"
+    },
+    "else": "new"
+  },
+  "cta_title": [
+    "Too hot? Too cold?",
+    "We're one call away."
+  ],
+  "footer_blurb": "AC repair, heating and ductwork for homes in {{ city }} and the surrounding area.",
+  "nav_explorer": "System check",
+  "area_title": [
+    "Heating & cooling across {{ city }}",
+    "and nearby."
+  ],
+  "quote_kicker": "Book a visit",
+  "quote_title": [
+    "Tell us what it's doing.",
+    "We'll sort it."
+  ],
+  "logo_strip": [
+    "Heating & Air Conditioning",
+    "Heating and Air Conditioning",
+    "Heating & Cooling",
+    "Heating and Cooling",
+    "Heating & Air",
+    "Heating and Air",
+    "Air Conditioning",
+    "HVAC Services",
+    "HVAC",
+    "Mechanical"
+  ]
+}

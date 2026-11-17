@@ -1,0 +1,18 @@
+{
+  "business": "Front Range Electric LLC",
+  "city": "Denver",
+  "state": "CO",
+  "phone": "(303) 555-0164",
+  "email": "office@frontrangeelectric.example",
+  "rating": 4.9,
+  "reviews": 96,
+  "maps_url": "https://www.google.com/maps",
+  "service_area": [
+    {"name": "Denver", "lat": 39.7392, "lon": -104.9903},
+    {"name": "Aurora", "lat": 39.7294, "lon": -104.8319},
+    {"name": "Lakewood", "lat": 39.7047, "lon": -105.0814},
+    {"name": "Englewood", "lat": 39.6478, "lon": -104.9878},
+    {"name": "Arvada", "lat": 39.8028, "lon": -105.0875},
+    {"name": "Thornton", "lat": 39.868, "lon": -104.9719}
+  ]
+}

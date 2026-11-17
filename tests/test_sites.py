@@ -108,7 +108,7 @@ def test_the_searched_city_and_its_state():
 
 def test_only_trades_with_a_design_have_a_pack():
     assert trade_pack("Roofer")[0] == "roofer" and trade_pack("Plumber")[0] == "plumber"
-    assert trade_pack("HVAC") is None and trade_pack("") is None
+    assert trade_pack("Pest control") is None and trade_pack("") is None
 
 
 def test_a_business_without_a_city_gets_the_searched_one(sites_dir):
@@ -271,12 +271,13 @@ async def test_the_roofer_emails_link_the_site_and_set_its_end(tmp_path):
 
 async def test_a_campaign_for_a_trade_without_a_design_cannot_start(tmp_path):
     manager, sites, _, _ = site_manager(tmp_path)
-    hvac = next(t for t in manager.list_business_types() if t.name == "HVAC")
-    job = Job(query="hvac in Houston", business="hvac", place="Houston", limit=5, status=JobStatus.COMPLETED)
-    job.rows.append(PlaceRow(rank=1, name="Palm Breeze Air", email="palm@gmail.com", place_id="p1"))
-    campaign = await manager.create(CampaignCreate(job_ids=[job.id], business_type_id=hvac.id), [job])
+    pests = next(t for t in manager.list_business_types() if t.name == "Pest control")
+    job = Job(query="pest control service in Houston", business="pest control service", place="Houston", limit=5,
+              status=JobStatus.COMPLETED)
+    job.rows.append(PlaceRow(rank=1, name="Bayou Bug Guys", email="bugguys@gmail.com", place_id="p1"))
+    campaign = await manager.create(CampaignCreate(job_ids=[job.id], business_type_id=pests.id), [job])
     assert [lead.site for lead in campaign.leads] == [""]
-    assert any("no website design for HVAC" in p for p in manager.campaign_problems(campaign))
+    assert any("no website design for Pest control" in p for p in manager.campaign_problems(campaign))
 
 
 async def test_a_failed_upload_says_why(tmp_path):
@@ -322,3 +323,47 @@ def test_plumbers_get_website_b_and_website_a_stays_renderable(tmp_path):
     assert 'class="ring tank"' in html and "--lvl:10.1px" in html and html.count('class="wave"') == 7
     assert "--wave:url(&quot;" not in html and "fill=%22%231EC8E8%22" in html     # the data URI is not escaped
     assert (tmp_path / "b" / "site.css").read_text(encoding="utf-8").count(".help-tab") > 3
+
+
+def test_hvac_gets_the_air_design_with_its_thermostat_calculator_and_gauge(tmp_path):
+    """HVAC businesses get the air design: a thermostat in the hero, the system check drawing, the "what's your
+    system doing?" helper, the old-AC calculator (the page's first numbers match what its JS shows) and the gauge."""
+    from sites.render import load_pack, render
+    root = Path(__file__).resolve().parent.parent / "sites"
+    assert trade_pack("HVAC")[1]["design"] == "air"
+    pack = load_pack(root / "trades" / "hvac.json")
+    words = json.dumps(pack).lower()
+    assert not re.search(r"\bfree\b|\blicensed\b|24/7", words)
+    out = tmp_path / "hvac"
+    page = render(root / "trades" / "hvac.json", root / "samples" / "hvac-phoenix.json", out, variant=0).read_text(
+        encoding="utf-8")
+    assert '<svg class="hx"' in page and "hx-fan" in page and page.count('data-fx="air"') == 2
+    assert 'role="slider"' in page and 'aria-valuenow="72"' in page and "--t:0.48" in page
+    assert "stroke-dasharray:36.0 100" in page and 'data-room-start="77"' in page
+    assert page.count('role="tab"') == 4 and 'data-pick="ac-repair"' in page
+    assert "data-ec-in" in page and ">$28<" in page and ">$113<" in page          # $150 a month, 13 -> 16 SEER
+    assert 'class="ring gauge"' in page and "--r:4.8" in page
+    assert "wave" not in page and "drip" not in page
+    css = (out / "site.css").read_text(encoding="utf-8")
+    assert "prefers-reduced-motion: no-preference" in css and ".dial-knob" in css and ".hero-frost" in css
+
+
+def test_electricians_get_the_spark_design_with_its_switch_led_calculator_and_power_check(tmp_path):
+    """Electricians get the spark design: a wall switch and dimmer in the hero, current on circuit traces
+    (data-fx="spark"), the power check drawing, the helper, the LED calculator (the page's first numbers match what
+    its JS shows) and the gauge."""
+    from sites.render import load_pack, render
+    root = Path(__file__).resolve().parent.parent / "sites"
+    assert trade_pack("Electrician")[1]["design"] == "spark"
+    pack = load_pack(root / "trades" / "electrician.json")
+    assert not re.search(r"\bfree\b|\blicensed\b|24/7", json.dumps(pack).lower())
+    out = tmp_path / "electrician"
+    page = render(root / "trades" / "electrician.json", root / "samples" / "electrician-denver.json", out,
+                  variant=0).read_text(encoding="utf-8")
+    assert '<svg class="hx"' in page and "sx-meter-disc" in page and page.count('data-fx="spark"') == 2
+    assert 'aria-pressed="true"' in page and "data-dim" in page and "<span data-watts>43</span>" in page
+    assert page.count('role="tab"') == 4 and 'data-pick="outlets"' in page
+    assert ">$190<" in page and ">1,117<" in page and ">$223<" in page and ">$34<" in page   # 20 bulbs, 3 h, 17¢
+    assert 'class="ring gauge"' in page and "data-dial" not in page and "data-ecalc" not in page
+    css = (out / "site.css").read_text(encoding="utf-8")
+    assert ".sw-plate" in css and "prefers-reduced-motion: no-preference" in css and ".ec-" not in css

@@ -1,0 +1,18 @@
+{
+  "business": "Desert Breeze Heating & Air LLC",
+  "city": "Phoenix",
+  "state": "AZ",
+  "phone": "(602) 555-0178",
+  "email": "office@desertbreezeair.example",
+  "rating": 4.8,
+  "reviews": 132,
+  "maps_url": "https://www.google.com/maps",
+  "service_area": [
+    {"name": "Phoenix", "lat": 33.4484, "lon": -112.074},
+    {"name": "Scottsdale", "lat": 33.4942, "lon": -111.9261},
+    {"name": "Tempe", "lat": 33.4255, "lon": -111.94},
+    {"name": "Mesa", "lat": 33.4152, "lon": -111.8315},
+    {"name": "Glendale", "lat": 33.5387, "lon": -112.186},
+    {"name": "Chandler", "lat": 33.3062, "lon": -111.8413}
+  ]
+}

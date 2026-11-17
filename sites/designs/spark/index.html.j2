@@ -1,0 +1,553 @@
+{% set t = trade %}
+{% macro stars(r, cls="") %}<span class="stars {{ cls }}" style="--r:{{ r }}" aria-hidden="true"><span class="stars-row">{% for _ in range(5) %}<svg><use href="#i-star"/></svg>{% endfor %}</span><span class="stars-row stars-fill">{% for _ in range(5) %}<svg><use href="#i-star"/></svg>{% endfor %}</span></span>{% endmacro %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ business }} | {{ t.label }} in {{ city }}{% if state %}, {{ state }}{% endif %}</title>
+<meta name="description" content="{{ t.footer_blurb }}{% if phone %} Call {{ phone }}.{% endif %}">
+{% if preview %}<meta name="robots" content="noindex, nofollow">{% endif %}
+<meta name="theme-color" content="#0A0B12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://images.unsplash.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500..700&family=Inter:wght@400..700&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="{{ hero.src | img(1400) }}" imagesrcset="{{ hero.src | srcset }}" imagesizes="(max-width: 900px) 100vw, 42vw">
+<link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add("js");setTimeout(function(){if(!window.siteReady)document.documentElement.classList.remove("js")},4000)</script>
+<style>:root{--accent:{{ accent.accent }};--accent-text:{{ accent.accent_text }};--accent-soft:{{ accent.accent_soft }}}</style>
+<script type="application/ld+json">
+{{ {"@context": "https://schema.org", "@type": t.schema_type | default("RoofingContractor"), "name": business, "telephone": phone, "email": email,
+    "address": {"@type": "PostalAddress", "addressLocality": city, "addressRegion": state},
+    "areaServed": area} | tojson }}
+</script>
+</head>
+<body{% if preview %} class="is-preview"{% endif %}>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M13 5l7 7-7 7"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M7 17 17 7M8 7h9v9"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path fill="currentColor" d="m12 2.5 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 12-8.4 8.4a2.1 2.1 0 0 1-3-3L12 9m5.6-3.4L14.5 2.5 11 6l3.1 3.1m3.5-3.5 2.4-.4 1.5 1.5-.4 2.4-2.4 2.4-4.6-4.6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m12 2 10 5-10 5L2 7zm-10 10 10 5 10-5M2 17l10 5 10-5"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 2.7s-6.5 7.1-6.5 11.8a6.5 6.5 0 0 0 13 0C18.5 9.8 12 2.7 12 2.7z"/></symbol>
+    <symbol id="i-gutter" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M2 6h20v3a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3zm15 6v6a2 2 0 0 0 2 2h2"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm10 2-4.3-4.3"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 0v6h6M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-broom" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M19.4 2.6 12 10m-6.5 1.5 7 7M4 13l-2 7 5.5-1.5M5.5 11.5 9 8l7 7-3.5 3.5"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2-5.3A8.4 8.4 0 1 1 21 11.5z"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm18 2-10 7L2 6"/></symbol>
+    <symbol id="i-roof" viewBox="0 0 32 32"><path fill="currentColor" d="M16 3 1 15.2l3 3.6 12-9.8 12 9.8 3-3.6zm-7 13.5V29h5.5v-7h3v7H23V16.5L16 11z"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.7.6 1 1.4 1 2.3h6c0-.9.3-1.7 1-2.3A7 7 0 0 0 12 2z"/></symbol>
+    <symbol id="i-snow" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M4.9 6.5l14.2 11M4.9 17.5l14.2-11M9 3.5l3 2.5 3-2.5M9 20.5l3-2.5 3 2.5M3 9.5l3.6.7-1 3.6M21 14.5l-3.6-.7 1-3.6M3 14.5l3.6-.7-1-3.6M21 9.5l-3.6.7 1 3.6"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
+    {% for name, body in (t.symbols | default({})).items() %}
+    <symbol id="i-{{ name }}" viewBox="0 0 24 24">{{ body | safe }}</symbol>
+    {% endfor %}
+  </defs>
+</svg>
+
+<div class="top" data-top>
+  {% if preview %}
+  <div class="pv" role="region" aria-label="Website preview">
+    <span class="pv-dot" aria-hidden="true"></span>
+    <p class="pv-msg"><span class="pv-long">Free preview of your new website. It goes offline in</span><span class="pv-short">Ends in</span></p>
+    <p class="pv-timer" data-ends="{{ preview_ends }}" aria-live="off">
+      <span><b data-u="d">7</b>d</span><span><b data-u="h">00</b>h</span><span><b data-u="m">00</b>m</span><span class="pv-s"><b data-u="s">00</b>s</span>
+    </p>
+    <a class="pv-keep" href="{{ keep_href }}">Keep this site</a>
+  </div>
+  {% endif %}
+  <div class="bar" aria-hidden="true"><span data-progress></span></div>
+  <header class="hd">
+    <div class="wrap hd-in">
+      <a class="logo" href="#top" aria-label="{{ business }}, home">
+        <span class="logo-badge" aria-hidden="true"><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="#services">Services</a>
+        <a href="#explore">{{ t.nav_explorer }}</a>
+        <a href="#why">Why us</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#area">Service area</a>
+      </nav>
+      <div class="hd-cta">
+        {% if phone %}<a class="hd-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        <a class="btn btn-accent btn-sm" href="#quote" data-magnetic>{{ t.nav_cta | default("Free inspection") }}</a>
+        <button class="burger" type="button" aria-expanded="false" aria-controls="menu" data-burger><span></span><span></span><span class="sr">Menu</span></button>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="menu" id="menu" hidden data-menu>
+  <nav aria-label="Mobile">
+    {% for href, label in [("#services", "Services"), ("#explore", t.nav_explorer), ("#why", "Why us"), ("#reviews", "Reviews"), ("#area", "Service area"), ("#quote", t.nav_cta | default("Free inspection"))] %}
+    <a href="{{ href }}" style="--i:{{ loop.index0 }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+  {% if phone %}<a class="btn btn-accent btn-lg" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call {{ phone }}</a>{% endif %}
+</div>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero" data-hero>
+    <div class="hero-sky" aria-hidden="true"><i class="glow glow-a"></i><i class="glow glow-b"></i></div>
+    <canvas class="rain" data-rain="{{ hero.rain | default(1) }}" data-fx="spark" aria-hidden="true"></canvas>
+    <div class="wrap hero-in">
+      <div class="hero-copy">
+        <p class="chip chip-glass hero-chip"><span class="live-dot" aria-hidden="true"></span>{{ t.label }} in {{ city }}{% if state %}, {{ state }}{% endif %}</p>
+        <h1 class="hero-title">
+          {% set n = namespace(i=0) %}
+          {% for line in headline %}
+          <span class="line{% if loop.last %} line-accent{% endif %}">{% for w in line.split() %}<span class="wm"><span class="wi" style="--i:{{ n.i }}">{{ w }}</span></span>{% set n.i = n.i + 1 %}{% if not loop.last %} {% endif %}{% endfor %}{% if loop.last %}<svg class="scribble" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true"><path d="M3 14c50-8 120-11 180-8 40 2 80 5 114 1"/></svg>{% endif %}</span>
+          {% endfor %}
+        </h1>
+        <p class="hero-sub">{{ t.hero_sub }}</p>
+        <div class="hero-ctas">
+          {% if phone %}<a class="btn btn-accent btn-lg" href="{{ phone_href }}" data-magnetic><svg aria-hidden="true"><use href="#i-phone"/></svg>Call {{ phone }}</a>{% endif %}
+          <a class="btn btn-glass btn-lg" href="#quote">{{ t.cta_primary }}<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </div>
+      <div class="hero-side">
+        {% set sw = t.switch %}
+        <figure class="hero-card">
+          <img src="{{ hero.src | img(1100, 1300) }}" alt="{{ hero.alt }}" style="object-position:{{ hero.pos }}" width="1100" height="1300" fetchpriority="high">
+          <span class="hero-bloom" aria-hidden="true"></span>
+          <figcaption class="room"><small>{{ sw.reading }}</small><b><span data-watts>{{ (sw.bulbs * sw.bulb_watts * sw.default / 100) | round | int }}</span> W</b><span class="room-state">{{ sw.bulbs }} {{ sw.bulb_note }}</span></figcaption>
+        </figure>
+        <div class="sw" data-switch data-on="{{ sw.on }}" data-off="{{ sw.off }}" data-bulbs="{{ sw.bulbs }}" data-bulb-watts="{{ sw.bulb_watts }}">
+          <button class="sw-plate" type="button" aria-pressed="true" aria-label="{{ sw.label }}" data-switch-btn>
+            <span class="sw-screw" aria-hidden="true"></span>
+            <span class="sw-slot" aria-hidden="true"><span class="sw-toggle"></span></span>
+            <span class="sw-screw" aria-hidden="true"></span>
+          </button>
+          <div class="sw-side">
+            <p class="sw-state"><b data-switch-state>{{ sw.on }}</b><span>{{ sw.hint }}</span></p>
+            <label class="sw-dim"><span>{{ sw.dimmer }} <output data-dim-out>{{ sw.default }}%</output></span>
+              <input type="range" min="10" max="100" step="5" value="{{ sw.default }}" data-dim>
+            </label>
+          </div>
+        </div>
+        {% if rating and reviews %}
+        <a class="rate-card" href="{{ reviews_url }}" target="_blank" rel="noopener">
+          <span class="rate-num">{{ "%.1f" | format(rating) }}</span>
+          <span class="rate-meta">
+            {{ stars(rating) }}
+            <span>{{ reviews }} Google reviews</span>
+          </span>
+          <svg class="rate-go" aria-hidden="true"><use href="#i-out"/></svg>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    <a class="scroll-cue" href="#services" aria-label="Scroll to services"><span></span></a>
+  </section>
+
+  <!-- MARQUEE -->
+  <div class="mq" aria-hidden="true">
+    <div class="mq-track">
+      {% for _ in range(2) %}
+      <div class="mq-set">{% for item in t.marquee %}<span>{{ item }}</span><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg>{% endfor %}</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <section class="stats wrap" aria-label="At a glance">
+    {% if rating and reviews %}
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ rating }}" data-decimals="1">{{ "%.1f" | format(rating) }}</span><svg class="stat-star" aria-hidden="true"><use href="#i-star"/></svg></p><p class="stat-label">Google rating</p></div>
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ reviews }}">{{ reviews }}</span></p><p class="stat-label">reviews from local homeowners</p></div>
+    {% endif %}
+    <div class="stat" data-reveal><p class="stat-num"><span data-count="{{ area | length }}">{{ area | length }}</span></p><p class="stat-label">{{ "city" if area | length == 1 else "cities" }} we cover</p></div>
+    <div class="stat" data-reveal><p class="stat-num">{{ t.stats_extra.value }}</p><p class="stat-label">{{ t.stats_extra.label }}</p></div>
+  </section>
+
+  <!-- RIGHT NOW: what to do before the plumber gets there -->
+  {% if t.helper is defined %}
+  {% set hp = t.helper %}
+  <section class="sec help" id="help">
+    <div class="wrap help-grid">
+      <div class="help-head" data-reveal>
+        <p class="kicker">{{ hp.kicker }}</p>
+        <h2 class="h2">{{ hp.title[0] }} <em>{{ hp.title[1] }}</em></h2>
+        <p class="lead">{{ hp.intro }}</p>
+        <div class="help-tabs" role="tablist" aria-label="{{ hp.title[0] }} {{ hp.title[1] }}" data-help>
+          {% for it in hp["items"] %}
+          <button class="help-tab" type="button" role="tab" id="ht-{{ it.key }}" aria-controls="hp-{{ it.key }}" aria-selected="{{ 'true' if loop.first else 'false' }}" tabindex="{{ '0' if loop.first else '-1' }}"><span class="help-ico" aria-hidden="true"><svg><use href="#i-{{ it.icon }}"/></svg></span>{{ it.label }}<svg class="help-go" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="help-panels" data-reveal>
+        {% for it in hp["items"] %}
+        <article class="help-card" role="tabpanel" id="hp-{{ it.key }}" aria-labelledby="ht-{{ it.key }}" tabindex="0"{% if not loop.first %} hidden{% endif %}>
+          <div class="help-art art-{{ it.key }}" aria-hidden="true"><svg><use href="#i-{{ it.icon }}"/></svg><i></i><i></i><i></i></div>
+          <p class="help-sub">{{ hp.do_now }}</p>
+          <ol class="help-steps">{% for st in it.steps %}<li style="--d:{{ loop.index0 }}"><span>{{ loop.index }}</span><p>{{ st }}</p></li>{% endfor %}</ol>
+          <p class="help-note"><svg aria-hidden="true"><use href="#i-bolt"/></svg><span>{{ it.note }}</span></p>
+          <div class="help-ctas">
+            {% if phone %}<a class="btn btn-accent" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call {{ phone }}</a>{% endif %}
+            <a class="btn btn-ghost" href="#quote" data-pick="{{ it.service }}">{{ t.nav_cta | default("Book a visit") }}<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- SERVICES -->
+  <section class="sec svc" id="services">
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">What we do</p>
+        {% set st = t.services_title | default(["Every part of your roof,", "handled."]) %}
+        <h2 class="h2">{{ st[0] }} <em>{{ st[1] }}</em></h2>
+      </div>
+      <div class="bento">
+        {% for s in t.services %}
+        <a class="card card-{{ loop.index }}" href="#quote" data-service="{{ s.slug }}" data-tilt data-reveal style="--d:{{ loop.index0 }}">
+          <img src="{{ s.photo | img(900, 700) }}" alt="{{ s.alt }}" loading="lazy" width="900" height="700">
+          <span class="card-shade" aria-hidden="true"></span>
+          <span class="card-num" aria-hidden="true">0{{ loop.index }}</span>
+          <span class="card-body">
+            <svg class="card-icon" aria-hidden="true"><use href="#i-{{ s.icon }}"/></svg>
+            <span class="card-title">{{ s.title }}</span>
+            <span class="card-text">{{ s.blurb }}</span>
+            <span class="card-go">Get a quote <svg aria-hidden="true"><use href="#i-arrow"/></svg></span>
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- ROOF CHECK -->
+  {% set x = t.explorer %}
+  <section class="sec xp is-night" id="explore">
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">{{ x.kicker }}</p>
+        <h2 class="h2">{{ x.title }}</h2>
+        <p class="lead">{{ x.intro }}</p>
+      </div>
+      <div class="xp-grid">
+        <div class="xp-stage{% if x.svg is defined %} is-drawn{% endif %}" data-reveal>
+          <div class="xp-zoom" data-zoom>
+            {% if x.svg is defined %}
+            <div class="xp-art" role="img" aria-label="{{ x.alt }}">{{ x.svg }}</div>
+            {% else %}
+            <img src="{{ x.photo | img(1400) }}" srcset="{{ x.photo | srcset }}" sizes="(max-width: 900px) 100vw, 60vw" alt="{{ x.alt }}" loading="lazy" width="1920" height="1088">
+            {% endif %}
+            {% for s in x.spots %}
+            <button class="pin pin-{{ s.side }}{% if loop.first %} is-on{% endif %}" type="button" style="left:{{ s.x }}%;top:{{ s.y }}%" data-spot="{{ s.key }}" data-x="{{ s.x }}" data-y="{{ s.y }}" aria-pressed="{{ 'true' if loop.first else 'false' }}"><span class="pin-dot" aria-hidden="true">{{ loop.index }}</span><span class="pin-label"><b>0{{ loop.index }}</b> {{ s.label }}</span></button>
+            {% endfor %}
+          </div>
+          {% if x.legend is defined %}<ul class="xp-legend" aria-hidden="true">{% for l in x.legend %}<li><i style="--c:{{ l.color }}"></i>{{ l.label }}</li>{% endfor %}</ul>{% endif %}
+          <p class="xp-hint" aria-hidden="true"><span class="live-dot"></span>Tap a marker</p>
+        </div>
+        <div class="xp-panel" data-reveal>
+          {% for s in x.spots %}
+          <article class="xp-card" data-card="{{ s.key }}"{% if not loop.first %} hidden{% endif %}>
+            <p class="xp-count">0{{ loop.index }} <span>/ 0{{ x.spots | length }}</span></p>
+            <h3>{{ s.label }}</h3>
+            <p class="xp-what">{{ s.what }}</p>
+            <p class="xp-sub">Signs to look for</p>
+            <ul>{% for sign in s.signs %}<li><svg aria-hidden="true"><use href="#i-check"/></svg>{{ sign }}</li>{% endfor %}</ul>
+            <a class="link-go" href="#quote" data-pick="{{ s.service }}">{% if x.go is defined %}{{ x.go }}{% else %}Not sure? We'll check it for free{% endif %} <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+          </article>
+          {% endfor %}
+          <div class="xp-nav">
+            <button class="xp-arrow xp-prev" type="button" data-xp-step="-1" aria-label="Previous {{ x.part | default('part of the roof') }}"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+            <span class="xp-dots" aria-hidden="true">{% for s in x.spots %}<i data-dot="{{ s.key }}"{% if loop.first %} class="is-on"{% endif %}></i>{% endfor %}</span>
+            <button class="xp-arrow" type="button" data-xp-step="1" aria-label="Next {{ x.part | default('part of the roof') }}"><svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT THE OLD BULBS COST -->
+  {% if t.led_calc is defined %}
+  {% set lc = t.led_calc %}
+  {% set kwh_old = lc.bulbs * lc.old_watts * lc.hours * 365 / 1000 %}
+  {% set kwh_new = lc.bulbs * lc.new_watts * lc.hours * 365 / 1000 %}
+  <section class="sec calc" id="savings" data-led data-old="{{ lc.old_watts }}" data-new="{{ lc.new_watts }}">
+    <div class="wrap calc-grid">
+      <div class="calc-copy" data-reveal>
+        <p class="kicker">{{ lc.kicker }}</p>
+        <h2 class="h2">{{ lc.title[0] }} <em>{{ lc.title[1] }}</em></h2>
+        <p class="lead">{{ lc.intro }}</p>
+        <label class="calc-field"><span>{{ lc.bulbs_label }} <output data-led-out="bulbs">{{ lc.bulbs }}</output></span>
+          <input type="range" min="1" max="60" step="1" value="{{ lc.bulbs }}" data-led-in="bulbs" aria-describedby="calc-src">
+        </label>
+        <label class="calc-field"><span>{{ lc.hours_label }} <output data-led-out="hours">{{ lc.hours }}</output></span>
+          <input type="range" min="1" max="12" step="1" value="{{ lc.hours }}" data-led-in="hours" aria-describedby="calc-src">
+        </label>
+        <label class="calc-field"><span>{{ lc.rate_label }} <output data-led-out="rate">{{ (lc.rate * 100) | round | int }}¢</output></span>
+          <input type="range" min="0.08" max="0.45" step="0.01" value="{{ lc.rate }}" data-led-in="rate" aria-describedby="calc-src">
+        </label>
+        <p class="calc-hint">{{ lc.hint }}</p>
+        <div class="calc-out" aria-live="polite">
+          <p><b data-led-save>${{ ((kwh_old - kwh_new) * lc.rate + 0.5) | int }}</b><span>{{ lc.per_year }}</span></p>
+          <p><b data-led-kwh>{{ "{:,}".format((kwh_old - kwh_new + 0.5) | int) }}</b><span>{{ lc.kwh_year }}</span></p>
+        </div>
+        <a class="btn btn-dark btn-lg" href="#quote" data-pick="{{ lc.service }}">{{ lc.go }}<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        <p class="calc-src" id="calc-src">{{ lc.source }}</p>
+      </div>
+      <figure class="ld-art" data-reveal aria-hidden="true">
+        {% for who in ["old", "new"] %}
+        <div class="ld-unit ld-{{ who }}">
+          <svg viewBox="0 0 160 220">
+            <circle class="ld-glow" cx="80" cy="74" r="74"/>
+            <path class="ld-glass" d="M80 12a56 56 0 0 0-34 100c8 7 12 15 12 24v10h44v-10c0-9 4-17 12-24A56 56 0 0 0 80 12z"/>
+            {% if who == "old" %}<path class="ld-filament" d="M66 132V96l6-10 8 14 8-14 6 10v36"/><g class="ld-heat"><path d="M40 40q-8-12 0-24"/><path d="M120 40q8-12 0-24"/><path d="M80 6q-8-12 0-24"/></g>
+            {% else %}<g class="ld-chips"><rect x="62" y="78" width="10" height="10" rx="2"/><rect x="76" y="70" width="10" height="10" rx="2"/><rect x="90" y="78" width="10" height="10" rx="2"/><rect x="76" y="86" width="10" height="10" rx="2"/></g>{% endif %}
+            <path class="ld-base" d="M58 150h44v10H58zM60 164h40v10H60zM66 178h28l-6 12H72z"/>
+          </svg>
+          <p><span>{{ lc.old_name if who == "old" else lc.new_name }}</span><b>{{ lc.old_watts if who == "old" else lc.new_watts }} W</b></p>
+          <p class="ld-cost"><b data-led-cost="{{ who }}">${{ ((kwh_old if who == "old" else kwh_new) * lc.rate + 0.5) | int }}</b><span>{{ lc.a_year }}</span></p>
+          <span class="ld-meter"><i class="ld-disc"></i></span>
+        </div>
+        {% endfor %}
+      </figure>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- PROCESS -->
+  <section class="sec proc" data-proc>
+    <div class="wrap">
+      <div class="sec-head" data-reveal>
+        <p class="kicker">How it works</p>
+        {% set pt = t.process_title | default(["From first call to", "clean driveway."]) %}
+        <h2 class="h2">{{ pt[0] }} <em>{{ pt[1] }}</em></h2>
+      </div>
+      <div class="steps-wrap">
+      <span class="steps-line" aria-hidden="true"><span></span></span>
+      <ol class="steps">
+        {% for p in t.process %}
+        <li class="step" data-reveal style="--d:{{ loop.index0 }}">
+          <span class="step-num">0{{ loop.index }}</span>
+          <h3>{{ p.title }}</h3>
+          <p>{{ p.text }}</p>
+        </li>
+        {% endfor %}
+      </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY US -->
+  <section class="sec why" id="why">
+    <div class="wrap why-grid">
+      <figure class="why-media" data-reveal>
+        <div class="why-img"><img src="{{ t.why.photo | img(1100, 1300) }}" alt="{{ t.why.alt }}" loading="lazy" width="1100" height="1300" data-parallax></div>
+        <figcaption class="why-badge"><svg aria-hidden="true"><use href="#i-pin"/></svg><span>Based in<br><b>{{ city }}{% if state %}, {{ state }}{% endif %}</b></span></figcaption>
+      </figure>
+      <div class="why-copy">
+        <div data-reveal>
+          <p class="kicker">Why {{ business }}</p>
+          <h2 class="h2">{{ t.why.title }}</h2>
+        </div>
+        <ul class="why-list">
+          {% for p in t.why.points %}
+          <li data-reveal style="--d:{{ loop.index0 }}">
+            <span class="why-icon"><svg aria-hidden="true"><use href="#i-{{ p.icon }}"/></svg></span>
+            <span><b>{{ p.title }}</b>{{ p.text }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORK -->
+  <section class="sec work is-night">
+    <div class="wrap work-head" data-reveal>
+      <div>
+        <p class="kicker">Our work</p>
+        {% set wt = t.work_title | default(["Built to last.", "Built to look good."]) %}
+        <h2 class="h2">{{ wt[0] }} <em>{{ wt[1] }}</em></h2>
+      </div>
+      {% if preview %}<p class="chip chip-note">Sample photos. Your own jobs go here.</p>{% endif %}
+    </div>
+    <div class="work-rail" data-rail tabindex="0" aria-label="Photo gallery, scroll sideways">
+      {% for g in t.gallery %}
+      <figure class="shot" data-reveal style="--d:{{ loop.index0 }}">
+        <img src="{{ g.src | img(800, 1000) }}" alt="{{ g.alt }}" loading="lazy" width="800" height="1000" draggable="false">
+        <figcaption>{{ g.tag }}</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+    <div class="wrap"><div class="rail-bar" aria-hidden="true"><span data-rail-bar></span></div></div>
+  </section>
+
+  <!-- REVIEWS -->
+  {% if rating and reviews %}
+  <section class="sec rev" id="reviews">
+    <div class="wrap rev-in" data-reveal>
+      <div class="ring gauge" style="--r:{{ rating }}" data-ring>
+        <svg viewBox="0 0 240 150" aria-hidden="true">
+          <path class="gauge-track" d="M30 130 A90 90 0 0 1 210 130" pathLength="100"/>
+          <path class="gauge-fill" d="M30 130 A90 90 0 0 1 210 130" pathLength="100"/>
+          <g class="gauge-ticks">{% for i in range(11) %}<line x1="120" y1="20" x2="120" y2="{{ 28 if i % 5 == 0 else 25 }}" transform="rotate({{ -90 + i * 18 }} 120 130)"/>{% endfor %}</g>
+          <g class="gauge-needle"><path d="M115 130 L120 56 L125 130 Z"/><circle cx="120" cy="130" r="11"/></g>
+        </svg>
+        <p><span data-count="{{ rating }}" data-decimals="1">{{ "%.1f" | format(rating) }}</span><small>out of 5</small></p>
+      </div>
+      <div class="rev-copy">
+        <p class="kicker">Reviews</p>
+        <h2 class="h2">{{ reviews }} homeowners have had their say.</h2>
+        <p class="stars-wrap" data-reveal>{{ stars(rating, "stars-lg") }}</p>
+        <p class="lead">Rated {{ "%.1f" | format(rating) }} out of 5 on Google. Read what they say, in their own words.</p>
+        <a class="btn btn-dark btn-lg" href="{{ reviews_url }}" target="_blank" rel="noopener">Read our Google reviews<svg aria-hidden="true"><use href="#i-out"/></svg></a>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- SERVICE AREA -->
+  <section class="sec area is-night" id="area">
+    <div class="wrap area-grid{% if not area_map %} is-plain{% endif %}">
+      <div data-reveal>
+        <p class="kicker">Service area</p>
+        <h2 class="h2">{{ t.area_title[0] }} <em>{{ t.area_title[1] }}</em></h2>
+        <p class="lead">Not sure if you're in our area? Call us. If we can't help, we'll tell you straight away.</p>
+        <ul class="chips">{% for c in area %}<li data-reveal style="--d:{{ loop.index0 }}"><svg aria-hidden="true"><use href="#i-pin"/></svg>{{ c }}</li>{% endfor %}</ul>
+      </div>
+      {% if area_map %}
+      {% set m = area_map %}
+      <figure class="map" data-reveal>
+        <div class="map-canvas" aria-hidden="true">
+          <svg class="map-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {% for r in m.rings %}<circle cx="{{ m.home.x }}" cy="{{ m.home.y }}" r="{{ r.r }}"/>{% endfor %}
+            {% for c in m.towns %}<line x1="{{ m.home.x }}" y1="{{ m.home.y }}" x2="{{ c.x }}" y2="{{ c.y }}" pathLength="1" style="--d:{{ loop.index0 }}"/>{% endfor %}
+          </svg>
+          {% for r in m.rings if r.ly is not none %}<span class="map-ring" style="left:{{ m.home.x }}%;top:{{ r.ly }}%">{{ r.label }}</span>{% endfor %}
+          {% for c in m.towns %}
+          <span class="town town-{{ c.side }}" style="left:{{ c.x }}%;top:{{ c.y }}%;--d:{{ loop.index0 }}"><i></i><span><b>{{ c.name }}</b><small>{{ c.mi }} mi</small></span></span>
+          {% endfor %}
+          <span class="map-home" style="left:{{ m.home.x }}%;top:{{ m.home.y }}%"><span class="map-pulse"></span><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg><b>{{ m.home.name }}</b></span>
+          <span class="map-north">N</span>
+        </div>
+        <figcaption>Straight-line distances from {{ m.home.name }}.</figcaption>
+      </figure>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- QUOTE -->
+  <section class="sec quote" id="quote">
+    <div class="wrap quote-grid">
+      <div class="quote-copy" data-reveal>
+        <p class="kicker">{{ t.quote_kicker }}</p>
+        <h2 class="h2">{{ t.quote_title[0] }} <em>{{ t.quote_title[1] }}</em></h2>
+        <p class="lead">Tell us what's going on and we'll call you back to set a time. Rather talk now? Call us.</p>
+        {% if phone %}<a class="big-phone" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        {% if email %}<a class="quote-mail" href="mailto:{{ email }}"><svg aria-hidden="true"><use href="#i-mail"/></svg>{{ email }}</a>{% endif %}
+      </div>
+      <form class="qf" data-quote data-endpoint="{{ form_endpoint }}" data-email="{{ email }}" data-phone="{{ phone }}" data-business="{{ business }}"{% if t.quote_for is defined %} data-for="{{ t.quote_for | tojson | forceescape }}"{% endif %} novalidate data-reveal>
+        <h3 class="qf-title">{{ t.form_title | default("Request your free inspection") }}</h3>
+        <p class="qf-sub">It takes under a minute. We'll call you back to set a time.</p>
+        <div class="qf-quick" role="group" aria-labelledby="qf-quick">
+          <p class="qf-label" id="qf-quick">Quick start</p>
+          <div class="qf-chips">
+            {% for o in t.quote_options %}
+            <button class="qchip" type="button" data-chip="{{ o.value }}" aria-pressed="false"><svg aria-hidden="true"><use href="#i-{{ o.icon }}"/></svg>{{ o.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="qf-fields">
+          <label class="field"><span>Your name</span><input name="name" autocomplete="name" required></label>
+          <label class="field"><span>Phone number</span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" required></label>
+          <label class="field"><span>Street address or ZIP code</span><input name="address" autocomplete="street-address" required></label>
+          <label class="field"><span>Email (optional)</span><input name="email" type="email" autocomplete="email" inputmode="email"></label>
+          <label class="field"><span>What do you need?</span>
+            <select name="problem" required>
+              <option value="">Choose one…</option>
+              {% for o in t.quote_options %}<option value="{{ o.label }}" data-val="{{ o.value }}">{{ o.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field"><span>How soon do you need us?</span>
+            <select name="when"><option>As soon as possible</option><option>This week</option><option>In the next month</option><option>Just planning ahead</option></select>
+          </label>
+          <label class="field field-wide"><span>Anything we should know? (optional)</span><textarea name="details" rows="3" maxlength="500"></textarea></label>
+        </div>
+        <label style="position:absolute;left:-9999px" aria-hidden="true">Fax<input name="fax" tabindex="-1" autocomplete="off"></label>
+        <p class="qf-error" data-qf-error role="alert" hidden></p>
+        <div class="qf-nav">
+          <button class="btn btn-accent btn-lg" type="submit" data-qf-next>Send request<svg aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="qf-done" data-qf-done hidden>
+          <svg class="qf-tick" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="m15 27 7 7 15-16"/></svg>
+          <h3>Thanks<span data-qf-name></span>. We've got it.</h3>
+          <p>{{ business }} will call you back shortly to set a time.{% if phone %} Can't wait? Call <a href="{{ phone_href }}">{{ phone }}</a>.{% endif %}</p>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="sec faq">
+    <div class="wrap faq-grid">
+      <div data-reveal>
+        <p class="kicker">Questions</p>
+        <h2 class="h2">Straight answers.</h2>
+        <p class="lead">Something else on your mind?{% if phone %} Call <a class="nowrap" href="{{ phone_href }}">{{ phone }}</a>.{% endif %}</p>
+      </div>
+      <div class="faq-list">
+        {% for f in t.faq %}
+        <details data-reveal style="--d:{{ loop.index0 }}"><summary>{{ f.q }}<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><p>{{ f.a }}</p></div></details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta is-night{% if cta_photo %} has-photo{% endif %}">
+    {% if cta_photo %}<img class="cta-photo" src="{{ cta_photo.src | img(1400) }}" srcset="{{ cta_photo.src | srcset }}" sizes="100vw" alt="" loading="lazy" width="2000" height="1133" style="object-position:{{ cta_photo.pos }}">{% endif %}
+    <canvas class="cta-rain" data-rain="0.5" data-fx="spark" aria-hidden="true"></canvas>
+    <div class="wrap cta-in" data-reveal>
+      <h2 class="cta-title">{{ t.cta_title[0] }}<br><em>{{ t.cta_title[1] }}</em></h2>
+      <div class="hero-ctas">
+        {% if phone %}<a class="btn btn-accent btn-xl" href="{{ phone_href }}" data-magnetic><svg aria-hidden="true"><use href="#i-phone"/></svg>{{ phone }}</a>{% endif %}
+        <a class="btn btn-glass btn-xl" href="#quote">{{ t.cta_primary }}</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="wrap ft-grid">
+    <div>
+      <a class="logo" href="#top" aria-label="{{ business }}, back to top"><span class="logo-badge" aria-hidden="true"><svg><use href="#i-{{ t.logo_icon | default('roof') }}"/></svg></span><span class="logo-text"><b>{{ logo_name }}</b><small>{{ logo_tag }}</small></span></a>
+      <p>{{ t.footer_blurb }}</p>
+    </div>
+    <div><p class="ft-h">Services</p><ul>{% for s in t.services %}<li><a href="#services">{{ s.title }}</a></li>{% endfor %}</ul></div>
+    <div><p class="ft-h">Areas</p><ul>{% for c in area %}<li>{{ c }}</li>{% endfor %}</ul></div>
+    <div><p class="ft-h">Contact</p><ul>
+      {% if phone %}<li><a href="{{ phone_href }}">{{ phone }}</a></li>{% endif %}
+      {% if email %}<li><a href="mailto:{{ email }}">{{ email }}</a></li>{% endif %}
+      <li>{{ city }}{% if state %}, {{ state }}{% endif %}</li>
+    </ul></div>
+  </div>
+  <div class="wrap ft-base"><p>&copy; {{ year }} {{ business }}</p>{% if preview %}<p>Preview built by Leads Pilot</p>{% endif %}</div>
+</footer>
+
+<div class="mbar" data-mbar>
+  {% if phone %}<a class="btn btn-accent" href="{{ phone_href }}"><svg aria-hidden="true"><use href="#i-phone"/></svg>Call</a>
+  <a class="btn btn-glass" href="{{ sms_href }}"><svg aria-hidden="true"><use href="#i-chat"/></svg>Text</a>{% endif %}
+  <a class="btn btn-glass" href="#quote">{{ t.mbar_cta | default("Free quote") }}</a>
+</div>
+
+<script src="site.js" defer></script>
+</body>
+</html>

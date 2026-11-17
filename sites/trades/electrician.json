@@ -1,0 +1,516 @@
+{
+  "trade": "electrician",
+  "design": "spark",
+  "label": "Electrical",
+  "noun": "electrician",
+  "schema_type": "Electrician",
+  "logo_icon": "bolt",
+  "nav_cta": "Book a visit",
+  "form_title": "Book an electrician",
+  "mbar_cta": "Get a quote",
+  "services_title": [
+    "Every circuit in the house,",
+    "handled."
+  ],
+  "process_title": [
+    "From the first call to",
+    "the lights back on."
+  ],
+  "work_title": [
+    "Neat panels.",
+    "Safe wiring."
+  ],
+  "symbols": {
+    "panel": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M5 2h14a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM8 6h3M13 6h3M8 10h3M13 10h3M8 14h3M13 14h3M8 18h8\"/>",
+    "plug": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0zM12 17v5\"/>",
+    "car": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M5 17H3v-5l2-5h10l4 5h2v5h-2M5 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM15 17a2 2 0 1 0 4 0 2 2 0 1 0-4 0zM9 17h6M11 8l-2 3h3l-2 3\"/>",
+    "wire": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 7h5a3 3 0 0 1 3 3v4a3 3 0 0 0 3 3h7M3 3v8M21 13v8\"/>",
+    "smoke": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8 20c-2-2 2-3 0-6s2-4 0-6M12 22c-2-2 2-3 0-6s2-4 0-6M16 20c-2-2 2-3 0-6s2-4 0-6\"/>",
+    "switch": "<path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM10 7h4v6h-4z\"/>"
+  },
+  "accents": [
+    {
+      "name": "volt yellow",
+      "accent": "#FFD23F",
+      "accent_text": "#7C5E00",
+      "accent_soft": "#FFF3C4"
+    },
+    {
+      "name": "arc blue",
+      "accent": "#4C9BFF",
+      "accent_text": "#1D4FA8",
+      "accent_soft": "#DDEBFF"
+    },
+    {
+      "name": "live green",
+      "accent": "#9BE15D",
+      "accent_text": "#3B6B12",
+      "accent_soft": "#E7F7D6"
+    }
+  ],
+  "headlines": [
+    [
+      "Power,",
+      "done right."
+    ],
+    [
+      "Your {{ city }}",
+      "electrician."
+    ],
+    [
+      "Lights out?",
+      "We're on it."
+    ]
+  ],
+  "hero_photos": [
+    {
+      "src": "https://images.unsplash.com/photo-1609280069678-ab9ef26a0b05",
+      "alt": "Pendant lights glowing over a kitchen island",
+      "pos": "50% 40%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1473308822086-710304d7d30c",
+      "alt": "Glowing filament light bulbs hanging in the dark",
+      "pos": "45% 50%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1660330589693-99889d60181e",
+      "alt": "Electrician in a hi-vis shirt working on an electrical panel",
+      "pos": "40% 45%"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1730991568658-ad8638395a9e",
+      "role": "cta",
+      "alt": "",
+      "pos": "50% 45%"
+    }
+  ],
+  "hero_sub": "Repairs, panel upgrades, lighting and EV chargers for homes across {{ city }} and nearby. We find the real cause, tell you the price before any work starts, and leave everything safe and tidy.",
+  "cta_primary": "Book an electrician",
+  "marquee": [
+    "Panel upgrades",
+    "Troubleshooting",
+    "Lighting",
+    "EV chargers",
+    "Outlets & switches",
+    "Rewiring",
+    "Smoke alarms"
+  ],
+  "stats_extra": {
+    "value": "Upfront",
+    "label": "prices, before any work"
+  },
+  "switch": {
+    "label": "Kitchen lights",
+    "on": "Lights on",
+    "off": "Lights off",
+    "hint": "Flip it",
+    "dimmer": "Dimmer",
+    "default": 80,
+    "reading": "Kitchen lights",
+    "bulbs": 6,
+    "bulb_watts": 9,
+    "bulb_note": "LED bulbs, 9 W each"
+  },
+  "services": [
+    {
+      "slug": "panels",
+      "icon": "panel",
+      "title": "Panel Upgrades",
+      "blurb": "An old or full panel, breakers that trip, room for a new circuit. Upgraded, labeled and inspected where your town asks for it.",
+      "photo": "https://images.unsplash.com/photo-1566417110090-6b15a06ec800",
+      "alt": "Gray electrical panel with breakers and switches"
+    },
+    {
+      "slug": "repairs",
+      "icon": "search",
+      "title": "Troubleshooting",
+      "blurb": "Dead outlets, flickering lights, a breaker that won't stay on. We trace the fault to where it starts and fix it there.",
+      "photo": "https://images.unsplash.com/photo-1758101755915-462eddc23f57",
+      "alt": "Electrician testing the wiring in a panel with a multimeter"
+    },
+    {
+      "slug": "lighting",
+      "icon": "bulb",
+      "title": "Lighting",
+      "blurb": "Pendants over the island, recessed lights, dimmers, outdoor lights. Planned with you and fitted cleanly.",
+      "photo": "https://images.unsplash.com/photo-1768486143865-342d8cc12c90",
+      "alt": "Kitchen with an island and pendant lights"
+    },
+    {
+      "slug": "ev-chargers",
+      "icon": "car",
+      "title": "EV Chargers",
+      "blurb": "A home charger on its own circuit, with a check that your panel can take it before anything is mounted.",
+      "photo": "https://images.unsplash.com/photo-1766507680004-1c71007aefe5",
+      "alt": "Electric car charger mounted on a wooden wall"
+    },
+    {
+      "slug": "outlets",
+      "icon": "switch",
+      "title": "Outlets & Switches",
+      "blurb": "New outlets where you need them, GFCI outlets in kitchens and bathrooms, switches and dimmers that work like they should.",
+      "photo": "https://images.unsplash.com/photo-1784829054577-4e6bc11dec2d",
+      "alt": "Brass toggle light switch on a white wall"
+    },
+    {
+      "slug": "wiring",
+      "icon": "wire",
+      "title": "Wiring & Rewiring",
+      "blurb": "Old wiring replaced, new circuits for a kitchen or an addition, and everything put back so you can't tell we were in the walls.",
+      "photo": "https://images.unsplash.com/photo-1601462904263-f2fa0c851cb9",
+      "alt": "Bundles of yellow, blue and black electrical wires"
+    }
+  ],
+  "explorer": {
+    "kind": "drawing",
+    "kicker": "Interactive power check",
+    "title": "Follow the power through your house.",
+    "intro": "Current is running through the walls right now, from the street to every switch. Tap a marker to see what goes wrong there, and the signs you can spot yourself.",
+    "svg": "assets/electrician/house-check.svg",
+    "alt": "A drawing of a house cut open, with the power line, meter, panel, wiring, lights, outlets and an EV charger",
+    "part": "part of the wiring",
+    "go": "Not sure? Ask us to take a look",
+    "legend": [
+      {
+        "label": "Power coming in",
+        "color": "#FFD23F"
+      },
+      {
+        "label": "Circuits",
+        "color": "#7FB2FF"
+      }
+    ],
+    "spots": [
+      {
+        "key": "panel",
+        "label": "Electrical panel",
+        "x": 77.08,
+        "y": 84.38,
+        "service": "panels",
+        "what": "Every circuit in the house starts here, behind its own breaker. Old panels, full ones and loose connections are where many electrical problems begin.",
+        "signs": [
+          "A breaker that trips again and again",
+          "Warm spots, a buzzing sound or a burning smell at the panel",
+          "No room left for a new circuit"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "meter",
+        "label": "Meter & service",
+        "x": 82.08,
+        "y": 64.15,
+        "service": "panels",
+        "what": "Power comes from the pole, down the mast and through the meter. The parts up to the meter usually belong to the utility; the rest of the run is yours.",
+        "signs": [
+          "Lights dim all over the house when something big starts",
+          "A damaged mast, loose wires or a cracked meter box",
+          "Half the house out while the rest still works"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "outlets",
+        "label": "Kitchen outlets",
+        "x": 67.71,
+        "y": 70.59,
+        "service": "outlets",
+        "what": "Kitchens, bathrooms, garages and outdoor spots need GFCI protection, which cuts the power in a split second when current goes where it shouldn't.",
+        "signs": [
+          "An outlet that's warm, loose or scorched",
+          "A GFCI outlet that won't reset, or never trips when tested",
+          "Plugs that fall out of the socket"
+        ],
+        "side": "left"
+      },
+      {
+        "key": "lights",
+        "label": "Lights & switches",
+        "x": 36.46,
+        "y": 30.88,
+        "service": "lighting",
+        "what": "A light that flickers is often just a bulb, but a loose connection in a box or switch heats up every time it carries power.",
+        "signs": [
+          "Flickering that a new bulb doesn't fix",
+          "A switch or dimmer that feels warm",
+          "Bulbs in one fixture burning out fast"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "ev",
+        "label": "EV charger",
+        "x": 18.02,
+        "y": 67.1,
+        "service": "ev-chargers",
+        "what": "A home charger pulls a lot of power for hours. It needs its own circuit, sized for it, and a panel with room to spare.",
+        "signs": [
+          "Charging off an extension cord",
+          "The breaker trips while the car charges",
+          "A plug or charger that gets hot"
+        ],
+        "side": "right"
+      },
+      {
+        "key": "smoke",
+        "label": "Smoke alarms",
+        "x": 62.5,
+        "y": 28.86,
+        "service": "wiring",
+        "what": "Wired-in smoke alarms are linked, so when one sounds they all do. They only work if they're powered and not too old.",
+        "signs": [
+          "A chirp every minute or so",
+          "Alarms more than 10 years old",
+          "One alarm sounds and the others stay quiet"
+        ],
+        "side": "right"
+      }
+    ]
+  },
+  "helper": {
+    "kicker": "Right now",
+    "title": [
+      "What's happening",
+      "with your power?"
+    ],
+    "intro": "Pick the closest one. Here's what to do in the next five minutes, and when to stop and call.",
+    "do_now": "Do this first",
+    "items": [
+      {
+        "key": "trip",
+        "label": "A breaker tripped",
+        "icon": "panel",
+        "service": "repairs",
+        "steps": [
+          "Unplug or switch off what was running on that circuit when it went out.",
+          "At the panel, push the tripped breaker firmly to Off, then back to On.",
+          "If it trips again straight away, leave it off. That circuit has a fault we need to find."
+        ],
+        "note": "Never tape or hold a breaker on. It trips to stop wires from overheating."
+      },
+      {
+        "key": "dead",
+        "label": "Outlets are dead",
+        "icon": "plug",
+        "service": "outlets",
+        "steps": [
+          "Look for a GFCI outlet nearby, the kind with Test and Reset buttons, and press Reset. One GFCI can protect several outlets.",
+          "Check the panel for a tripped breaker.",
+          "Still dead? Don't open the outlet. Call us."
+        ],
+        "note": "GFCI outlets are often in the kitchen, bathrooms, garage or outside, sometimes in a different room from the dead outlet."
+      },
+      {
+        "key": "flicker",
+        "label": "Lights flickering",
+        "icon": "bulb",
+        "service": "lighting",
+        "steps": [
+          "One light: switch it off, let it cool, and check the bulb is screwed in firmly. Try a new bulb.",
+          "Lights dim when the AC or the microwave starts? Note which ones. It helps us find the circuit.",
+          "Flickering all over the house: call us, and your utility if the neighbors have it too."
+        ],
+        "note": "A flicker with a buzzing or crackling sound means turn it off at the switch and call us."
+      },
+      {
+        "key": "smell",
+        "label": "Burning smell or sparks",
+        "icon": "smoke",
+        "service": "repairs",
+        "steps": [
+          "If it's safe to reach, turn off the breaker for that room, or the main breaker.",
+          "Don't touch the outlet, switch or anything plugged into it.",
+          "Smoke or flames: get everyone out and call 911."
+        ],
+        "note": "A downed power line outside? Stay well away, keep others back, and call 911 and your utility."
+      }
+    ]
+  },
+  "led_calc": {
+    "kicker": "Those old bulbs",
+    "title": [
+      "What are your bulbs",
+      "really costing?"
+    ],
+    "intro": "Slide to the old bulbs still in your house, how long they're on, and your rate.",
+    "bulbs_label": "Old 60 W bulbs",
+    "hours_label": "Hours on a day",
+    "rate_label": "Your rate, per kWh",
+    "hint": "Your rate is on your electric bill, in cents per kWh.",
+    "bulbs": 20,
+    "hours": 3,
+    "rate": 0.17,
+    "old_watts": 60,
+    "new_watts": 9,
+    "old_name": "Old bulb",
+    "new_name": "LED",
+    "a_year": "a year",
+    "per_year": "a year you could save",
+    "kwh_year": "kWh a year, less",
+    "go": "Ask about new lighting",
+    "service": "lighting",
+    "source": "A rough estimate: bulbs × watts × hours a day × 365 ÷ 1,000 × your rate. It compares 60-watt incandescent bulbs with 9-watt LEDs that give about the same light (800 lumens). The Department of Energy says LEDs use at least 75% less energy and last up to 25 times longer than incandescent bulbs."
+  },
+  "process": [
+    {
+      "title": "You call or book online",
+      "text": "Tell us what's going on. We'll find a time that suits you."
+    },
+    {
+      "title": "We find the cause",
+      "text": "We test the circuit, not just the outlet you can see, and explain what we find."
+    },
+    {
+      "title": "You get the price first",
+      "text": "You know what it costs before any work starts. No surprises on the bill."
+    },
+    {
+      "title": "Fixed, tested, tidy",
+      "text": "We do the work, test every circuit we touched, and leave the place as clean as we found it."
+    }
+  ],
+  "why": {
+    "photo": "https://images.unsplash.com/photo-1621905251189-08b45d6a269e",
+    "alt": "Electrician in a yellow hard hat installing wiring",
+    "title": "An electrician who explains, not just bills.",
+    "points": [
+      {
+        "icon": "pin",
+        "title": "Local to {{ city }}",
+        "text": "We work in {{ city }} and the towns around it, so we're never far away when the power goes."
+      },
+      {
+        "icon": "doc",
+        "title": "The price before the work",
+        "text": "You know what it costs before we start. The number we agree is the number you pay."
+      },
+      {
+        "icon": "search",
+        "title": "The real cause, fixed",
+        "text": "Resetting a breaker that keeps tripping isn't a fix. We trace the fault back to where it starts."
+      },
+      {
+        "icon": "broom",
+        "title": "Clean and tidy",
+        "text": "Covers down, dust cleaned up, plates back on straight. You'd hardly know we were in the walls."
+      }
+    ]
+  },
+  "gallery": [
+    {
+      "src": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5",
+      "alt": "Rows of circuit breakers and colorful wiring in a panel",
+      "tag": "Panel work"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1775259928422-779c18e32007",
+      "alt": "Electric car charging outside a modern home",
+      "tag": "EV charger"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1771862956702-4e8b247e28b5",
+      "alt": "Modern kitchen with pendant lights over the counter",
+      "tag": "Kitchen lighting"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1576446470246-499c738d1c8e",
+      "alt": "Row of white circuit breakers",
+      "tag": "Breakers"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1766507679659-30076abc8c95",
+      "alt": "Electric car chargers mounted on a brick wall",
+      "tag": "Charging station"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1553873002-785d775854c9",
+      "alt": "Clamp meter and test leads on a coil of wire",
+      "tag": "Testing"
+    }
+  ],
+  "faq": [
+    {
+      "q": "Why does my breaker keep tripping?",
+      "a": "Usually too much on one circuit, a short, or a ground fault. Unplug what's on it and reset it once. If it trips again, leave it off and call us."
+    },
+    {
+      "q": "Can my panel handle an EV charger?",
+      "a": "Often, but not always. We look at your panel and how much power the house already uses before we put anything in, and tell you straight if it needs an upgrade."
+    },
+    {
+      "q": "What is a GFCI outlet?",
+      "a": "An outlet that cuts the power in a split second if current leaks where it shouldn't, like through water or a person. Kitchens, bathrooms, garages and outdoor outlets should have them."
+    },
+    {
+      "q": "How often should smoke alarms be replaced?",
+      "a": "Test them every month, and replace them at least every 10 years, which is what the National Fire Protection Association recommends."
+    },
+    {
+      "q": "Do you tell me the price before you start?",
+      "a": "Yes. Once we've seen the problem we tell you what it will cost, and the work only starts when you agree."
+    },
+    {
+      "q": "Do I need a permit?",
+      "a": "Many electrical jobs, like panels, new circuits and EV chargers, need a permit and an inspection in most towns. We'll tell you what yours asks for."
+    }
+  ],
+  "quote_options": [
+    {
+      "value": "fault",
+      "label": "Something stopped working",
+      "icon": "plug"
+    },
+    {
+      "value": "panel",
+      "label": "Panel or breakers",
+      "icon": "panel"
+    },
+    {
+      "value": "light",
+      "label": "Lights or outlets",
+      "icon": "bulb"
+    },
+    {
+      "value": "ev",
+      "label": "EV charger",
+      "icon": "car"
+    }
+  ],
+  "quote_for": {
+    "for": {
+      "panels": "panel",
+      "repairs": "fault",
+      "lighting": "light",
+      "ev-chargers": "ev",
+      "outlets": "light",
+      "wiring": "fault"
+    },
+    "else": "fault"
+  },
+  "cta_title": [
+    "Power acting up?",
+    "We're one call away."
+  ],
+  "footer_blurb": "Electrical repairs, panels, lighting and EV chargers for homes in {{ city }} and the surrounding area.",
+  "nav_explorer": "Power check",
+  "area_title": [
+    "Electrical work across {{ city }}",
+    "and nearby."
+  ],
+  "quote_kicker": "Book a visit",
+  "quote_title": [
+    "Tell us what's going on.",
+    "We'll sort it."
+  ],
+  "logo_strip": [
+    "Electrical Contractors",
+    "Electrical Services",
+    "Electrical Contractor",
+    "Electric Company",
+    "Electrical",
+    "Electricians",
+    "Electrician",
+    "Electric"
+  ]
+}
