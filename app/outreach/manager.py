@@ -56,7 +56,8 @@ from app.outreach.calls import STOP_EMAILS
 from app.outreach.leads import leads_from_jobs
 from app.outreach.mailbox import (declined, MailAuthError, MailboxClient, Mailbox, MailError, MailRejected, RecipientRefused,
                                   build_message, classify, imap_problems, mailbox_problems, new_message_id,
-                                  sender_address, sender_header, smtp_problems, written_part)
+                                  own_addresses, second_sender, sender_address, sender_header, smtp_problems,
+                                  written_part)
 from app.outreach.models import (OPEN_STATUSES, BusinessType, BusinessTypeCreate, BusinessTypeUpdate, Campaign,
                                  CampaignCreate, CampaignStatus, CampaignUpdate, DriveSource, InboundEmail, Lead,
                                  LeadStatus, LeadUpdate, LeftOut, SendTestRequest, SentEmail, Step, default_steps)
@@ -278,6 +279,8 @@ class OutreachManager:
             "autosend": cfg.OUTREACH_AUTOSEND,
             "running": running,
             "sender": sender_header(cfg),
+            "second_sender": ({"address": second, "limit": cfg.SECOND_SENDER_LIMIT,
+                               "sent_24h": self.sent_from(second, now)} if (second := second_sender(cfg)) else None),
             "smtp": f"{cfg.SMTP_HOST}:{cfg.SMTP_PORT}" if cfg.SMTP_HOST else "",
             "imap": f"{cfg.IMAP_HOST}:{cfg.IMAP_PORT}" if cfg.IMAP_HOST else "",
             "window": (f"{days_label(window.days)} {window.start:02d}:00–{window.end:02d}:00 their time"
@@ -309,6 +312,28 @@ class OutreachManager:
     def sent_in_24h(self, now: datetime) -> int:
         """Emails sent in the last 24 hours - what OUTREACH_DAILY_LIMIT counts."""
         return sum(1 for at in self._sent_times() if timedelta(0) <= now - at < DAY)
+
+    def from_address(self, lead: Lead) -> str:
+        """The From address of the lead's emails: the one its first email went out from, else SENDER_EMAIL."""
+        return lead.sender or sender_address(self.cfg)
+
+    def sent_from(self, address: str, now: datetime, *, today: bool = False) -> int:
+        """Emails sent from ``address`` in the last 24 hours (``today``: on this computer's day)."""
+        address, main = address.lower(), sender_address(self.cfg).lower()
+        day = now.astimezone().date()
+        return sum(1 for c in self.campaigns.values() for lead in c.leads
+                   if (lead.sender or main).lower() == address for s in lead.sent
+                   if (s.sent_at.astimezone().date() == day if today else timedelta(0) <= now - s.sent_at < DAY))
+
+    def _second_full(self, now: datetime) -> bool:
+        """The second From address has had its share of the last 24 hours (True when there is none)."""
+        second = second_sender(self.cfg)
+        return not second or self.sent_from(second, now) >= self.cfg.SECOND_SENDER_LIMIT
+
+    def _pick_sender(self, now: datetime) -> str:
+        """The From address of a business about to get its first email: the second address while it has room
+        in its share of the last 24 hours, else SENDER_EMAIL. The business keeps it for its follow-ups."""
+        return second_sender(self.cfg) if not self._second_full(now) else sender_address(self.cfg)
 
     def _cap_free_at(self, now: datetime) -> datetime | None:
         """When the next email fits under OUTREACH_DAILY_LIMIT again (None: it does now)."""
@@ -790,6 +815,8 @@ class OutreachManager:
                     zone = self.zone_of(lead)
                     served[zone] = served.get(zone, 0) + recent
         running = [c for c in self.campaigns.values() if c.status == CampaignStatus.RUNNING]
+        second = second_sender(self.cfg).lower()
+        second_full = bool(second) and self._second_full(now)
         for campaign in sorted(running, key=lambda c: c.started_at or c.created_at):
             for index, lead in enumerate(campaign.leads):
                 if lead.status not in (LeadStatus.SENT, LeadStatus.QUEUED):
@@ -801,6 +828,8 @@ class OutreachManager:
                     due = lead.next_due or now
                     if due > now and not any_time:
                         continue
+                    if second_full and lead.sender.lower() == second and not any_time:
+                        continue                         # the second address has had its share: it waits
                     key = (0, served.get(zone, 0), due, index)
                 elif lead.status == LeadStatus.QUEUED:
                     if not self.site_ready(campaign, lead):
@@ -835,9 +864,9 @@ class OutreachManager:
         if step == 1 and campaign.steps_b and not lead.variant:
             lead.variant = self._next_variant()
         subject, body = compose(campaign, lead, step, self.cfg)
-        me = sender_address(self.cfg)
+        me = self.from_address(lead) if step > 1 else self._pick_sender(now)
         message_id = new_message_id(me)
-        message = build_message(sender=sender_header(self.cfg), to=lead.email, subject=subject, body=body,
+        message = build_message(sender=sender_header(self.cfg, me), to=lead.email, subject=subject, body=body,
                                 message_id=message_id, earlier_ids=[s.message_id for s in lead.sent],
                                 unsubscribe=me if self.cfg.OUTREACH_UNSUBSCRIBE_HEADER else "")
         try:
@@ -866,6 +895,8 @@ class OutreachManager:
                 log.warning("Could not send email %d to %s (%s) - trying again in 5 minutes", step, lead.email, exc)
             return
         self._failures = 0
+        if step == 1:
+            lead.sender = me
         lead.sent.append(SentEmail(step=step, sent_at=now, message_id=message_id, subject=subject))
         if step == 1:
             self._mark_contacted(campaign, lead, "emailed", now)
@@ -873,6 +904,8 @@ class OutreachManager:
             self._site_dates(campaign, lead, step, now)
         self._schedule(campaign, lead)
         version = f" (version {lead.variant})" if lead.variant else ""
+        if me.lower() != sender_address(self.cfg).lower():
+            version += f" from {me}"
         log.info("Sent email %d of %d%s to %s <%s> (campaign %r)", step, len(campaign.steps_of(lead)), version,
                  lead.business, lead.email, campaign.name)
         self._note("Email sent", f"email {step} of {len(campaign.steps_of(lead))}{version}: {subject}", campaign,
@@ -880,7 +913,8 @@ class OutreachManager:
         self._finish_if_done(campaign, now)
         self._save(campaign)
         self._after_send(now)
-        if test_copy_addresses(self.cfg) and self.sent_today(now) == 1:
+        # the day's first email from each From address, word for word, to your own addresses
+        if test_copy_addresses(self.cfg) and self.sent_from(me, now, today=True) == 1:
             await self._test_copy(campaign, lead, step, subject, body)
 
     async def record_calls(self, edits: dict[str, dict]) -> int:
@@ -930,9 +964,9 @@ class OutreachManager:
         if lead.site and self.sites is not None:
             url = self.sites.url(lead.site)
             body = body.replace(url, url + "?copy")
-        me = sender_address(self.cfg)
+        me = self.from_address(lead)
         for address in test_copy_addresses(self.cfg):
-            message = build_message(sender=sender_header(self.cfg), to=address, subject=subject, body=body,
+            message = build_message(sender=sender_header(self.cfg, me), to=address, subject=subject, body=body,
                                     message_id=new_message_id(me),
                                     unsubscribe=me if self.cfg.OUTREACH_UNSUBSCRIBE_HEADER else "")
             try:
@@ -1079,7 +1113,7 @@ class OutreachManager:
             return
         replies = bounces = 0
         changed: dict[str, Campaign] = {}
-        own = sender_address(self.cfg)
+        own = own_addresses(self.cfg)
         for message in messages:
             hit = classify(message, addresses=addresses, message_ids=message_ids, own_address=own)
             if hit is None:

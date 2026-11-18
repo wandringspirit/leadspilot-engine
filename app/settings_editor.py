@@ -94,6 +94,12 @@ OPTIONS = (
     # --- sender ---
     Option("SENDER_NAME", "sender", "Your name", "The From name, and {SenderName}", "Your Name", needed="email"),
     Option("SENDER_EMAIL", "sender", "From address", "Empty: the username above", "you@yourdomain.com"),
+    Option("SECOND_SENDER_EMAIL", "sender", "Second From address",
+           "A send-as alias of the same mailbox that takes a few of the day's emails while it builds its name. A "
+           "business that starts with it gets all its follow-ups from it too. Empty: none", "you@reach.yourdomain.com"),
+    Option("SECOND_SENDER_LIMIT", "sender", "… emails per day from it",
+           "In any 24 hours, follow-ups included – part of “Emails per day”, not on top. 0: it sends nothing",
+           minimum=0),
     Option("SENDER_COMPANY", "sender", "Company", "{SenderCompany} – optional", "Your Company"),
     Option("SENDER_ADDRESS", "sender", "Postal address",
            "{SenderAddress}, in every email's footer – US law (CAN-SPAM) wants it", "Street, City, State ZIP",
@@ -411,7 +417,7 @@ def _check(option: Option, text: str) -> None:
             parse_hours(text)
         except WindowError:
             raise ValueError("write the first and the last hour like 8-12 (0 to 24)") from None
-    elif name == "SENDER_EMAIL" and "@" not in text:
+    elif name in ("SENDER_EMAIL", "SECOND_SENDER_EMAIL") and "@" not in text:
         raise ValueError("must be an email address")
     elif name in ("REGION_CODE", "DEFAULT_REGION") and not _COUNTRY.match(text):
         raise ValueError("a two-letter country code, e.g. US")

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from email.message import EmailMessage, Message
 from email.utils import formataddr, formatdate, make_msgid, parseaddr, parsedate_to_datetime
-from typing import Mapping, Protocol
+from typing import Collection, Mapping, Protocol
 
 from app.config import Settings
 from app.outreach.schedule import MONTHS
@@ -68,9 +68,22 @@ def sender_address(cfg: Settings) -> str:
     return (cfg.SENDER_EMAIL or cfg.MAIL_USERNAME).strip()
 
 
-def sender_header(cfg: Settings) -> str:
-    """'Piyush Gaur <piyush@example.com>' (the From header)."""
-    address = sender_address(cfg)
+def second_sender(cfg: Settings) -> str:
+    """The second From address, when it is set and has a share of the day's emails ('' otherwise)."""
+    address = cfg.SECOND_SENDER_EMAIL.strip()
+    if not address or cfg.SECOND_SENDER_LIMIT <= 0 or address.lower() == sender_address(cfg).lower():
+        return ""
+    return address
+
+
+def own_addresses(cfg: Settings) -> set[str]:
+    """Every address the emails go out from (lower case)."""
+    return {a.lower() for a in (sender_address(cfg), cfg.SECOND_SENDER_EMAIL.strip()) if a}
+
+
+def sender_header(cfg: Settings, address: str = "") -> str:
+    """'Piyush Gaur <piyush@example.com>' (the From header) - from ``address``, else the From address."""
+    address = address or sender_address(cfg)
     return formataddr((cfg.SENDER_NAME.strip(), address)) if address else ""
 
 
@@ -96,6 +109,9 @@ def smtp_problems(cfg: Settings) -> list[str]:
     address = sender_address(cfg)
     if address and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
         problems.append(f"SENDER_EMAIL {address!r} is not an email address")
+    second = cfg.SECOND_SENDER_EMAIL.strip()
+    if second and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", second):
+        problems.append(f"SECOND_SENDER_EMAIL {second!r} is not an email address")
     return problems
 
 
@@ -239,7 +255,7 @@ def parse_headers(raw: bytes, text: str = "") -> MailboxMessage:
 
 
 def classify(message: MailboxMessage, *, addresses: Mapping[str, str], message_ids: Mapping[str, str],
-             own_address: str = "") -> tuple[str, str] | None:
+             own_address: str | Collection[str] = "") -> tuple[str, str] | None:
     """(lead key, kind) for an email that concerns a lead, else None.
 
     ``addresses`` / ``message_ids`` map the leads' addresses (lower case) and the Message-IDs of
@@ -259,7 +275,8 @@ def classify(message: MailboxMessage, *, addresses: Mapping[str, str], message_i
             if address in text:
                 return key, "bounce"
         return None
-    if own_address and message.sender == own_address.lower():
+    own = {own_address} if isinstance(own_address, str) else set(own_address)
+    if message.sender in {a.lower() for a in own if a}:
         return None
     key = addresses.get(message.sender) or next((message_ids[i] for i in message.refs if i in message_ids), None)
     if key is None:

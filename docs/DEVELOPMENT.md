@@ -185,6 +185,8 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `MAIL_USERNAME` | *(empty)* | the mailbox login for SMTP and IMAP, usually the address |
 | `MAIL_PASSWORD` | *(empty)* | its password – for Gmail / Google Workspace an app password (spaces are dropped) |
 | `SENDER_EMAIL` | *(empty = `MAIL_USERNAME`)* | the From address |
+| `SECOND_SENDER_EMAIL` | *(empty)* | a second From address (a send-as alias of the same mailbox) that takes a few of the day's emails while it builds its name ([OUTREACH.md §6](OUTREACH.md#6-what-is-sent)) |
+| `SECOND_SENDER_LIMIT` | `0` | how many: emails from it in any 24 hours, follow-ups included – part of `OUTREACH_DAILY_LIMIT`, not on top |
 | `SENDER_NAME` | *(empty)* | the From name and `{SenderName}` – required to start a campaign |
 | `SENDER_COMPANY` | *(empty)* | `{SenderCompany}` |
 | `SENDER_ADDRESS` | *(empty)* | `{SenderAddress}`, your postal address – required (CAN-SPAM), it goes in every footer |

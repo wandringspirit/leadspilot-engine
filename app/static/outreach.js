@@ -247,6 +247,10 @@
     const facts = [];
     if (!s.autosend) facts.push(["Sending", "off – Settings › When emails go out"]);
     facts.push(["From", s.sender || "not set"]);
+    const second = s.second_sender;
+    if (second) {
+      facts.push(["Also from", `${second.address} – ${second.sent_24h} of ${second.limit} in the last 24 hours`]);
+    }
     facts.push(["Send window", s.window ? s.window + (s.window_open ? " · open now" : "") : "—"]);
     facts.push(["Last 24 hours", `${s.sent_24h ?? s.sent_today} of ${s.daily_limit} emails sent`]);
     facts.push(["Next email", !s.autosend ? "— (sending is off)" : s.next_send_at ? when(s.next_send_at)

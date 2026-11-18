@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.5 – 2026-11-18
+
+### Added
+- **A second From address** (`SECOND_SENDER_EMAIL`, `SECOND_SENDER_LIMIT`; Settings › Sender): a send-as
+  alias that takes a few of the day's emails while it builds its name - e.g. 2 of 15. A business that
+  starts with it gets all its follow-ups from it; the panel shows its count for the last 24 hours, the
+  activity log which emails went out from it, and each address gets its own test copy each day.
+
 ## 1.27.4 – 2026-11-17
 
 ### Added

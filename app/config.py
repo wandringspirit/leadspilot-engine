@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     MAIL_USERNAME: str = ""               # the mailbox login (SMTP and IMAP), usually the address
     MAIL_PASSWORD: str = ""               # Gmail / Google Workspace: an app password
     SENDER_EMAIL: str = ""                # From address; empty: MAIL_USERNAME
+    SECOND_SENDER_EMAIL: str = ""         # a second From address (a send-as alias of the same mailbox) that takes
+    SECOND_SENDER_LIMIT: int = 0          # this many of the day's emails (any 24 hours, follow-ups included)
     SENDER_NAME: str = ""                 # From name and {SenderName}
     SENDER_COMPANY: str = ""              # {SenderCompany}
     SENDER_ADDRESS: str = ""              # {SenderAddress}: your postal address (US law: in every email)

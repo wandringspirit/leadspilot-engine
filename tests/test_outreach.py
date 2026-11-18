@@ -15,7 +15,8 @@ from app.config import Settings
 from app.models import Job, JobStatus, PlaceRow
 from app.outreach.leads import email_problem, leads_from_jobs, search_city
 from app.outreach.mailbox import (MailAuthError, MailError, MailboxMessage, RecipientRefused, build_message,
-                                  classify, imap_date, mail_password, mailbox_problems, parse_headers)
+                                  classify, imap_date, mail_password, mailbox_problems, own_addresses,
+                                  parse_headers)
 from app.outreach.manager import OutreachError, OutreachManager, steps_problems
 from app.outreach.models import (InboundEmail, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate, CampaignStatus,
                                  CampaignUpdate, Lead, LeadStatus, LeadUpdate, SendTestRequest, Step)
@@ -437,6 +438,65 @@ def test_daily_limit(tmp_path):
         run(manager.tick())
         clock.advance(seconds=61)
     assert len(mailbox.sent) == 2 and manager.status()["sent_today"] == 2
+
+
+def test_a_second_from_address_takes_its_share_and_keeps_its_businesses(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock, SECOND_SENDER_EMAIL="me@reach.mysender.com",
+                                            SECOND_SENDER_LIMIT=1, OUTREACH_TEST_COPY_TO="seed@gmail.com",
+                                            OUTREACH_UNSUBSCRIBE_HEADER=True)
+    for _ in range(3):                                              # the three first emails
+        run(manager.tick())
+        clock.advance(seconds=61)
+    firsts = [m for m in mailbox.sent if m["To"] != "seed@gmail.com"]
+    # the second address takes the first business (its share is 1), the main address the rest
+    assert [m["From"] for m in firsts] == ["Pat <me@reach.mysender.com>", "Pat <me@mysender.com>",
+                                            "Pat <me@mysender.com>"]
+    assert firsts[0]["Message-ID"].endswith("@reach.mysender.com>")
+    assert "me@reach.mysender.com" in firsts[0]["List-Unsubscribe"]
+    # a test copy of each address's first email of the day, from that address
+    copies = [m["From"] for m in mailbox.sent if m["To"] == "seed@gmail.com"]
+    assert copies == ["Pat <me@reach.mysender.com>", "Pat <me@mysender.com>"]
+    palm = campaign.leads[0]
+    assert palm.sender == "me@reach.mysender.com" and campaign.leads[1].sender == "me@mysender.com"
+    second = manager.status()["second_sender"]
+    assert second == {"address": "me@reach.mysender.com", "limit": 1, "sent_24h": 1}
+    # Friday: the follow-ups are due; Palm Breeze's comes from the second address, whose share is free again
+    clock.now = TUESDAY_9AM + timedelta(days=3, minutes=5)
+    for _ in range(3):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    follow_ups = {m["To"]: m["From"] for m in mailbox.sent if m["Subject"].startswith("Re:")}
+    assert follow_ups["palmbreeze@gmail.com"] == "Pat <me@reach.mysender.com>"
+    assert follow_ups["hampshire@gmail.com"] == "Pat <me@mysender.com>"
+    # an email from either of your own addresses is never taken for a business's reply
+    assert manager.status()["second_sender"]["sent_24h"] == 1
+    assert own_addresses(manager.cfg) == {"me@mysender.com", "me@reach.mysender.com"}
+
+
+def test_a_full_second_address_holds_its_follow_ups_and_new_businesses_go_from_the_main_one(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock, SECOND_SENDER_EMAIL="me@reach.mysender.com",
+                                            SECOND_SENDER_LIMIT=1)
+    for _ in range(3):                                              # the three first emails
+        run(manager.tick())
+        clock.advance(seconds=61)
+    for lead in campaign.leads:                                     # every follow-up due now
+        lead.next_due = clock.now
+    for _ in range(3):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    froms = [(m["To"], m["From"]) for m in mailbox.sent]
+    # Palm Breeze started on the second address: its follow-up waits for the second address's share
+    assert ("palmbreeze@gmail.com", "Pat <me@reach.mysender.com>") in froms
+    assert [to for to, _ in froms].count("palmbreeze@gmail.com") == 1
+    assert all(sender == "Pat <me@mysender.com>" for to, sender in froms if to != "palmbreeze@gmail.com")
+    clock.advance(hours=24)                                         # the next day it goes, from the same address
+    for _ in range(2):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    assert [m["From"] for m in mailbox.sent if m["To"] == "palmbreeze@gmail.com"] == \
+        ["Pat <me@reach.mysender.com>"] * 2
 
 
 def test_follow_ups_thread_and_a_reply_stops_them(tmp_path):

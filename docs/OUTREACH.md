@@ -227,6 +227,16 @@ the same email without it to the inbox. The footer says to reply "no" either way
 Workspace keep a copy in *Sent* themselves. No tracking pixels, no links added (besides `{Website}`).
 Who opened their website is known from the website itself ([SITES.md](SITES.md#5-who-opened-their-website)).
 
+**A second From address.** `SECOND_SENDER_EMAIL` (a send-as alias of the same mailbox, e.g. a new
+subdomain warming up) takes `SECOND_SENDER_LIMIT` of the day's emails: a business about to get its first
+email gets it from the second address while that one has had fewer than its share in the last 24 hours
+(follow-ups included), else from `SENDER_EMAIL`. The business keeps that address for all its follow-ups
+(the lead's `sender`), so the thread never changes sender; a follow-up whose address has had its share
+waits for room. The total stays `OUTREACH_DAILY_LIMIT`. Replies to either address land in the same
+mailbox and are recognised the same way; the test copy goes out for each address's first email of the
+day, from that address. To move over to the second address later, raise its share step by step; to make
+it the main one, set it as `SENDER_EMAIL` - businesses already started keep the address they started with.
+
 **Test copy.** With `OUTREACH_TEST_COPY_TO` set to your own addresses (a Gmail, a Yahoo …), each
 day's first email also goes to them, word for word, right after it went to the business, so you can
 see which tab it lands in: Primary, Promotions or Spam. Its website link ends in `?copy`, so opening
@@ -274,7 +284,7 @@ summary twice. A problem email that can't go out (the mailbox is the problem) is
 ## 9. Settings
 
 `SMTP_HOST`, `SMTP_PORT`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_FOLDER`, `MAIL_USERNAME`,
-`MAIL_PASSWORD`, `SENDER_EMAIL`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
+`MAIL_PASSWORD`, `SENDER_EMAIL`, `SECOND_SENDER_EMAIL`, `SECOND_SENDER_LIMIT`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
 `OUTREACH_AUTOSEND`, `OUTREACH_TIMEZONE`, `OUTREACH_DAYS`, `OUTREACH_HOURS`,
 `OUTREACH_DAILY_LIMIT`, `OUTREACH_MIN_GAP_S`, `OUTREACH_MAX_GAP_S`, `OUTREACH_CHECK_MINUTES`,
 `OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`, `EMAIL_VERIFY_KEY`. What each one does and its default:
