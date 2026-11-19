@@ -19,6 +19,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Mapping
 
+from app.outreach.zones import without_country
+
 if TYPE_CHECKING:
     from app.config import Settings
     from app.outreach.models import Campaign, Lead
@@ -185,7 +187,7 @@ _BLOCK = re.compile(r"\[\[(.*?)\]\]", re.S)
 _TOKEN = re.compile(r"\[\[(?P<block>.*?)\]\]|\{(?P<field>[A-Za-z]+)\}", re.S)
 _BLANK_LINES = re.compile(r"\n{3,}")
 _LEGAL_SUFFIX = re.compile(
-    r"[\s,]+(?:l\.?\s?l\.?\s?c|p\.?\s?l\.?\s?l\.?\s?c|inc(?:orporated)?|ltd|limited|corp(?:oration)?)\.?$", re.I)
+    r"[\s,]+(?:l\.?\s?l\.?\s?c|p\.?\s?l\.?\s?l\.?\s?c|inc(?:orporated)?|ltd|limited|corp(?:oration)?|pty)\.?$", re.I)
 
 
 # --------------------------------------------------------------------------
@@ -254,7 +256,7 @@ def lead_values(campaign: "Campaign", lead: "Lead", cfg: "Settings") -> dict[str
              and lead.reviews >= cfg.OUTREACH_MIN_REVIEWS and lead.rating >= cfg.OUTREACH_MIN_RATING)
     return {
         "Business": lead.business,
-        "City": lead.city,
+        "City": without_country(lead.city),     # "Perth, WA" - the way "Katy, TX" reads
         "Trade": campaign.trade.strip(),
         "Rating": f"{lead.rating:.1f}" if stars else "",
         "Reviews": str(lead.reviews) if stars else "",

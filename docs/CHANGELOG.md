@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.28.0 – 2026-11-19
+
+### Added
+- **Canada, Australia and New Zealand.** Each business's time zone from its province or state (or its New
+  Zealand address); places written with their country (`"Perth, WA, Australia"`); websites show the
+  province or state, dial the number's international form, skip photos made for US states, and the
+  plumber's drip calculator counts litres (a pack's `"units"`: `"us"` / `"metric"`). `{City}` leaves the
+  country out; "Pty Ltd" is dropped from names like "LLC". `deploy/build_places.py` writes these places.
+
 ## 1.27.6 – 2026-11-19
 
 ### Fixed

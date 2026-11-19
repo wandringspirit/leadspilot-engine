@@ -34,6 +34,7 @@ ROOT = Path(__file__).resolve().parent
 if str(ROOT.parent) not in sys.path:
     sys.path.insert(0, str(ROOT.parent))
 from app.outreach.leads import email_problem  # noqa: E402
+from app.outreach.zones import ABROAD_ZONES, REGION_CODES, country_of, without_country  # noqa: E402
 from sites.deploy import ends_at  # noqa: E402
 from sites.render import STATES, display_name, load_pack, render_lead  # noqa: E402
 
@@ -116,19 +117,48 @@ def trade_pack(business_type: str) -> tuple[str, dict] | None:
     return (trade, load_pack(path)) if trade and path.is_file() else None
 
 
-def searched_city(place_text: str, rows: list[dict]) -> tuple[str, str, dict | None]:
-    """The city and state a search was for (``"Katy, TX"``, or ``"Houston"`` plus its businesses' state),
-    and where it is: the town's location, else the middle of the businesses found."""
+def region_code(value: str | None, country: str) -> str:
+    """A province or state outside the US as an address writes it: 'Western Australia' / 'WA' -> 'WA'."""
+    value = (value or "").strip()
+    if value.upper() in ABROAD_ZONES.get(country, {}) and value:
+        return value.upper()
+    return REGION_CODES.get(country, {}).get(value.lower(), "")
+
+
+def _center(rows: list[dict]) -> dict | None:
+    coords = [(r["latitude"], r["longitude"]) for r in rows if r.get("latitude") is not None]
+    if not coords:
+        return None
+    lats, lons = sorted(c[0] for c in coords), sorted(c[1] for c in coords)
+    return {"lat": lats[len(lats) // 2], "lon": lons[len(lons) // 2]}
+
+
+def searched_city(place_text: str, rows: list[dict]) -> tuple[str, str, dict | None, str]:
+    """The city, state and country a search was for (``"Katy, TX"``, or ``"Houston"`` plus its businesses'
+    state; ``"Perth, WA, Australia"``), and where it is: the town's location, else the middle of the businesses
+    found. Outside the US there is no town list: the middle of the businesses."""
+    country = country_of(place_text) or next(
+        (c for c, _ in Counter(r.get("country") for r in rows if r.get("country")).most_common(1)
+         if c in ABROAD_ZONES), "")
+    if country:
+        parts = [p.strip() for p in without_country(place_text.strip()).split(",") if p.strip()]
+        city = parts[0] if parts else ""
+        state = region_code(parts[1], country) if len(parts) > 1 else ""
+        if not state:
+            counts = Counter(region_code(r.get("state"), country) for r in rows if region_code(r.get("state"), country))
+            state = counts.most_common(1)[0][0] if counts else ""
+        return city, state, _center(rows), country
+    city, state, center = _searched_us_city(place_text, rows)
+    return city, state, center, "US"
+
+
+def _searched_us_city(place_text: str, rows: list[dict]) -> tuple[str, str, dict | None]:
     m = re.match(r"^(.*?),\s*([A-Za-z .]+)$", place_text.strip())
     city, state = (m.group(1).strip(), state_code(m.group(2))) if m else (place_text.strip(), "")
     if not state:
         counts = Counter(state_code(r.get("state")) for r in rows if state_code(r.get("state")))
         state = counts.most_common(1)[0][0] if counts else ""
-    coords = [(r["latitude"], r["longitude"]) for r in rows if r.get("latitude") is not None]
-    center = None
-    if coords:
-        lats, lons = sorted(c[0] for c in coords), sorted(c[1] for c in coords)
-        center = {"lat": lats[len(lats) // 2], "lon": lons[len(lons) // 2]}
+    center = _center(rows)
     place = places().find(city, state) if city and state else None
     if city and not state and center:          # no business says its state: the town of that name nearby
         place = places().nearest_named(city, center["lat"], center["lon"])
@@ -165,30 +195,37 @@ def pick_slug(name: str, city: str, place_id: str, email: str, manifest: dict, s
     raise RuntimeError(f"no free address for {name}")
 
 
-def build_site(row: dict, search: tuple[str, str, dict | None], pack: dict, trade: str, manifest: dict,
+def build_site(row: dict, search: tuple[str, str, dict | None, str], pack: dict, trade: str, manifest: dict,
                sites_dir: Path = SITES, *, job_id: str = "") -> tuple[str, str]:
     """Build one business's site from its search row; returns (slug, "") or ("", why it was left out).
 
     ``search`` is ``searched_city()`` of the search that found it. ``manifest`` gets the site's entry.
     """
-    city, state, center = search
+    city, state, center, searched_country = search
     if NOT_THE_TRADE.search(row.get("category") or ""):
         return "", f"a {row['category'].lower()}, not a business of the trade"
     if center and row.get("latitude") is not None:
         away = miles(center["lat"], center["lon"], row["latitude"], row["longitude"])
         if away > MAX_MILES:
             return "", f"{away:.0f} miles from {city}, outside the searched area"
+    country = (row.get("country") or searched_country or "US").upper()
     lead_city = row.get("city") or city
-    lead_state = state_code(row.get("state")) or state
-    if not lead_city or not lead_state:
+    if country == "US":
+        lead_state = state_code(row.get("state")) or state
+    elif country in ABROAD_ZONES:
+        lead_state = region_code(row.get("state"), country) or state
+    else:
+        return "", f"in a country there are no websites for yet ({country})"
+    if not lead_city or (not lead_state and country != "NZ"):        # New Zealand addresses have no region
         return "", "no city or state to put on its website"
     email = row["email"].strip().lower()
-    home = places().find(lead_city, lead_state)
+    home = places().find(lead_city, lead_state) if country == "US" else None
     rating, reviews = row.get("rating"), row.get("review_count") or 0
     good = rating is not None and rating >= MIN_RATING and reviews >= MIN_REVIEWS
     lead = {
-        "business": row["name"], "city": lead_city, "state": lead_state,
-        "phone": row.get("phone") or "", "email": row["email"].strip(),
+        "business": row["name"], "city": lead_city, "state": lead_state, "country": country,
+        "phone": row.get("phone") or "", "phone_e164": row.get("phone_unformatted") or "",
+        "email": row["email"].strip(),
         "rating": rating if good else None, "reviews": reviews if good else None,
         "maps_url": row.get("maps_url") or row.get("url") or "", "place_id": row.get("place_id") or "",
         "service_area": places().service_area(home, lead_city) if home else [lead_city],
@@ -198,7 +235,8 @@ def build_site(row: dict, search: tuple[str, str, dict | None], pack: dict, trad
                                   "first_email_at": None, "link_sent_at": None, "hold": False, "published_at": None}
     site.pop("expires", None)                       # older entries kept their end date here
     site.update({"business": display_name(row["name"]), "email": email, "place_id": lead["place_id"],
-                 "city": lead_city, "state": lead_state, "trade": trade, "job_id": job_id or site.get("job_id", "")})
+                 "city": lead_city, "state": lead_state, "country": country, "trade": trade,
+                 "job_id": job_id or site.get("job_id", "")})
     manifest[slug] = site
     render_lead(pack, lead, sites_dir / slug, ends=ends_at(site) or datetime(2099, 1, 1, tzinfo=timezone.utc))
     return slug, ""

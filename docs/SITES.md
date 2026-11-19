@@ -124,6 +124,15 @@ When a campaign is made, each of its businesses gets a website, or is left out w
 
 A business that already has a website (the same Google place or email) keeps its address.
 
+**Canada, Australia and New Zealand** (since 1.28.0): the searched place carries the country
+(`"Perth, WA, Australia"` - `"WA"` alone is Washington), the site shows the province or state as an
+address writes it (`Geelong, VIC`; New Zealand has none), the call button dials the number's
+international form (`+61 3 5222 1234`, not a US `+1`), photos made for a US state never show, and a
+pack's `"units"` words switch from `"us"` to `"metric"` - the plumber's drip calculator counts litres
+(189 a year per drip a minute, 65 a shower) and still names its source, the US EPA. There is no town
+list outside the US, so the service-area map shows the business's own town. Quebec is left out of the
+autopilot's places (French-speaking).
+
 ## 3. How long a website is online (`sites/deploy.py`)
 
 The latest of these decides:

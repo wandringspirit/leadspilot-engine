@@ -32,3 +32,22 @@ def test_lead_zone_and_names():
     assert lead_zone(Lead(email="a@b.co", city="Tampa, FL", time_zone="America/Denver"), "") == "America/Denver"
     assert lead_zone(Lead(email="a@b.co", city="Houston"), "America/Chicago") == "America/Chicago"
     assert zone_name("America/New_York") == "Eastern" and zone_name("Europe/London") == "Europe/London"
+
+
+@pytest.mark.parametrize("address, state, town, zone", [
+    ("12 Smith St, Geelong VIC 3220, Australia", "Victoria", "Geelong, VIC, Australia", "Australia/Melbourne"),
+    ("", "", "Perth, WA, Australia", "Australia/Perth"),             # not Washington's Pacific time
+    ("1 King St W, Toronto, ON M5H 1A1, Canada", "Ontario", "Toronto, ON, Canada", "America/Toronto"),
+    ("", "Alberta", "Calgary, AB, Canada", "America/Edmonton"),
+    ("5 Queen St, Hamilton 3204, New Zealand", "Waikato", "Hamilton, New Zealand", "Pacific/Auckland"),
+    ("", "", "Spokane, WA", "America/Los_Angeles"),
+])
+def test_canada_australia_and_new_zealand(address, state, town, zone):
+    assert zone_for(address, state, town) == zone
+
+
+def test_the_country_is_left_out_of_the_city_in_an_email():
+    from app.outreach.zones import without_country
+    assert without_country("Perth, WA, Australia") == "Perth, WA"
+    assert without_country("Hamilton, New Zealand") == "Hamilton"
+    assert without_country("Katy, TX") == "Katy, TX"

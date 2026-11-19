@@ -29,6 +29,7 @@ from markupsafe import Markup
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 from app.outreach.templates import display_name  # noqa: E402
+from app.scraper.parsing import AU_STATES, CA_PROVINCES  # noqa: E402
 
 STATES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
@@ -188,18 +189,28 @@ def photos_for(pack: dict, state: str, role: str) -> list[dict]:
 def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends: datetime) -> dict:
     business = display_name(lead["business"])
     state = (lead.get("state") or "").upper()
+    country = (lead.get("country") or "US").upper()
+    names = {"US": STATES, "CA": CA_PROVINCES, "AU": AU_STATES}.get(country, {})
+    # a pack's words that differ by country: gallons in the US, litres elsewhere ("units": {"us", "metric"})
+    units = pack.get("units", {}).get("us" if country == "US" else "metric", {})
     base = {"business": business, "city": lead["city"], "state": state,
-            "state_name": STATES.get(state, state or lead["city"])}
+            "state_name": names.get(state, state or lead["city"]), "units": units}
     seed = int(hashlib.md5(f"{business}|{lead['city']}".lower().encode()).hexdigest(), 16)
     pick = (lambda items, shift: items[(variant if variant is not None else seed >> shift) % len(items)])
-    digits = re.sub(r"\D", "", lead.get("phone") or "")
-    if len(digits) == 10:
-        digits = "1" + digits
+    # the number to dial: its international form when the search had it ("+61352221234")
+    digits = re.sub(r"\D", "", lead.get("phone_e164") or "")
+    if not digits:
+        digits = re.sub(r"\D", "", lead.get("phone") or "")
+        if len(digits) == 10 and country in ("US", "CA"):
+            digits = "1" + digits
+        elif country not in ("US", "CA"):
+            digits = ""                                  # no country code known: no tap-to-call
+    photo_state = state if country == "US" else ""      # photos made for a US state ("WA" is Washington)
     places = [a if isinstance(a, dict) else {"name": a} for a in (lead.get("service_area") or [lead["city"]])]
     area = [a["name"] for a in places]
-    heroes = photos_for(pack, state, "hero")
+    heroes = photos_for(pack, photo_state, "hero")
     hero = pick(heroes, 16)
-    closers = [p for p in photos_for(pack, state, "cta") + heroes if p["src"] != hero["src"]]
+    closers = [p for p in photos_for(pack, photo_state, "cta") + heroes if p["src"] != hero["src"]]
     logo_name = business
     for word in pack.get("logo_strip", []):
         short = re.sub(rf"[\s,&-]*\b{re.escape(word)}$", "", logo_name, flags=re.I).strip()

@@ -93,17 +93,23 @@ def test_quote_requests_go_straight_to_the_business_unless_it_must_not_be_emaile
 # building a business's site
 # --------------------------------------------------------------------------
 def test_the_searched_city_and_its_state():
-    city, state, place = searched_city("Katy, TX", [])
-    assert (city, state) == ("Katy", "TX") and place["lat"] == pytest.approx(29.79, abs=0.05)
-    city, state, place = searched_city("houston", [{"state": "Texas"}])
+    city, state, place, country = searched_city("Katy, TX", [])
+    assert (city, state, country) == ("Katy", "TX", "US") and place["lat"] == pytest.approx(29.79, abs=0.05)
+    city, state, place, _ = searched_city("houston", [{"state": "Texas"}])
     assert (city, state) == ("Houston", "TX") and place is not None
     # no business says its state: the Houston near them, not Houston, Missouri
-    city, state, place = searched_city("Houston", [{"latitude": HOUSTON[0], "longitude": HOUSTON[1]}])
+    city, state, place, _ = searched_city("Houston", [{"latitude": HOUSTON[0], "longitude": HOUSTON[1]}])
     assert (city, state) == ("Houston", "TX")
     # a place the town list doesn't know: the middle of the businesses found
-    city, state, center = searched_city("Nowhere Flats", [{"state": "Texas", "latitude": 30.0, "longitude": -95.0},
-                                                         {"state": "Texas", "latitude": 31.0, "longitude": -96.0}])
+    city, state, center, _ = searched_city("Nowhere Flats", [{"state": "Texas", "latitude": 30.0, "longitude": -95.0},
+                                                            {"state": "Texas", "latitude": 31.0, "longitude": -96.0}])
     assert (city, state) == ("Nowhere Flats", "TX") and center == {"lat": 31.0, "lon": -95.0}
+    # outside the US: the country is written ("WA" alone is Washington); New Zealand has no region
+    assert searched_city("Perth, WA, Australia", [])[::3] == ("Perth", "AU")
+    assert searched_city("Perth, WA, Australia", [])[1] == "WA"
+    assert searched_city("Calgary, AB, Canada", [])[:2] == ("Calgary", "AB")
+    assert searched_city("Hamilton, New Zealand", [])[::3] == ("Hamilton", "NZ")
+    assert searched_city("Geelong", [{"country": "AU", "state": "Victoria"}])[1::2] == ("VIC", "AU")
 
 
 def test_only_trades_with_a_design_have_a_pack():
@@ -139,6 +145,31 @@ def test_the_keep_link_carries_the_whole_name(sites_dir):
     link = re.search(r'class="pv-keep" href="([^"]+)"', page).group(1)
     url = urlsplit(html.unescape(link))
     assert parse_qs(url.query) == {"subject": ["Hill & Sons Roofing - keep my website"]}
+
+
+def test_a_plumber_in_australia_gets_litres_its_state_and_a_dialable_number(sites_dir):
+    trade, pack = trade_pack("Plumber")
+    manifest: dict = {}
+    row = dict(rank=1, name="Geelong Plumbing Pty Ltd", email="geelongplumbing@gmail.com", city="Geelong",
+               state="Victoria", country="AU", category="Plumber", rating=4.8, review_count=31, place_id="p-geelong",
+               phone="(03) 5222 1234", phone_unformatted="+61352221234", latitude=-38.15, longitude=144.36)
+    slug, why = build_site(row, searched_city("Geelong, VIC, Australia", [row]), pack, trade, manifest, sites_dir)
+    assert why == "" and manifest[slug]["country"] == "AU" and manifest[slug]["state"] == "VIC"
+    page = (sites_dir / slug / "index.html").read_text(encoding="utf-8")
+    assert 'href="tel:+61352221234"' in page and "Geelong, VIC" in page
+    assert "litres a year" in page and "gallons" not in page and 'data-per-dpm="189"' in page
+    assert "Washington" not in page
+
+
+def test_a_plumber_in_the_us_still_gets_gallons(sites_dir):
+    trade, pack = trade_pack("Plumber")
+    manifest: dict = {}
+    slug, why = build_site(roofer_row(name="Bayou Plumbing", place_id="p-bayou", email="bayou@gmail.com",
+                                      category="Plumber", phone_unformatted="+12815550101"),
+                           searched_city("Houston", [{"state": "Texas"}]), pack, trade, manifest, sites_dir)
+    page = (sites_dir / slug / "index.html").read_text(encoding="utf-8")
+    assert why == "" and "gallons a year" in page and 'data-per-dpm="50"' in page and "litres" not in page
+    assert 'href="tel:+12815550101"' in page and "says the EPA" in page
 
 
 @pytest.mark.parametrize("overrides, reason", [

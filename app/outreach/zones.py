@@ -3,8 +3,9 @@ own 9-11am - whatever the business does.
 
 From its Google Maps address first (the ZIP code catches the parts of a state on another clock: El Paso,
 the Florida Panhandle, East Tennessee ...), else its state, else the town that was searched ("Tampa, FL").
-'' when none of these says - the caller falls back to OUTREACH_TIMEZONE. US only for now. Pure functions
-(tests/test_zones.py).
+'' when none of these says - the caller falls back to OUTREACH_TIMEZONE. Canada, Australia and New Zealand
+by their province or state ("Perth, WA, Australia": the country is always written, as "WA" alone is
+Washington). Pure functions (tests/test_zones.py).
 """
 from __future__ import annotations
 
@@ -71,16 +72,74 @@ TOWN_ZONES = {
     **dict.fromkeys(["coeur d'alene, id", "lewiston, id", "moscow, id", "post falls, id"], PACIFIC),
 }
 
+#: outside the US: country -> province / state (as an address writes it) -> zone; "" = the country's main zone
+ABROAD_ZONES = {
+    "CA": {"BC": "America/Vancouver", "AB": "America/Edmonton", "SK": "America/Regina", "MB": "America/Winnipeg",
+           "ON": "America/Toronto", "QC": "America/Toronto", "NB": "America/Moncton", "NS": "America/Halifax",
+           "PE": "America/Halifax", "NL": "America/St_Johns", "YT": "America/Whitehorse",
+           "NT": "America/Yellowknife", "NU": "America/Iqaluit", "": "America/Toronto"},
+    "AU": {"NSW": "Australia/Sydney", "ACT": "Australia/Sydney", "VIC": "Australia/Melbourne",
+           "TAS": "Australia/Hobart", "QLD": "Australia/Brisbane", "SA": "Australia/Adelaide",
+           "NT": "Australia/Darwin", "WA": "Australia/Perth", "": "Australia/Sydney"},
+    "NZ": {"": "Pacific/Auckland"},
+}
+COUNTRIES = {"canada": "CA", "australia": "AU", "new zealand": "NZ"}
+REGION_CODES = {
+    "CA": {"british columbia": "BC", "alberta": "AB", "saskatchewan": "SK", "manitoba": "MB", "ontario": "ON",
+           "quebec": "QC", "québec": "QC", "new brunswick": "NB", "nova scotia": "NS",
+           "prince edward island": "PE", "newfoundland and labrador": "NL", "yukon": "YT",
+           "northwest territories": "NT", "nunavut": "NU"},
+    "AU": {"new south wales": "NSW", "australian capital territory": "ACT", "victoria": "VIC", "tasmania": "TAS",
+           "queensland": "QLD", "south australia": "SA", "northern territory": "NT", "western australia": "WA"},
+    "NZ": {},
+}
+
 #: how the zones are called in the panel and the master sheet
 ZONE_NAMES = {EASTERN: "Eastern", CENTRAL: "Central", MOUNTAIN: "Mountain", ARIZONA: "Arizona",
-              PACIFIC: "Pacific", ALASKA: "Alaska", HAWAII: "Hawaii"}
+              PACIFIC: "Pacific", ALASKA: "Alaska", HAWAII: "Hawaii",
+              "America/Toronto": "Eastern (Canada)", "America/Winnipeg": "Central (Canada)",
+              "America/Regina": "Saskatchewan", "America/Edmonton": "Mountain (Canada)",
+              "America/Vancouver": "Pacific (Canada)", "America/Halifax": "Atlantic", "America/Moncton": "Atlantic",
+              "America/St_Johns": "Newfoundland", "Australia/Sydney": "Sydney", "Australia/Melbourne": "Melbourne",
+              "Australia/Hobart": "Hobart", "Australia/Brisbane": "Brisbane", "Australia/Adelaide": "Adelaide",
+              "Australia/Darwin": "Darwin", "Australia/Perth": "Perth", "Pacific/Auckland": "New Zealand"}
 
 _ADDRESS = re.compile(r",\s*([A-Z]{2})\s+(\d{5})(?:-\d{4})?\b")
 _TOWN = re.compile(r",\s*([A-Za-z]{2})\s*$")
 
 
+_CA_ADDRESS = re.compile(r",\s*([A-Z]{2})\s+[A-Z]\d[A-Z]\s?\d[A-Z]\d\b")       # ", ON M5V 2T6"
+_AU_ADDRESS = re.compile(r"\b(NSW|ACT|VIC|TAS|QLD|SA|NT|WA)\s+\d{4}\b")          # "Geelong VIC 3220"
+
+
+def country_of(text: str) -> str:
+    """'CA' / 'AU' / 'NZ' when an address or a place ends with that country's name, else ''."""
+    last = (text or "").rsplit(",", 1)[-1].strip().lower()
+    return COUNTRIES.get(last, "")
+
+
+def without_country(place: str) -> str:
+    """'Perth, WA, Australia' -> 'Perth, WA'; 'Hamilton, New Zealand' -> 'Hamilton'; US places as they are."""
+    return place.rsplit(",", 1)[0].strip() if country_of(place) else place
+
+
+def _abroad_zone(country: str, address: str, state: str, town: str) -> str:
+    zones, names = ABROAD_ZONES[country], REGION_CODES[country]
+    pattern = {"CA": _CA_ADDRESS, "AU": _AU_ADDRESS}.get(country)
+    found = pattern.findall(address or "") if pattern else []
+    candidates = [found[-1]] if found else []
+    candidates.append(names.get((state or "").strip().lower(), (state or "").strip().upper()))
+    parts = [p.strip() for p in (town or "").split(",")]
+    if len(parts) == 3:                              # "Perth, WA, Australia"
+        candidates.append(parts[1].upper())
+    return next((zones[c] for c in candidates if c and c in zones), zones[""])
+
+
 def zone_for(address: str = "", state: str = "", town: str = "") -> str:
     """The business's time zone (an IANA name such as 'America/Chicago'), or '' when nothing says."""
+    country = country_of(address) or country_of(town)
+    if country:
+        return _abroad_zone(country, address, state, town)
     found = _ADDRESS.findall(address or "")
     if found:
         code, zip_code = found[-1]

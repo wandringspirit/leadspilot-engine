@@ -450,7 +450,7 @@
           "Overflowing? Lift the tank lid and pull the float up to stop the fill.",
           "Don't flush again until it's fixed."
         ],
-        "note": "A leaking toilet can waste about 200 gallons a day, says the EPA, often without a sound."
+        "note": "A leaking toilet can waste {{ units.toilet_leak }} a day, says the {{ units.epa }}, often without a sound."
       }
     ]
   },
@@ -464,9 +464,11 @@
     "label": "Drips a minute",
     "default": 30,
     "max": 120,
-    "per_year": "gallons a year",
+    "per_year": "{{ units.volume }} a year",
+    "per_dpm": "{{ units.per_dpm }}",
+    "shower": "{{ units.shower }}",
     "showers": "showers' worth",
-    "source": "Based on the EPA's WaterSense figures: a tap dripping once a second wastes over 3,000 gallons a year, and an average shower uses about 17 gallons.",
+    "source": "Based on the {{ units.epa }}'s WaterSense figures: a tap dripping once a second wastes over {{ units.drip_year }} a year, and an average shower uses about {{ units.shower }} {{ units.volume }}.",
     "go": "Fix that drip",
     "service": "fixtures"
   },
@@ -493,5 +495,23 @@
     "Plumbing",
     "Plumbers",
     "Plumber"
-  ]
+  ],
+  "units": {
+    "us": {
+      "volume": "gallons",
+      "per_dpm": 50,
+      "shower": 17,
+      "drip_year": "3,000 gallons",
+      "toilet_leak": "about 200 gallons",
+      "epa": "EPA"
+    },
+    "metric": {
+      "volume": "litres",
+      "per_dpm": 189,
+      "shower": 65,
+      "drip_year": "11,000 litres",
+      "toilet_leak": "about 750 litres",
+      "epa": "US EPA"
+    }
+  }
 }

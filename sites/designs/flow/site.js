@@ -441,18 +441,20 @@
     });
   });
 
-  /* ---- the drip calculator: EPA - one drip a second is over 3,000 gallons a year, so 50 a year per drip a minute ---- */
+  /* ---- the drip calculator: EPA - one drip a second is over 3,000 gallons a year, so 50 a year per drip a minute
+     (data-per-dpm; 189 litres outside the US), a shower about 17 gallons (data-shower; 65 litres) ---- */
   const calc = $("[data-calc]");
   if (calc) {
     const input = $("[data-calc-in]", calc);
     const max = Number(calc.dataset.max) || 120;
+    const perDpm = Number(calc.dataset.perDpm) || 50, perShower = Number(calc.dataset.shower) || 17;
     const fmt = (n) => Math.round(n).toLocaleString("en-US");
     const set = () => {
       const dpm = Number(input.value);
-      const gallons = dpm * 50;
+      const gallons = dpm * perDpm;
       $("[data-calc-dpm]", calc).textContent = dpm;
       $("[data-calc-gal]", calc).textContent = fmt(gallons);
-      $("[data-calc-sh]", calc).textContent = fmt(gallons / 17);
+      $("[data-calc-sh]", calc).textContent = fmt(gallons / perShower);
       const top = 400 - (dpm / max) * 180;                  // the water's surface in the drawing
       calc.style.setProperty("--wl", `${top}px`);
       calc.style.setProperty("--fall", `${top - 152}px`);

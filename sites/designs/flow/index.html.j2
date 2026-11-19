@@ -255,7 +255,8 @@
   <!-- DRIP CALCULATOR -->
   {% if t.drip_calc is defined %}
   {% set dc = t.drip_calc %}
-  <section class="sec calc has-wave" id="drip" data-calc data-max="{{ dc.max }}">
+  {% set per_dpm, per_shower = dc.per_dpm | int, dc.shower | int %}
+  <section class="sec calc has-wave" id="drip" data-calc data-max="{{ dc.max }}" data-per-dpm="{{ per_dpm }}" data-shower="{{ per_shower }}">
     <div class="wave" aria-hidden="true"><svg viewBox="0 0 2880 60" preserveAspectRatio="none"><path class="wave-2" d="M0 34Q180 8 360 34T720 34T1080 34T1440 34T1800 34T2160 34T2520 34T2880 34V60H0z"/><path class="wave-1" d="M0 30Q180 0 360 30T720 30T1080 30T1440 30T1800 30T2160 30T2520 30T2880 30V60H0z"/></svg></div>
     <div class="wrap calc-grid">
       <div class="calc-copy" data-reveal>
@@ -266,8 +267,8 @@
           <input type="range" min="1" max="{{ dc.max }}" value="{{ dc.default }}" data-calc-in aria-describedby="calc-src">
         </label>
         <div class="calc-out" aria-live="polite">
-          <p><b data-calc-gal>{{ "{:,}".format(dc.default * 50) }}</b><span>{{ dc.per_year }}</span></p>
-          <p><b data-calc-sh>{{ "{:,}".format((dc.default * 50 / 17) | round | int) }}</b><span>{{ dc.showers }}</span></p>
+          <p><b data-calc-gal>{{ "{:,}".format(dc.default * per_dpm) }}</b><span>{{ dc.per_year }}</span></p>
+          <p><b data-calc-sh>{{ "{:,}".format((dc.default * per_dpm / per_shower) | round | int) }}</b><span>{{ dc.showers }}</span></p>
         </div>
         <a class="btn btn-dark btn-lg" href="#quote" data-pick="{{ dc.service }}">{{ dc.go }}<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
         <p class="calc-src" id="calc-src">{{ dc.source }}</p>

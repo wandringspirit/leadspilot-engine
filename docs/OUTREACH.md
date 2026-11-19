@@ -145,6 +145,13 @@ the ZIP code for the parts of a state on another clock (El Paso, the Florida Pan
 Tennessee, Western Kentucky ...). Without an address, the searched town ("Tampa, FL") says; when
 nothing does, `OUTREACH_TIMEZONE`. In India time, 08:00–12:00 is 18:30–22:30 Eastern, 19:30–23:30
 Central, 20:30–00:30 Mountain and 21:30–01:30 Pacific (US winter time; an hour earlier in US summer).
+Canada, Australia and New Zealand (since 1.28.0): the province or state in the address
+(`ON M5V 2T6`, `VIC 3220`) or the searched place (`"Perth, WA, Australia"`) says - BC Pacific, AB
+Mountain, SK, MB Central, ON / QC Eastern, the Maritimes Atlantic, NL Newfoundland; NSW / ACT, VIC,
+TAS, QLD, SA, NT, WA each their own; New Zealand one. In India time their 08:00–12:00 is roughly
+18:30–00:30 for Canada, 02:30–07:30 for Australia and 00:30–04:30 for New Zealand, so the cloud sends
+nearly around the clock: deploy only between about 07:30 and 18:30 India time. `{City}` leaves the
+country out ("Perth, WA"), and "Pty Ltd" goes from a business's name like "LLC".
 The Calls tab's "call" times are each business's 9–11am, in your time. Everything shown to you – sent
 today, the Activity, the 10 searches a day – counts this computer's days (India).
 
