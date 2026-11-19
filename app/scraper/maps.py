@@ -194,6 +194,7 @@ class ScrapeStats:
     sections: int = 0         # of which map sections (whole-area search)
     full_lists: int = 0       # result lists that hit Google's ~120 cap (there may be more)
     dense: int = 0            # sections still full at MAX_SECTION_ZOOM (may hold more)
+    stalled: int = 0          # sections whose list stopped loading early (searched again as quarters)
     # why the scan stopped: limit | end_of_list | no_results | single | stalled (one search),
     # searched_all (several searches / whole area), section_limit | scan_limit (caps),
     # blocked (Google's "unusual traffic" check)
@@ -514,11 +515,19 @@ class MapsScraper:
             failed = self._failures > 0          # searched again as quarters, so nothing is skipped
             listed = len(self._feed_keys)
             near = sum(1 for lat, lng in self._feed_points if section.near(lat, lng))
-            full = listed >= NEAR_GOOGLE_LIMIT and near * 2 >= listed
-            split = (full or failed) and section.zoom < MAX_SECTION_ZOOM
+            about_here = near * 2 >= listed              # not a zoomed-out list of what's nearest
+            full = listed >= NEAR_GOOGLE_LIMIT and about_here
+            # the list stopped loading before Google's "end of the list" (slow, or Google holding back): the
+            # rest of this section is unknown, not empty - its quarters each list their own first page
+            stalled = self._search_stop == "stalled" and about_here and not full
+            if stalled:
+                self.stats.stalled += 1
+            split = (full or failed or stalled) and section.zoom < MAX_SECTION_ZOOM
             log.info("%s: %d listing(s)%s", self._where, listed,
-                     " - splitting it into 4" if split else
-                     " - still full at the smallest section size" if full else "")
+                     (" - the list stopped loading early, splitting it into 4" if stalled else
+                      " - splitting it into 4") if split else
+                     " - still full at the smallest section size" if full else
+                     " - the list stopped loading early at the smallest section size" if stalled else "")
             if split:
                 queue.extend(sorted(section.quarters(), key=root.distance))
             elif full:

@@ -275,11 +275,39 @@ async def test_a_refused_web_check_is_a_problem_entry(tmp_path):
     assert "could not be reached after 2 web search(es)" in activity.entries()[0]["detail"]
 
 
+async def test_at_the_end_of_the_list_it_starts_again_from_the_top_at_most_once_a_month(tmp_path):
+    pilot, _, jobs, activity, clock = make_autopilot(tmp_path, OUTREACH_DAILY_LIMIT=30)
+    pilot.update(AutopilotUpdate(searches_per_day=40))
+
+    async def search() -> str:
+        await pilot.tick()
+        job = jobs.get(pilot.state.runs[-1].job_id)
+        job.status, job.finished_at = JobStatus.COMPLETED, clock()     # found nothing
+        await pilot.job_finished(job)
+        clock.advance(minutes=1)
+        return job.query
+
+    # a list never searched from the top before: at its end it starts again right away
+    assert [await search() for _ in range(3)] == ["plumber in Katy, TX", "plumber in Pearland, TX",
+                                                  "plumber in Katy, TX"]
+    assert activity.entries()[0]["what"] == "Search finished"
+    assert any(e["what"] == "Places list from the top" for e in activity.entries())
+    await search()                                                  # Pearland, the end of the list again
+    await pilot.tick()
+    assert "searched in the last 30 days" in pilot.waiting_for and not pilot.state.stopped
+    clock.advance(days=30)
+    await pilot.tick()
+    assert jobs.get(pilot.state.runs[-1].job_id).query == "plumber in Katy, TX"
+    assert pilot.state.next_place == 1
+
+
 async def test_two_business_types_take_turns_each_with_its_own_next_place(tmp_path):
     pilot, outreach, jobs, _, clock = make_autopilot(tmp_path)
     roofer = next(t for t in outreach.list_business_types() if t.name == "Roofer")
     pilot.state.next_place = 1                          # the plumbers are further on: Pearland next
     pilot.update(AutopilotUpdate(also_type_ids=[roofer.id], searches_per_day=10))
+    # both began a round of the list just now: at its end they don't start it again yet
+    pilot.state.rounds = {pilot.state.business_type_id: clock(), roofer.id: clock()}
     assert [t["next"] for t in pilot.status()["turns"]] == ["Pearland, TX", "Katy, TX"]
     assert pilot.status()["up_next"] == {"business_type_name": "Plumber", "place": "Pearland, TX"}
 
@@ -297,7 +325,8 @@ async def test_two_business_types_take_turns_each_with_its_own_next_place(tmp_pa
     assert pilot.state.runs[1].business_type_id == roofer.id
     assert pilot.status()["runs"][0]["business_type_name"] == "Roofer"
     await pilot.tick()
-    assert "every place on the list has been searched" in pilot.state.stopped
+    assert "every place on the list was searched in the last 30 days" in pilot.waiting_for
+    assert not pilot.state.stopped
 
     # a new place: each business type searches it, and a lost search is searched again for its own type
     pilot.update(AutopilotUpdate(places=["Katy, TX", "Pearland, TX", "Spring, TX"], enabled=True))

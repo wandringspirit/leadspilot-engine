@@ -177,6 +177,11 @@ flowchart TD
   section (±10 %): if Google zooms out to show businesses from elsewhere (an empty section), the
   list is not about this section and splitting would only repeat that.
 - A section whose search failed is split too, so its area is still covered.
+- So is a section whose list **stopped loading early** (`stalled`: no new listings after
+  `SCROLL_STALL_LIMIT` scrolls and no "end of the list" - a slow connection, or Google holding back):
+  the rest of it is unknown, not empty, and each quarter lists its own first page. Before 1.27.6 such a
+  section counted as searched, and a whole city could end as "nothing found" after 20 listings.
+  `stats.stalled` counts them.
 - `MAX_SECTION_ZOOM` (16, sections ~2 km wide) ends the splitting; a still-full section there is
   counted in `stats.dense` and the notice says a few very busy spots may hold more.
 - `MAX_SECTIONS` (default 200) caps the sections per job (`section_limit`). Every section is one

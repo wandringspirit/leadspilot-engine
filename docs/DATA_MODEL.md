@@ -116,6 +116,7 @@ names are kept verbatim.
     "sections": 0,                  // of which map sections (whole-area search)
     "full_lists": 0,                // lists that hit Google's ~120 cap
     "dense": 0,                     // sections still full at the smallest section size
+    "stalled": 0,                   // sections whose list stopped loading early (split into quarters)
     "stopped": "end_of_list",       // see below
     "blocked_ip": "",               // the IP address Google's "unusual traffic" page named (stopped = blocked)
     "errors": [],

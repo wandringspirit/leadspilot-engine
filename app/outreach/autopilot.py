@@ -61,6 +61,11 @@ RETRIED = {JobStatus.FAILED, JobStatus.INTERRUPTED}
 FAILS_BEFORE_SKIP = 3
 #: ROLE=sender: a search whose search computer hasn't reported for this long is given up (and searched again)
 REMOTE_SILENCE_S = 20 * 60
+#: at the end of the list a business type starts again from the top - new businesses open, others drop their
+#: website - but not sooner than this after its last round began (a short list isn't searched over and over)
+ROUND_MIN_DAYS = 30
+#: the most places the list can hold
+MAX_PLACES = 10000
 
 #: Texas first: Houston's suburbs, Dallas–Fort Worth, San Antonio, Austin
 DEFAULT_PLACES = [
@@ -104,6 +109,8 @@ class AutopilotState(BaseModel):
     next_place: int = 0                  # index into places (the main business type's)
     also: list[AutopilotTurn] = Field(default_factory=list)   # business types taking turns with the main one
     turn: int = 0                        # whose search is next: 0 = business_type_id, 1 = also[0] …
+    rounds: dict[str, datetime] = Field(default_factory=dict)   # business type -> when it last started the list
+                                                                # again from the top
     min_waiting: int = 10
     searches_per_day: int = 10
     limit: int = 60                      # businesses wanted per search
@@ -117,10 +124,11 @@ class AutopilotUpdate(BaseModel):
     business_type_id: str | None = Field(None, max_length=40)
     also_type_ids: list[str] | None = Field(None, max_length=20,
                                             description="Business types taking turns with the main one")
-    places: list[str] | None = Field(None, max_length=500, description="Searched in this order, e.g. 'Katy, TX'")
+    places: list[str] | None = Field(None, max_length=MAX_PLACES,
+                                     description="Searched in this order, e.g. 'Katy, TX'")
     next_place: int | None = Field(None, ge=0, description="Index of the next place to search")
     min_waiting: int | None = Field(None, ge=1, le=500)
-    searches_per_day: int | None = Field(None, ge=1, le=20)
+    searches_per_day: int | None = Field(None, ge=1, le=40)
     limit: int | None = Field(None, ge=1, le=500)
 
 
@@ -271,13 +279,22 @@ class Autopilot:
                 turn.next_place = index
 
     def _up_next(self) -> tuple[str, int] | None:
-        """Whose search is next and where: from ``turn`` on, the first business type with a place left."""
+        """Whose search is next and where: from ``turn`` on, the first business type with a place left - or at
+        the end of the list, one that may start it again from the top (``ROUND_MIN_DAYS``)."""
         order = self._order()
         for k in range(len(order)):
             type_id = order[(self.state.turn + k) % len(order)]
             if (index := self._next_of(type_id)) < len(self.state.places):
                 return type_id, index
+            if self._may_start_again(type_id):
+                return type_id, 0
         return None
+
+    def _may_start_again(self, type_id: str) -> bool:
+        if not self.state.places:
+            return False
+        began = self.state.rounds.get(type_id)
+        return began is None or (self.clock() - began).days >= ROUND_MIN_DAYS
 
     def _first_in_line(self, run: AutopilotRun) -> None:
         """The run's place is its business type's next place again."""
@@ -364,9 +381,17 @@ class Autopilot:
             return state.stopped
         up = self._up_next()
         if up is None:
-            self._stop("every place on the list has been searched - add more places")
-            return state.stopped
+            if not state.places:
+                self._stop("the list of places is empty - add places")
+                return state.stopped
+            return (f"every place on the list was searched in the last {ROUND_MIN_DAYS} days - add more places "
+                    "(it starts the list again from the top after that)")
         type_id, index = up
+        if self._next_of(type_id) >= len(state.places):       # the end of the list: from the top again
+            state.rounds[type_id] = now
+            self.activity.add("Places list from the top", f"{self._name(type_id)}: every place on the list has been "
+                                                          "searched - starting again with the first")
+            log.info("Autopilot: %s starts the list of places again from the top", self._name(type_id))
         order = self._order()
         state.turn = (order.index(type_id) + 1) % len(order)       # the next business type's turn
         self._set_next(type_id, index + 1)

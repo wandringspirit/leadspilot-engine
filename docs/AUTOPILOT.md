@@ -39,9 +39,9 @@ search is searched again for its own type.
 | --- | --- | --- |
 | business type | Roofer | what it looks for, and the emails its campaigns use |
 | `also` | none | business types taking turns with it, each with its own `next_place` |
-| places | 20 Texas places | searched in this order; *next* is the next one |
+| places | 20 Texas places | searched in this order; *next* is the next one; up to 10,000. At the end of the list a business type starts again from the top (new businesses open, others drop their website) – at most once every 30 days (`rounds`) |
 | `min_waiting` | 10 | search when fewer businesses than this wait for their first email (two days at 5 a day) |
-| `searches_per_day` | 10 | at most this many searches a day (this computer's day – India), one at a time; up to 20 |
+| `searches_per_day` | 10 | at most this many searches a day (this computer's day – India), one at a time; up to 40 |
 | `limit` | 60 | businesses wanted per search |
 
 With a cloud server (`ROLE=sender`, [CLOUD.md](CLOUD.md)) the autopilot runs there, and its searches
@@ -75,7 +75,10 @@ A search whose **web check was refused** – DuckDuckGo and Bing, which look for
 list, refused or couldn't be reached – is a *Web check refused* alert. Nothing stops for it, but the
 businesses after that were checked only by their email domain and social page, so a few may have a
 website after all.
-- every place on the list has been searched, or its business type was deleted.
+- the list of places is empty, or its business type was deleted.
+
+When every business type has searched the whole list and began it less than 30 days ago, it waits ("every
+place on the list was searched in the last 30 days") instead of stopping, and goes on by itself.
 
 A search that didn't finish (the panel was closed during it) is searched again. So is one that failed with an error (say the browser didn't survive the laptop sleeping), until it has failed three times in a row: then the next place is searched. A search you cancelled isn't searched again. Each try counts toward the searches a day.
 
@@ -150,3 +153,12 @@ Each campaign's own results file, with one row per business, stays in `<business
 `GET /api/autopilot`, `PATCH /api/autopilot`, `GET /api/activity`,
 `GET /api/master/status.csv`, `GET /api/master/campaigns.csv`, `GET /api/master/activity.csv`
 ([API.md](API.md#autopilot)).
+
+### A list that never runs out
+
+`deploy/build_places.py` builds the list from GeoNames' towns of 5,000+ people
+(`cities5000.zip` from download.geonames.org, CC BY 4.0 – data by GeoNames, geonames.org): towns of
+10,000+ people (not parts of towns), each state or province giving its largest town not yet listed in
+turn, so the list moves around the country. `--skip` leaves out what is on the list already. Since
+19 Nov 2026 the live list has every US town of 10,000+ (about 4,300 places) after the hand-picked ones;
+at the end it starts again from the top (above).

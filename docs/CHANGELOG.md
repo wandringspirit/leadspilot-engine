@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.27.6 – 2026-11-19
+
+### Fixed
+- **A city's search could end as "nothing found" after its first 20–30 listings**: when Google's list stopped
+  loading early, the map section counted as searched. It is now split into quarters like a full one
+  (`stats.stalled`). On 19 Nov Arlington, Plano, Frisco, St. Louis and Springfield, MO ended this way.
+
+### Added
+- **The autopilot's list of places never runs out**: at its end each business type starts again from the top,
+  at most once every 30 days. The list holds up to 10,000 places; up to 40 searches a day.
+
 ## 1.27.5 – 2026-11-18
 
 ### Added

@@ -548,7 +548,7 @@ def stats_to_dict(stats: ScrapeStats) -> dict:
         "links_found": stats.links_found, "scraped": stats.scraped, "matched": stats.matched,
         "skipped": dict(stats.skipped), "failed": stats.failed, "reached_end": stats.reached_end,
         "searches": stats.searches, "sections": stats.sections, "full_lists": stats.full_lists,
-        "dense": stats.dense, "stopped": stats.stopped, "blocked_ip": stats.blocked_ip, "errors": stats.errors[:20],
+        "dense": stats.dense, "stalled": stats.stalled, "stopped": stats.stopped, "blocked_ip": stats.blocked_ip, "errors": stats.errors[:20],
     }
 
 

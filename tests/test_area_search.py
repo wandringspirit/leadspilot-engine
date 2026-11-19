@@ -45,10 +45,11 @@ def href(b: dict) -> str:
 
 
 class GeoScraper(MapsScraper):
-    def __init__(self, businesses: list[dict], *, root: Section | None = ROOT, fail: tuple = (), **settings):
+    def __init__(self, businesses: list[dict], *, root: Section | None = ROOT, fail: tuple = (), stall: tuple = (),
+                 **settings):
         cfg = Settings(MIN_DELAY_MS=0, MAX_DELAY_MS=0, SCROLL_STALL_LIMIT=1, DETAIL_CONCURRENCY=4, **settings)
         super().__init__(cfg, headless=True)
-        self.businesses, self.root, self.fail = businesses, root, fail
+        self.businesses, self.root, self.fail, self.stall = businesses, root, fail, stall
         self.by_id = {b["id"]: b for b in businesses}
         self.text_results: dict[str, list[dict]] = {}
         self.opened: list[str] = []
@@ -92,6 +93,8 @@ class GeoScraper(MapsScraper):
         return self.loaded >= len(self.feed)
 
     async def _scroll_feed(self, page):
+        if any(part in self.opened[-1] for part in self.stall):
+            return              # the list stops loading after its first page (slow, or Google holding back)
         self.loaded = min(self.loaded + 20, len(self.feed))
 
     async def _scrape_one(self, page, capture, ref, search_rec):
@@ -167,6 +170,24 @@ async def test_a_failed_section_is_searched_again_as_quarters():
     s = GeoScraper(biz, fail=(root_view,))
     rows = await s.scrape(Search("roofing", area="Houston"), 50, selector=PlaceFilter(LEADS))
     assert len(rows) == 30 and len(s.stats.errors) == 1
+
+
+async def test_a_list_that_stops_loading_early_is_searched_again_as_quarters():
+    """Arlington, 19 Nov: the city's list stopped at 20 of hundreds and the city was taken as empty."""
+    biz = city()
+    root_view = ROOT.url("roofing").rsplit("/@", 1)[1]
+    s = GeoScraper(biz, stall=(root_view,))
+    rows = await s.scrape(Search("roofing", area="Houston"), 50, selector=PlaceFilter(LEADS))
+    assert {r.name for r in rows} == without_website(biz) and len(rows) == 30
+    assert s.stats.stalled == 1 and s.stats.sections > 1
+
+
+async def test_a_list_that_ends_early_is_not_split():
+    """A short list that reaches Google's end is a section that has been searched completely."""
+    biz = city(15)
+    s = GeoScraper(biz)
+    await s.scrape(Search("roofing", area="Houston"), 50, selector=PlaceFilter(LEADS))
+    assert s.stats.sections == 1 and s.stats.stalled == 0
 
 
 async def test_a_failing_search_is_skipped_but_three_in_a_row_fail_the_job():
