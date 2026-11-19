@@ -79,6 +79,8 @@ MAX_FAILURES = 3                         # failed sends in a row before the camp
 STOP_WAIT_S = 90                         # stopping waits this long at most for the email being sent
 LINK_CHECK = timedelta(minutes=2)        # a website opened this soon after its email: a mail server checking it
 DAY = timedelta(hours=24)                # OUTREACH_DAILY_LIMIT counts the emails in any 24 hours
+RAMP_BOUNCE_WINDOW = 20                  # the second address's share stops rising while RAMP_BOUNCE_LIMIT of
+RAMP_BOUNCE_LIMIT = 2                    # ... the last RAMP_BOUNCE_WINDOW businesses it emailed bounced
 SPREAD_AHEAD = timedelta(hours=12)       # send windows opening within this long count as this evening's
 MAX_SPREAD = timedelta(minutes=60)       # spreading never waits longer than this between two emails
 PERSON_KINDS = frozenset({"seen", "call", "email", "keep"})   # visits only a person makes
@@ -163,8 +165,10 @@ class OutreachManager:
                  clock: Callable[[], datetime] | None = None, rng: random.Random | None = None,
                  sites: SiteService | None = None, activity: ActivityLog | None = None,
                  visits: Visits | None = None,
-                 check_domain: Callable[[str], Awaitable[str]] | None = None) -> None:
+                 check_domain: Callable[[str], Awaitable[str]] | None = None,
+                 save_settings: Callable[[dict], object] | None = None) -> None:
         self.cfg = cfg
+        self.save_settings = save_settings       # writes settings to .env (None: only the running ones change)
         self.check_domain = check_domain
         self.activity = activity                 # None: nothing is written down (tests)
         self.mailbox: MailboxClient = mailbox or Mailbox(cfg)
@@ -280,7 +284,8 @@ class OutreachManager:
             "running": running,
             "sender": sender_header(cfg),
             "second_sender": ({"address": second, "limit": cfg.SECOND_SENDER_LIMIT,
-                               "sent_24h": self.sent_from(second, now)} if (second := second_sender(cfg)) else None),
+                               "sent_24h": self.sent_from(second, now), "ramp": self.ramp_status(now)}
+                              if (second := second_sender(cfg)) else None),
             "smtp": f"{cfg.SMTP_HOST}:{cfg.SMTP_PORT}" if cfg.SMTP_HOST else "",
             "imap": f"{cfg.IMAP_HOST}:{cfg.IMAP_PORT}" if cfg.IMAP_HOST else "",
             "window": (f"{days_label(window.days)} {window.start:02d}:00–{window.end:02d}:00 their time"
@@ -334,6 +339,85 @@ class OutreachManager:
         """The From address of a business about to get its first email: the second address while it has room
         in its share of the last 24 hours, else SENDER_EMAIL. The business keeps it for its follow-ups."""
         return second_sender(self.cfg) if not self._second_full(now) else sender_address(self.cfg)
+
+    # ------------------------------------------------------------------
+    # The second address's share, raised step by step
+    # ------------------------------------------------------------------
+    @property
+    def _ramp_file(self) -> Path:
+        return self.cfg.DATA_DIR / "sender_ramp.json"
+
+    def _ramp_state(self, now: datetime) -> dict:
+        """{"limit": the share the count started at, "since": when, "held": why it's held ('' if not)} - started
+        afresh whenever SECOND_SENDER_LIMIT is not the share it counted for (changed by you, or just raised)."""
+        try:
+            state = json.loads(self._ramp_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = {}
+        if state.get("limit") != self.cfg.SECOND_SENDER_LIMIT or not state.get("since"):
+            state = {"limit": self.cfg.SECOND_SENDER_LIMIT, "since": now.isoformat(), "held": ""}
+            _write(self._ramp_file, json.dumps(state))
+        return state
+
+    def _second_leads(self, address: str) -> list[Lead]:
+        return [lead for c in self.campaigns.values() for lead in c.leads
+                if lead.sent and lead.sender.lower() == address.lower()]
+
+    def _second_bounces(self, address: str) -> int:
+        """Of the last RAMP_BOUNCE_WINDOW businesses the second address emailed, how many bounced."""
+        leads = sorted(self._second_leads(address), key=lambda lead: lead.sent[0].sent_at, reverse=True)
+        return sum(lead.status == LeadStatus.BOUNCED for lead in leads[:RAMP_BOUNCE_WINDOW])
+
+    def ramp_status(self, now: datetime) -> dict | None:
+        """Where the second address's share is going (None: it isn't being raised)."""
+        cfg, second = self.cfg, second_sender(self.cfg)
+        target = min(cfg.SECOND_SENDER_TARGET, cfg.OUTREACH_DAILY_LIMIT)
+        if not second or target <= cfg.SECOND_SENDER_LIMIT:
+            return None
+        state = self._ramp_state(now)
+        since = datetime.fromisoformat(state["since"])
+        sent = sum(1 for lead in self._second_leads(second) for s in lead.sent if s.sent_at >= since)
+        return {"target": target, "next": min(cfg.SECOND_SENDER_LIMIT + max(1, cfg.SECOND_SENDER_STEP), target),
+                "sent": sent, "needed": max(1, cfg.SECOND_SENDER_EVERY) * cfg.SECOND_SENDER_LIMIT,
+                "held": state.get("held", "")}
+
+    async def _ramp(self, now: datetime) -> None:
+        """Raise SECOND_SENDER_LIMIT by SECOND_SENDER_STEP once the second address has sent SECOND_SENDER_EVERY
+        days' worth of its share since the last step, up to SECOND_SENDER_TARGET (never past the daily limit).
+        It holds while RAMP_BOUNCE_LIMIT of the second address's last RAMP_BOUNCE_WINDOW businesses bounced.
+        Crossing half the daily limit, it emails you: time to move the warm-up over."""
+        ramp = self.ramp_status(now)
+        if ramp is None:
+            return
+        second, limit, daily = second_sender(self.cfg), self.cfg.SECOND_SENDER_LIMIT, self.cfg.OUTREACH_DAILY_LIMIT
+        bounced = self._second_bounces(second)
+        held = (f"{bounced} of its last {RAMP_BOUNCE_WINDOW} businesses bounced"
+                if bounced >= RAMP_BOUNCE_LIMIT else "")
+        if held != ramp["held"]:
+            _write(self._ramp_file, json.dumps({**self._ramp_state(now), "held": held}))
+            if held:
+                self._note("Second address on hold", f"{second} stays at {limit} a day: {held}")
+                await self.email_me(f"{second} stays at {limit} emails a day",
+                                    f"Its share is no longer being raised: {held}. Check the addresses and where "
+                                    f"its test copies land. It goes on rising once fewer of its emails bounce.")
+        if held or ramp["sent"] < ramp["needed"]:
+            return
+        new = ramp["next"]
+        if self.save_settings is not None:
+            try:
+                self.save_settings({"SECOND_SENDER_LIMIT": new})
+            except Exception as exc:  # noqa: BLE001 - e.g. an environment variable sets it: raise it until a restart
+                log.warning("Outreach: couldn't save SECOND_SENDER_LIMIT=%d to .env: %s", new, exc)
+        self.cfg.SECOND_SENDER_LIMIT = new
+        self._ramp_state(now)                            # counts afresh at the new share
+        rest = f"; it goes on up to {ramp['target']}" if new < ramp["target"] else ", its target"
+        self._note("Second address raised", f"{second} now sends {new} of the {daily} emails a day{rest}")
+        log.info("Outreach: %s now sends %d of the %d emails a day", second, new, daily)
+        if limit * 2 <= daily < new * 2:
+            main = sender_address(self.cfg)
+            await self.email_me(f"Move the warm-up to {second}",
+                                f"{second} now sends {new} of the {daily} emails a day - more than {main}. "
+                                f"Time to move the warm-up in your warm-up tool from {main} to {second}.")
 
     def _cap_free_at(self, now: datetime) -> datetime | None:
         """When the next email fits under OUTREACH_DAILY_LIMIT again (None: it does now)."""
@@ -768,6 +852,7 @@ class OutreachManager:
                 pick = self._next_email(now)             # a reply may just have stopped it
                 if pick and self._fresh(now):
                     await self._send(*pick, now)
+            await self._ramp(now)
 
     def site_ready(self, campaign: Campaign, lead: Lead) -> bool:
         """The lead's first email may go out: its website is online (or the campaign has no websites)."""

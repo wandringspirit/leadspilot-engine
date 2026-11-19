@@ -460,7 +460,7 @@ def test_a_second_from_address_takes_its_share_and_keeps_its_businesses(tmp_path
     palm = campaign.leads[0]
     assert palm.sender == "me@reach.mysender.com" and campaign.leads[1].sender == "me@mysender.com"
     second = manager.status()["second_sender"]
-    assert second == {"address": "me@reach.mysender.com", "limit": 1, "sent_24h": 1}
+    assert second == {"address": "me@reach.mysender.com", "limit": 1, "sent_24h": 1, "ramp": None}
     # Friday: the follow-ups are due; Palm Breeze's comes from the second address, whose share is free again
     clock.now = TUESDAY_9AM + timedelta(days=3, minutes=5)
     for _ in range(3):
@@ -472,6 +472,53 @@ def test_a_second_from_address_takes_its_share_and_keeps_its_businesses(tmp_path
     # an email from either of your own addresses is never taken for a business's reply
     assert manager.status()["second_sender"]["sent_24h"] == 1
     assert own_addresses(manager.cfg) == {"me@mysender.com", "me@reach.mysender.com"}
+
+
+def test_the_second_address_share_rises_step_by_step_up_to_its_target(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    saved = []
+    manager, mailbox, campaign, _ = started(tmp_path, clock, SECOND_SENDER_EMAIL="me@reach.mysender.com",
+                                            SECOND_SENDER_LIMIT=1, SECOND_SENDER_TARGET=3, SECOND_SENDER_STEP=1,
+                                            SECOND_SENDER_EVERY=1, OUTREACH_DAILY_LIMIT=4)
+    manager.save_settings = saved.append
+    assert manager.status()["second_sender"]["ramp"] == {"target": 3, "next": 2, "sent": 0, "needed": 1, "held": ""}
+    for _ in range(3):                                              # the three first emails
+        run(manager.tick())
+        clock.advance(seconds=61)
+    # 1 a day sent -> 2; 2 sent at 2 -> 3, the target: every business started on the second address
+    assert saved == [{"SECOND_SENDER_LIMIT": 2}, {"SECOND_SENDER_LIMIT": 3}]
+    assert manager.cfg.SECOND_SENDER_LIMIT == 3 and manager.status()["second_sender"]["ramp"] is None
+    assert [lead.sender for lead in campaign.leads] == ["me@reach.mysender.com"] * 3
+    # crossing half of the 4 a day, you're told to move the warm-up over
+    alerts = [m["Subject"] for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")]
+    assert alerts == ["[Leads Pilot] Move the warm-up to me@reach.mysender.com"]
+    # at the target nothing more happens
+    run(manager.tick())
+    assert manager.cfg.SECOND_SENDER_LIMIT == 3 and len(saved) == 2
+
+
+def test_the_second_address_share_holds_while_its_emails_bounce(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock, SECOND_SENDER_EMAIL="me@reach.mysender.com",
+                                            SECOND_SENDER_LIMIT=3, SECOND_SENDER_TARGET=10, OUTREACH_DAILY_LIMIT=10)
+    for _ in range(3):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    for lead in campaign.leads[:2]:
+        lead.status = LeadStatus.BOUNCED
+    run(manager.tick())
+    assert manager.cfg.SECOND_SENDER_LIMIT == 3
+    ramp = manager.status()["second_sender"]["ramp"]
+    assert ramp["held"] == "2 of its last 20 businesses bounced"
+    assert [m["Subject"] for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")] == \
+        ["[Leads Pilot] me@reach.mysender.com stays at 3 emails a day"]
+    run(manager.tick())                                             # told once, not every round
+    assert len([m for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")]) == 1
+    campaign.leads[1].status = LeadStatus.SENT                      # fewer bounces: it goes on
+    for lead in campaign.leads:
+        lead.sent.extend(lead.sent)                                 # 6 emails at a share of 3 = 2 days' worth
+    run(manager.tick())
+    assert manager.cfg.SECOND_SENDER_LIMIT == 5
 
 
 def test_a_full_second_address_holds_its_follow_ups_and_new_businesses_go_from_the_main_one(tmp_path):

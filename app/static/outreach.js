@@ -249,7 +249,10 @@
     facts.push(["From", s.sender || "not set"]);
     const second = s.second_sender;
     if (second) {
-      facts.push(["Also from", `${second.address} – ${second.sent_24h} of ${second.limit} in the last 24 hours`]);
+      const ramp = second.ramp;
+      const rising = !ramp ? "" : ramp.held ? ` · held at ${second.limit}: ${ramp.held}`
+        : ` · rising to ${ramp.next} after ${ramp.needed - Math.min(ramp.sent, ramp.needed)} more (target ${ramp.target})`;
+      facts.push(["Also from", `${second.address} – ${second.sent_24h} of ${second.limit} in the last 24 hours${rising}`]);
     }
     facts.push(["Send window", s.window ? s.window + (s.window_open ? " · open now" : "") : "—"]);
     facts.push(["Last 24 hours", `${s.sent_24h ?? s.sent_today} of ${s.daily_limit} emails sent`]);

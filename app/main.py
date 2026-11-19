@@ -109,7 +109,8 @@ sites = SiteService(settings) if settings.PREVIEW_SITES else None
 activity = ActivityLog(settings.DATA_DIR / "activity.jsonl")
 visits = Visits(settings) if sites is not None else None
 address_check = AddressCheck(settings)     # the DNS check, then Reoon when EMAIL_VERIFY_KEY is set
-outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=address_check)
+outreach = OutreachManager(settings, sites=sites, activity=activity, visits=visits, check_domain=address_check,
+                           save_settings=lambda values: settings_editor.save(settings, values, ENV_FILE))
 site_requests = SiteRequests(settings, outreach, sites, visits) if sites is not None else None
 autopilot = Autopilot(settings, manager, outreach, activity)
 drive = DriveSync(settings)

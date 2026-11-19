@@ -100,6 +100,15 @@ OPTIONS = (
     Option("SECOND_SENDER_LIMIT", "sender", "… emails per day from it",
            "In any 24 hours, follow-ups included – part of “Emails per day”, not on top. 0: it sends nothing",
            minimum=0),
+    Option("SECOND_SENDER_TARGET", "sender", "… raise that step by step up to",
+           "The server raises the number above by itself until it gets here, a few at a time once the second "
+           "address has sent its share for a few days, and holds while its emails bounce. 0: it stays as set",
+           minimum=0),
+    Option("SECOND_SENDER_STEP", "sender", "… this many at a time", "Raised by this many at each step",
+           minimum=1),
+    Option("SECOND_SENDER_EVERY", "sender", "… after this many days' worth",
+           "A step comes once the second address has sent this many days' worth of its share since the last "
+           "one – days it sent nothing don't count", minimum=1),
     Option("SENDER_COMPANY", "sender", "Company", "{SenderCompany} – optional", "Your Company"),
     Option("SENDER_ADDRESS", "sender", "Postal address",
            "{SenderAddress}, in every email's footer – US law (CAN-SPAM) wants it", "Street, City, State ZIP",

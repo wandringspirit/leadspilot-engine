@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.29.0 – 2026-11-19
+
+### Added
+- **The second From address's share rises by itself** (`SECOND_SENDER_TARGET`, `SECOND_SENDER_STEP`,
+  `SECOND_SENDER_EVERY`; Settings › Sender): once it has sent `SECOND_SENDER_EVERY` days' worth of its share,
+  `SECOND_SENDER_LIMIT` goes up by `SECOND_SENDER_STEP` (saved to `.env`), up to the target. It holds while 2 of
+  the last 20 businesses it emailed bounced, and emails you when it passes half the daily limit - the moment
+  to move the warm-up over. The panel shows where it is going.
+
 ## 1.28.1 – 2026-11-19
 
 ### Changed

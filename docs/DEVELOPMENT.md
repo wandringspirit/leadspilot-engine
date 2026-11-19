@@ -187,6 +187,9 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `SENDER_EMAIL` | *(empty = `MAIL_USERNAME`)* | the From address |
 | `SECOND_SENDER_EMAIL` | *(empty)* | a second From address (a send-as alias of the same mailbox) that takes a few of the day's emails while it builds its name ([OUTREACH.md §6](OUTREACH.md#6-what-is-sent)) |
 | `SECOND_SENDER_LIMIT` | `0` | how many: emails from it in any 24 hours, follow-ups included – part of `OUTREACH_DAILY_LIMIT`, not on top |
+| `SECOND_SENDER_TARGET` | `0` | the server raises `SECOND_SENDER_LIMIT` step by step up to this, holding while its emails bounce; 0: it stays as set ([OUTREACH.md §6](OUTREACH.md#6-what-is-sent)) |
+| `SECOND_SENDER_STEP` | `2` | raised by this many at a time |
+| `SECOND_SENDER_EVERY` | `2` | once it has sent this many days' worth of its share (`EVERY x LIMIT` emails) since the last step |
 | `SENDER_NAME` | *(empty)* | the From name and `{SenderName}` – required to start a campaign |
 | `SENDER_COMPANY` | *(empty)* | `{SenderCompany}` |
 | `SENDER_ADDRESS` | *(empty)* | `{SenderAddress}`, your postal address – required (CAN-SPAM), it goes in every footer |

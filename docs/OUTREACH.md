@@ -241,8 +241,18 @@ email gets it from the second address while that one has had fewer than its shar
 (the lead's `sender`), so the thread never changes sender; a follow-up whose address has had its share
 waits for room. The total stays `OUTREACH_DAILY_LIMIT`. Replies to either address land in the same
 mailbox and are recognised the same way; the test copy goes out for each address's first email of the
-day, from that address. To move over to the second address later, raise its share step by step; to make
-it the main one, set it as `SENDER_EMAIL` - businesses already started keep the address they started with.
+day, from that address. To make it the main one, set it as `SENDER_EMAIL` - businesses already started
+keep the address they started with.
+
+**Moving over step by step.** With `SECOND_SENDER_TARGET` above `SECOND_SENDER_LIMIT`, the server raises the
+share by itself: once the second address has sent `SECOND_SENDER_EVERY` days' worth of its share since the
+last step (`EVERY x LIMIT` emails, follow-ups included - days it sent nothing don't count), `SECOND_SENDER_LIMIT`
+goes up by `SECOND_SENDER_STEP`, is saved to `.env` and noted in the activity log, up to the target (never
+past `OUTREACH_DAILY_LIMIT`). It holds while 2 of the last 20 businesses the second address emailed bounced
+(you get an email once) and goes on when fewer have. Passing half the daily limit, it emails you: the
+second address now sends most of the emails, so move the warm-up over to it. Where the count stands is
+in `data/sender_ramp.json` and on the Outreach tab (*Also from*); a share you set by hand starts the count
+afresh. Example: 2 of 15, target 13, step 2, every 2 - 4, 6, 8, 10, 12, 13 over about 12 sending days.
 
 **Test copy.** With `OUTREACH_TEST_COPY_TO` set to your own addresses (a Gmail, a Yahoo …), each
 day's first email also goes to them, word for word, right after it went to the business, so you can
@@ -291,7 +301,7 @@ summary twice. A problem email that can't go out (the mailbox is the problem) is
 ## 9. Settings
 
 `SMTP_HOST`, `SMTP_PORT`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_FOLDER`, `MAIL_USERNAME`,
-`MAIL_PASSWORD`, `SENDER_EMAIL`, `SECOND_SENDER_EMAIL`, `SECOND_SENDER_LIMIT`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
+`MAIL_PASSWORD`, `SENDER_EMAIL`, `SECOND_SENDER_EMAIL`, `SECOND_SENDER_LIMIT`, `SECOND_SENDER_TARGET`, `SECOND_SENDER_STEP`, `SECOND_SENDER_EVERY`, `SENDER_NAME`, `SENDER_COMPANY`, `SENDER_ADDRESS`, `ALERT_TO`,
 `OUTREACH_AUTOSEND`, `OUTREACH_TIMEZONE`, `OUTREACH_DAYS`, `OUTREACH_HOURS`,
 `OUTREACH_DAILY_LIMIT`, `OUTREACH_MIN_GAP_S`, `OUTREACH_MAX_GAP_S`, `OUTREACH_CHECK_MINUTES`,
 `OUTREACH_MIN_REVIEWS`, `OUTREACH_MIN_RATING`, `OUTREACH_TEST_COPY_TO`, `EMAIL_VERIFY_KEY`. What each one does and its default:

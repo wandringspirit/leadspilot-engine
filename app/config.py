@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     SENDER_EMAIL: str = ""                # From address; empty: MAIL_USERNAME
     SECOND_SENDER_EMAIL: str = ""         # a second From address (a send-as alias of the same mailbox) that takes
     SECOND_SENDER_LIMIT: int = 0          # this many of the day's emails (any 24 hours, follow-ups included)
+    SECOND_SENDER_TARGET: int = 0         # raise SECOND_SENDER_LIMIT step by step up to this (0: it stays put)
+    SECOND_SENDER_STEP: int = 2           # ... this many at a time,
+    SECOND_SENDER_EVERY: int = 2          # ... once it has sent this many days' worth (EVERY x LIMIT emails)
     SENDER_NAME: str = ""                 # From name and {SenderName}
     SENDER_COMPANY: str = ""              # {SenderCompany}
     SENDER_ADDRESS: str = ""              # {SenderAddress}: your postal address (US law: in every email)
