@@ -83,7 +83,7 @@
       "slug": "roof-repair",
       "icon": "hammer",
       "title": "Roof Repair",
-      "blurb": "Missing shingles, lifted flashing, a drip in the hallway. Fixed properly, not patched and forgotten.",
+      "blurb": "{{ words.repair_blurb }}",
       "photo": "https://images.unsplash.com/photo-1635424824849-1b09bdcc55b1",
       "alt": "Roofer fixing shingles with a nail gun"
     },
@@ -99,7 +99,7 @@
       "slug": "storm-damage",
       "icon": "bolt",
       "title": "Storm & Hail Damage",
-      "blurb": "Hail bruises, wind-lifted shingles, dented vents. We document everything with photos you can send to your insurer.",
+      "blurb": "{{ words.storm_blurb }}",
       "photo": "https://images.unsplash.com/photo-1791252716105-a63dbeb040d8",
       "alt": "Storm clouds over a house"
     },
@@ -136,15 +136,15 @@
     "spots": [
       {
         "key": "shingles",
-        "label": "Shingles",
+        "label": "{{ words.roof_label }}",
         "x": 34,
         "y": 31,
         "service": "roof-repair",
-        "what": "Sun, wind and age dry shingles out until they curl, crack or blow off, leaving the layer underneath open to rain.",
+        "what": "{{ words.roof_what }}",
         "signs": [
-          "Curled, cracked or missing shingles",
-          "Bald patches where the granules have worn off",
-          "Granules collecting in the gutters"
+          "{{ words.roof_sign1 }}",
+          "{{ words.roof_sign2 }}",
+          "{{ words.roof_sign3 }}"
         ],
         "side": "left"
       },
@@ -168,10 +168,10 @@
         "x": 37,
         "y": 16,
         "service": "roof-repair",
-        "what": "Without airflow, attic heat cooks shingles from underneath and pushes up cooling bills in a {{ state_name }} summer.",
+        "what": "Without airflow, {{ words.vent_heat }} and pushes up cooling bills in a {{ state_name }} summer.",
         "signs": [
-          "A very hot, stuffy attic",
-          "Shingles ageing faster on one side",
+          "{{ words.vent_sign1 }}",
+          "{{ words.vent_sign2 }}",
           "Damaged or missing ridge caps"
         ],
         "side": "left"
@@ -198,7 +198,7 @@
         "signs": [
           "Ceiling stains below where two roof slopes meet",
           "Leaves and debris piling up in the valley",
-          "Cracked or lifted shingles along the valley line"
+          "{{ words.valley_sign }}"
         ],
         "x": 45.7,
         "y": 23,
@@ -210,9 +210,9 @@
         "x": 73,
         "y": 45,
         "service": "storm-damage",
-        "what": "Hail knocks the granules off and bruises the mat underneath. It often looks minor from the ground and isn't.",
+        "what": "{{ words.hail_what }}",
         "signs": [
-          "Dark round marks on the shingles",
+          "{{ words.hail_sign1 }}",
           "Dents in vents, gutters or downspouts",
           "A storm in the last few months"
         ],
@@ -269,7 +269,7 @@
       {
         "icon": "broom",
         "title": "Clean site, every time",
-        "text": "Nails, scraps and old shingles cleared before we leave. Your yard stays your yard."
+        "text": "{{ words.cleanup }}"
       }
     ]
   },
@@ -277,7 +277,7 @@
     {
       "src": "https://images.unsplash.com/photo-1710139323182-69622cad5c3b",
       "alt": "Homes with new architectural shingle roofs",
-      "tag": "Architectural shingles"
+      "tag": "{{ words.tag_new }}"
     },
     {
       "src": "https://images.unsplash.com/photo-1786550860403-4a58f184643e",
@@ -292,7 +292,7 @@
     {
       "src": "https://images.unsplash.com/photo-1727777266423-6a33048e4894",
       "alt": "Close-up of new shingle rows",
-      "tag": "Shingle detail"
+      "tag": "{{ words.tag_detail }}"
     },
     {
       "src": "https://images.unsplash.com/photo-1634750009079-6bf7bede038b",
@@ -319,8 +319,8 @@
       "a": "Most homes take one to two days once the materials arrive. Bigger or more complex roofs can take longer, and we'll give you a timeline with your quote."
     },
     {
-      "q": "How long does a shingle roof last in {{ state_name }}?",
-      "a": "Usually somewhere between 15 and 25 years, depending on the shingles, how well the attic is ventilated, and how many storms it has taken."
+      "q": "How long does {{ words.roof_kind }} last in {{ state_name }}?",
+      "a": "{{ words.life }}"
     },
     {
       "q": "My roof is leaking right now. What should I do?",
@@ -374,5 +374,67 @@
     "Roofing",
     "Roofers",
     "Roof"
-  ]
+  ],
+  "words": {
+    "default": {
+      "repair_blurb": "Missing shingles, lifted flashing, a drip in the hallway. Fixed properly, not patched and forgotten.",
+      "storm_blurb": "Hail bruises, wind-lifted shingles, dented vents. We document everything with photos you can send to your insurer.",
+      "roof_label": "Shingles",
+      "roof_what": "Sun, wind and age dry shingles out until they curl, crack or blow off, leaving the layer underneath open to rain.",
+      "roof_sign1": "Curled, cracked or missing shingles",
+      "roof_sign2": "Bald patches where the granules have worn off",
+      "roof_sign3": "Granules collecting in the gutters",
+      "valley_sign": "Cracked or lifted shingles along the valley line",
+      "vent_heat": "attic heat cooks shingles from underneath",
+      "vent_sign1": "A very hot, stuffy attic",
+      "vent_sign2": "Shingles ageing faster on one side",
+      "hail_what": "Hail knocks the granules off and bruises the mat underneath. It often looks minor from the ground and isn't.",
+      "hail_sign1": "Dark round marks on the shingles",
+      "cleanup": "Nails, scraps and old shingles cleared before we leave. Your yard stays your yard.",
+      "roof_kind": "a shingle roof",
+      "tag_new": "Architectural shingles",
+      "tag_detail": "Shingle detail",
+      "life": "Usually somewhere between 15 and 25 years, depending on the shingles, how well the attic is ventilated, and how many storms it has taken."
+    },
+    "AU": {
+      "repair_blurb": "Cracked or slipped tiles, lifted flashing, a drip in the hallway. Fixed properly, not patched and forgotten.",
+      "storm_blurb": "Hail-cracked tiles, wind-lifted sheets, dented flashing. We document everything with photos you can send to your insurer.",
+      "roof_label": "Tiles & sheets",
+      "roof_what": "Sun, wind and age crack tiles, wear out their bedding and loosen metal sheets, leaving the layer underneath open to rain.",
+      "roof_sign1": "Cracked, slipped or missing tiles",
+      "roof_sign2": "Rust spots or lifted screws on metal sheets",
+      "roof_sign3": "Tile chips or rust flakes in the gutters",
+      "valley_sign": "Cracked or lifted tiles along the valley line",
+      "vent_heat": "heat trapped in the roof space ages the roof from underneath",
+      "vent_sign1": "A very hot, stuffy roof space",
+      "vent_sign2": "Tiles or sheets ageing faster on one side",
+      "hail_what": "Hail cracks tiles and dents metal sheets and flashing. It often looks minor from the ground and isn't.",
+      "hail_sign1": "Cracked tiles or round dents in the sheets",
+      "cleanup": "Screws, offcuts and broken tiles cleared before we leave. Your yard stays your yard.",
+      "roof_kind": "a roof",
+      "tag_new": "New roofs",
+      "tag_detail": "Roof detail",
+      "life": "Tiles often last 50 years or more and a metal roof for decades too, but the bedding, pointing, flashing and fixings need attention much sooner, depending on how many storms the roof has taken."
+    },
+    "NZ": {
+      "repair_blurb": "Cracked or slipped tiles, lifted flashing, a drip in the hallway. Fixed properly, not patched and forgotten.",
+      "storm_blurb": "Hail-cracked tiles, wind-lifted sheets, dented flashing. We document everything with photos you can send to your insurer.",
+      "roof_label": "Tiles & sheets",
+      "roof_what": "Sun, wind and age crack tiles, wear out their bedding and loosen metal sheets, leaving the layer underneath open to rain.",
+      "roof_sign1": "Cracked, slipped or missing tiles",
+      "roof_sign2": "Rust spots or lifted screws on metal sheets",
+      "roof_sign3": "Tile chips or rust flakes in the gutters",
+      "valley_sign": "Cracked or lifted tiles along the valley line",
+      "vent_heat": "heat trapped in the roof space ages the roof from underneath",
+      "vent_sign1": "A very hot, stuffy roof space",
+      "vent_sign2": "Tiles or sheets ageing faster on one side",
+      "hail_what": "Hail cracks tiles and dents metal sheets and flashing. It often looks minor from the ground and isn't.",
+      "hail_sign1": "Cracked tiles or round dents in the sheets",
+      "cleanup": "Screws, offcuts and broken tiles cleared before we leave. Your yard stays your yard.",
+      "roof_kind": "a roof",
+      "tag_new": "New roofs",
+      "tag_detail": "Roof detail",
+      "life": "Tiles often last 50 years or more and a metal roof for decades too, but the bedding, pointing, flashing and fixings need attention much sooner, depending on how many storms the roof has taken."
+    }
+  }
 }

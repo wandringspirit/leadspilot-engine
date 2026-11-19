@@ -129,7 +129,10 @@ A business that already has a website (the same Google place or email) keeps its
 address writes it (`Geelong, VIC`; New Zealand has none), the call button dials the number's
 international form (`+61 3 5222 1234`, not a US `+1`), photos made for a US state never show, and a
 pack's `"units"` words switch from `"us"` to `"metric"` - the plumber's drip calculator counts litres
-(189 a year per drip a minute, 65 a shower) and still names its source, the US EPA. There is no town
+(189 a year per drip a minute, 65 a shower) and still names its source, the US EPA. A pack's `"words"`
+differ by country (`"default"`, then the country's own): Australian and New Zealand roofer sites speak of
+tiles, metal sheets and the roof space, not shingles and the attic - the photos' descriptions still say
+what the photos show, and US and Canadian sites are unchanged. There is no town
 list outside the US, so the service-area map shows the business's own town. Quebec is left out of the
 autopilot's places (French-speaking).
 

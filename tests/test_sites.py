@@ -161,6 +161,22 @@ def test_a_plumber_in_australia_gets_litres_its_state_and_a_dialable_number(site
     assert "Washington" not in page
 
 
+def test_a_roofer_in_australia_gets_tiles_and_roof_space_not_shingles(sites_dir):
+    trade, pack = trade_pack("Roofer")
+    manifest: dict = {}
+    row = roofer_row(name="Geelong Roofing Pty Ltd", email="geelongroof@gmail.com", place_id="p-geelong-roof",
+                     city="Geelong", state="Victoria", country="AU", latitude=-38.15, longitude=144.36,
+                     phone="(03) 5222 1234", phone_unformatted="+61352221234")
+    slug, why = build_site(row, searched_city("Geelong, VIC, Australia", [row]), pack, trade, manifest, sites_dir)
+    page = (sites_dir / slug / "index.html").read_text(encoding="utf-8")
+    assert why == "" and "Cracked or slipped tiles" in page and "roof space" in page
+    assert not re.findall(r">[^<]*shingle[^<]*<", page, re.I), "only the photos' descriptions may say shingles"
+    us_slug, _ = build_site(roofer_row(name="Bayou Roofing", place_id="p-bayou-roof", email="bayouroof@gmail.com"),
+                            searched_city("Houston", [{"state": "Texas"}]), pack, trade, manifest, sites_dir)
+    us = (sites_dir / us_slug / "index.html").read_text(encoding="utf-8")
+    assert "Curled, cracked or missing shingles" in us and "How long does a shingle roof last in Texas?" in us
+
+
 def test_a_plumber_in_the_us_still_gets_gallons(sites_dir):
     trade, pack = trade_pack("Plumber")
     manifest: dict = {}

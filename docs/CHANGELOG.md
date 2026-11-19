@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.28.1 – 2026-11-19
+
+### Changed
+- **Roofer websites in Australia and New Zealand** speak of tiles, metal sheets and the roof space instead of
+  shingles and the attic (a pack's `"words"` by country); US and Canadian sites are unchanged, word for word.
+
 ## 1.28.0 – 2026-11-19
 
 ### Added

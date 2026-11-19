@@ -193,8 +193,11 @@ def context(pack: dict, lead: dict, *, variant: int | None, preview: bool, ends:
     names = {"US": STATES, "CA": CA_PROVINCES, "AU": AU_STATES}.get(country, {})
     # a pack's words that differ by country: gallons in the US, litres elsewhere ("units": {"us", "metric"})
     units = pack.get("units", {}).get("us" if country == "US" else "metric", {})
+    # ... and words that differ by country: the roofer's shingles and attic are tiles and roof space in
+    # Australia and New Zealand ("words": {"default": {...}, "AU": {...}})
+    words = {**pack.get("words", {}).get("default", {}), **pack.get("words", {}).get(country, {})}
     base = {"business": business, "city": lead["city"], "state": state,
-            "state_name": names.get(state, state or lead["city"]), "units": units}
+            "state_name": names.get(state, state or lead["city"]), "units": units, "words": words}
     seed = int(hashlib.md5(f"{business}|{lead['city']}".lower().encode()).hexdigest(), 16)
     pick = (lambda items, shift: items[(variant if variant is not None else seed >> shift) % len(items)])
     # the number to dial: its international form when the search had it ("+61352221234")
