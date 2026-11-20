@@ -198,6 +198,9 @@ one is in the Settings tab (`OPTIONS` in `app/settings_editor.py`).
 | `OUTREACH_DAYS` | `mon-fri` | days emails go out, the business's days: `mon-fri`, `mon,wed,fri`, `mon-sat` … |
 | `OUTREACH_HOURS` | `8-12` | hours emails go out, the business's time: `8-12` = 08:00 until 11:59 |
 | `OUTREACH_DAILY_LIMIT` | `30` | emails in any 24 hours, all campaigns and follow-ups together |
+| `OUTREACH_DAILY_TARGET` | `0` | the server raises `OUTREACH_DAILY_LIMIT` step by step up to this, holding while emails bounce or businesses opt out; 0: it stays as set ([OUTREACH.md §6](OUTREACH.md#6-what-is-sent)) |
+| `OUTREACH_DAILY_STEP` | `5` | raised by this many at a time |
+| `OUTREACH_DAILY_EVERY` | `5` | once this many days' worth of emails (`EVERY x LIMIT`) went out since the last step |
 | `OUTREACH_SPREAD` | `true` | spread those emails over the evening's send windows still to come (each time zone opens an hour after the last) instead of sending them all in the first |
 | `OUTREACH_MIN_GAP_S` / `OUTREACH_MAX_GAP_S` | `90` / `240` | random pause between two emails |
 | `OUTREACH_CHECK_MINUTES` | `10` | how often the inbox is checked in the send window (hourly outside it; always right before an email) |

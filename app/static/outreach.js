@@ -255,7 +255,10 @@
       facts.push(["Also from", `${second.address} – ${second.sent_24h} of ${second.limit} in the last 24 hours${rising}`]);
     }
     facts.push(["Send window", s.window ? s.window + (s.window_open ? " · open now" : "") : "—"]);
-    facts.push(["Last 24 hours", `${s.sent_24h ?? s.sent_today} of ${s.daily_limit} emails sent`]);
+    const daily = s.daily_ramp;
+    const dailyRising = !daily ? "" : daily.held ? ` · held at ${s.daily_limit}: ${daily.held}`
+      : ` · rising to ${daily.next} after ${daily.needed - Math.min(daily.sent, daily.needed)} more (target ${daily.target})`;
+    facts.push(["Last 24 hours", `${s.sent_24h ?? s.sent_today} of ${s.daily_limit} emails sent${dailyRising}`]);
     facts.push(["Next email", !s.autosend ? "— (sending is off)" : s.next_send_at ? when(s.next_send_at)
       : s.running ? "nothing due" : "no campaign sending"]);
     const check = s.last_check;

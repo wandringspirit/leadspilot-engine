@@ -19,7 +19,7 @@ from app.outreach.mailbox import (MailAuthError, MailError, MailboxMessage, Reci
                                   parse_headers)
 from app.outreach.manager import OutreachError, OutreachManager, steps_problems
 from app.outreach.models import (InboundEmail, BusinessTypeCreate, BusinessTypeUpdate, Campaign, CampaignCreate, CampaignStatus,
-                                 CampaignUpdate, Lead, LeadStatus, LeadUpdate, SendTestRequest, Step)
+                                 CampaignUpdate, Lead, LeadStatus, LeadUpdate, SendTestRequest, SentEmail, Step)
 from app.outreach.schedule import SendWindow, WindowError, day_label, days_label, parse_days, parse_hours
 from app.outreach.templates import (compose, display_name, missing_fields, render, required_fields,
                                     template_errors)
@@ -509,7 +509,7 @@ def test_the_second_address_share_holds_while_its_emails_bounce(tmp_path):
     run(manager.tick())
     assert manager.cfg.SECOND_SENDER_LIMIT == 3
     ramp = manager.status()["second_sender"]["ramp"]
-    assert ramp["held"] == "2 of its last 20 businesses bounced"
+    assert ramp["held"] == "2 of the last 20 businesses bounced"
     assert [m["Subject"] for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")] == \
         ["[Leads Pilot] me@reach.mysender.com stays at 3 emails a day"]
     run(manager.tick())                                             # told once, not every round
@@ -519,6 +519,40 @@ def test_the_second_address_share_holds_while_its_emails_bounce(tmp_path):
         lead.sent.extend(lead.sent)                                 # 6 emails at a share of 3 = 2 days' worth
     run(manager.tick())
     assert manager.cfg.SECOND_SENDER_LIMIT == 5
+
+
+def test_the_emails_a_day_rise_step_by_step_up_to_their_target(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    saved = []
+    manager, mailbox, campaign, _ = started(tmp_path, clock, OUTREACH_DAILY_LIMIT=1, OUTREACH_DAILY_TARGET=3,
+                                            OUTREACH_DAILY_STEP=1, OUTREACH_DAILY_EVERY=1)
+    manager.save_settings = saved.append
+    assert manager.status()["daily_ramp"] == {"target": 3, "next": 2, "sent": 0, "needed": 1, "held": ""}
+    for _ in range(4):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    # 1 sent at 1 a day -> 2; 2 more sent at 2 -> 3, the target; the three businesses all emailed the same day
+    assert saved == [{"OUTREACH_DAILY_LIMIT": 2}, {"OUTREACH_DAILY_LIMIT": 3}]
+    assert manager.cfg.OUTREACH_DAILY_LIMIT == 3 and manager.status()["daily_ramp"] is None
+    assert all(lead.sent for lead in campaign.leads)
+    alerts = [m["Subject"] for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")]
+    assert alerts == ["[Leads Pilot] Now 2 emails a day", "[Leads Pilot] Now 3 emails a day"]
+
+
+def test_the_emails_a_day_hold_while_businesses_opt_out(tmp_path):
+    clock = Clock(TUESDAY_9AM)
+    manager, mailbox, campaign, _ = started(tmp_path, clock, OUTREACH_DAILY_LIMIT=3, OUTREACH_DAILY_TARGET=10,
+                                            OUTREACH_DAILY_EVERY=1)
+    campaign.leads[0].status = campaign.leads[1].status = LeadStatus.UNSUBSCRIBED
+    for lead in campaign.leads[:2]:
+        lead.sent.append(SentEmail(step=1, sent_at=clock.now, message_id="<x@mysender.com>", subject="s"))
+    for _ in range(2):
+        run(manager.tick())
+        clock.advance(seconds=61)
+    assert manager.cfg.OUTREACH_DAILY_LIMIT == 3
+    assert manager.status()["daily_ramp"]["held"] == "2 of the last 20 businesses asked not to be emailed"
+    assert [m["Subject"] for m in mailbox.sent if m["Subject"].startswith("[Leads Pilot]")] == \
+        ["[Leads Pilot] Emails stay at 3 a day"]
 
 
 def test_a_full_second_address_holds_its_follow_ups_and_new_businesses_go_from_the_main_one(tmp_path):

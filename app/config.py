@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     OUTREACH_DAYS: str = "mon-fri"        # days emails go out, in each business's own time zone
     OUTREACH_HOURS: str = "8-12"          # hours emails go out, e.g. 8-12 = 08:00 to 11:59
     OUTREACH_DAILY_LIMIT: int = 30        # emails in any 24 hours, all campaigns and follow-ups together
+    OUTREACH_DAILY_TARGET: int = 0        # raise OUTREACH_DAILY_LIMIT step by step up to this (0: it stays put)
+    OUTREACH_DAILY_STEP: int = 5          # ... this many at a time,
+    OUTREACH_DAILY_EVERY: int = 5         # ... once this many days' worth went out (EVERY x LIMIT emails)
     OUTREACH_SPREAD: bool = True          # spread the emails over the evening's send windows (one zone after another)
     OUTREACH_MIN_GAP_S: int = 90          # random pause between two emails: at least ...
     OUTREACH_MAX_GAP_S: int = 240         # ... and at most this many seconds

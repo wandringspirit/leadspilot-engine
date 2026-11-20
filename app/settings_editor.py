@@ -126,6 +126,14 @@ OPTIONS = (
     Option("OUTREACH_HOURS", "sending", "Hours", "Their time – e.g. 8-12 = from 08:00 to 11:59", "8-12"),
     Option("OUTREACH_DAILY_LIMIT", "sending", "Emails per day",
            "In any 24 hours – all campaigns and follow-ups together", minimum=1),
+    Option("OUTREACH_DAILY_TARGET", "sending", "… raise that step by step up to",
+           "The server raises Emails per day by itself until it gets here, a few at a time once that many have "
+           "gone out for a few days, and holds while emails bounce or businesses opt out. 0: it stays as set",
+           minimum=0),
+    Option("OUTREACH_DAILY_STEP", "sending", "… this many at a time", "Raised by this many at each step", minimum=1),
+    Option("OUTREACH_DAILY_EVERY", "sending", "… after this many days' worth",
+           "A step comes once this many days' worth of emails went out since the last one – days nothing went "
+           "out don't count", minimum=1),
     Option("OUTREACH_SPREAD", "sending", "Spread the emails over the evening",
            "The emails a day allows go out spread over the send windows still to come (each time zone opens an "
            "hour after the last), not all in the first; off: only the pause below"),

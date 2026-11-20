@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The version lives in
 `app/__init__.py`; `tests/test_docs.py` requires an entry for the current version.
 
+## 1.30.0 – 2026-11-20
+
+### Added
+- **The emails a day rise by themselves** (`OUTREACH_DAILY_TARGET`, `OUTREACH_DAILY_STEP`, `OUTREACH_DAILY_EVERY`;
+  Settings › Sending): once `OUTREACH_DAILY_EVERY` days' worth of emails went out, `OUTREACH_DAILY_LIMIT` goes up
+  by `OUTREACH_DAILY_STEP` (saved to `.env`, and you get an email: check where the next test copies land), up to
+  the target. The panel shows where it is going.
+
+### Changed
+- Both step-by-step raises (the emails a day, the second address's share) also hold while 2 of the last 20
+  businesses asked not to be emailed again, not only when they bounced.
+
 ## 1.29.0 – 2026-11-19
 
 ### Added
